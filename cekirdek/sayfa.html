@@ -1,0 +1,113 @@
+<div class="duzen" id="duzen">
+  <div class="sahne" id="sahne">
+    <canvas id="tuval" width="720" height="1280" aria-label="Halay sahnesi"></canvas>
+    <div class="hud">
+      <div class="hud-ust">
+        <div class="logo">Mendil <b>Kimde?</b></div>
+        <div class="nasil">
+          <span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h12v8H7l-3 3v-3H2z" fill="#22b8a7"/></svg>Yorum: halaya gir</span>
+          <span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 14S2 10 2 6a3 3 0 0 1 6-1 3 3 0 0 1 6 1c0 4-6 8-6 8z" fill="#e23d2f"/></svg>Beğeni: tempo</span>
+          <span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 6h12v8H2zM1 4h14v3H1zM7 4h2v10H7z" fill="#ffd166"/></svg>Hediye: mendil</span>
+        </div>
+      </div>
+      <div class="sira"><h2>Halay sırası</h2><ol id="sira-liste"></ol></div>
+      <div class="cosku"><h2>Coşku</h2><div class="cubuk"><div class="dolu" id="cosku-dolu"></div></div><div class="bilgi" id="cosku-bilgi"></div></div>
+      <div class="bildirim" id="bildirim"></div>
+      <div id="pankart-yeri"></div>
+      <button class="ses-cagri" id="ses-cagri" type="button">Davul zurnayı başlat</button>
+      <button class="cik-yayin" id="cik-yayin" type="button">Paneli göster</button>
+    </div>
+  </div>
+
+  <div class="panel" id="panel">
+    <div>
+      <h1>Deneme paneli</h1>
+      <p class="not" id="panel-not">Yayın bağlı değil. Buradaki yorum, beğeni ve hediyelerin hepsi sahte izleyiciden gelir. Sahne, yayında izleyicinin göreceği görüntüdür.</p>
+    </div>
+
+    <div class="bolum">
+      <h2>Sahte izleyici</h2>
+      <div class="alan">
+        <label for="sahte-ad">İzleyici adı (boş bırakırsan rastgele biri gelir)</label>
+        <input type="text" id="sahte-ad" maxlength="18" placeholder="örn. kendi adın" autocomplete="off">
+      </div>
+      <div class="satir">
+        <button class="dugme" id="s-yorum" type="button">Yorum yaz<small>halaya girer</small></button>
+        <button class="dugme" id="s-begeni" type="button">15 beğeni<small>coşku artar</small></button>
+        <button class="dugme" id="s-takip" type="button">Takip et<small>halaya girer</small></button>
+      </div>
+      <span class="etiket">Hediye gönder</span>
+      <div class="hediyeler" id="hediyeler"></div>
+      <div class="satir">
+        <button class="dugme secili" id="oto" type="button" aria-pressed="true">Otomatik izleyici: açık</button>
+        <span class="etiket">Kalabalık</span>
+        <span class="satir" id="hiz-sec" role="group" aria-label="Kalabalık hızı"></span>
+      </div>
+      <div class="satir">
+        <button class="dugme" id="bosalt" type="button">Meydanı boşalt</button>
+        <button class="dugme" id="yayin-gor" type="button">Yalnızca sahneyi göster</button>
+      </div>
+    </div>
+
+    <div class="bolum">
+      <h2>Müzik</h2>
+      <div class="satir">
+        <button class="dugme ana" id="ses-dugme" type="button">Sesi aç</button>
+        <input type="range" id="ses-duzey" min="0" max="100" value="86" aria-label="Ses düzeyi">
+      </div>
+      <div class="satir" id="hava-sec" role="group" aria-label="Hava seçimi"></div>
+      <div class="satir"><button class="dugme secili" id="sirayla" type="button" aria-pressed="true">Havaları sırayla çal: açık</button></div>
+      <div class="alan" id="hazir-kutu" hidden>
+        <span class="etiket">Parçalar (muzik klasöründen; sırayla çalar)</span>
+        <div class="satir" id="parca-sec" role="group" aria-label="Parça seçimi"></div>
+      </div>
+    </div>
+
+    <div class="bolum">
+      <h2>Gelen olaylar</h2>
+      <ul class="gunluk" id="gunluk" aria-live="off"></ul>
+    </div>
+
+    <div class="bolum">
+      <h2>Yayın ayarları</h2>
+      <div class="satir"><button class="dugme secili" id="balon-dugme" type="button" aria-pressed="true">Yorum balonları: açık</button></div>
+      <div class="alan">
+        <label for="yasak">Balonlarda ve adlarda gizlenecek kelimeler (virgülle ayır)</label>
+        <input type="text" id="yasak" autocomplete="off" spellcheck="false" placeholder="örn. kelime1, kelime2">
+      </div>
+      <p class="aciklama">Bağlantı adresleri ve telefon numarası gibi uzun rakam dizileri balonlarda kendiliğinden gizlenir.</p>
+    </div>
+
+    <div class="bolum">
+      <h2>Gerçek yayın bağlantısı</h2>
+      <div class="satir"><span class="rozet" id="bag-rozet">Bağlı değil</span></div>
+      <p class="aciklama">TikTok, canlı yayındaki yorum ve hediyeleri okumak için resmi bir açık API sunmuyor. Oyun bu yüzden TikTok'a doğrudan değil, bilgisayarında çalışan köprü programına bağlanır. Paketteki köprüyü çalıştırınca açılan sayfa kendiliğinden bağlanır. Köprü yayını yalnızca okur; şifre ya da hesap girişi istemez.</p>
+      <div class="satir">
+        <div class="alan">
+          <label for="bag-adres">Köprü adresi</label>
+          <input type="text" id="bag-adres" placeholder="ws://localhost:PORT" autocomplete="off" spellcheck="false">
+        </div>
+        <button class="dugme" id="bag-dugme" type="button">Bağlan</button>
+      </div>
+      <p class="aciklama" id="bag-ileti"></p>
+      <table>
+        <tr><th>Hediye değeri</th><th>Sahnede olan</th></tr>
+        <tr><td>1+ jeton</td><td>Gönderen zıplar</td></tr>
+        <tr><td>10+ jeton</td><td>Herkes omuz titretir</td></tr>
+        <tr><td>50+ jeton</td><td>Herkes çöker, kalkar</td></tr>
+        <tr><td>200+ jeton</td><td>Davulcu coşar, tempo fırlar</td></tr>
+        <tr><td>1000+ jeton</td><td>Gönderen ortaya çıkar, tek başına oynar</td></tr>
+      </table>
+      <details>
+        <summary>Köprünün göndermesi gereken ileti biçimi</summary>
+        <pre>{"event":"chat","data":{"uniqueId":"ayse","nickname":"Ayşe","comment":"halay!"}}
+{"event":"gift","data":{"uniqueId":"ayse","nickname":"Ayşe","diamondCount":5,"repeatCount":3,"giftType":1,"repeatEnd":true}}
+{"event":"like","data":{"uniqueId":"ayse","nickname":"Ayşe","likeCount":15}}
+{"event":"follow","data":{"uniqueId":"ayse","nickname":"Ayşe"}}
+
+ya da doğrudan sayfadan:
+MendilKimde.olay({tip:"hediye", kullanici:{id:"ayse", ad:"Ayşe"}, jeton:50})</pre>
+      </details>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,25 @@
+{
+  "name": "tiktok-oyun-fabrikasi",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Mendil Kimde? — TikTok canlı yayınları için dikey, etkileşimli halay oyunu: yorum yazan halaya girer, en çok hediye atan halay başı olur.",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "basla": "node kopru.js",
+    "deneme": "node kopru.js --deneme --ac",
+    "derle": "node araclar/derle.js",
+    "test": "node araclar/derle.js --denetle && node test/oyun.test.js && node test/kopru.test.js",
+    "test:oyun": "node test/oyun.test.js",
+    "test:kopru": "node test/kopru.test.js",
+    "ekran": "node test/ekran-goruntusu.js"
+  },
+  "dependencies": {
+    "tiktok-live-connector": "^2.5.0"
+  },
+  "devDependencies": {
+    "playwright": "^1.49.0"
+  }
+}

@@ -1,0 +1,8 @@
+node_modules/
+test/cikti/
+dist/
+# Kendi muzik parcalarin depoya girmez: haklari sende kalir (docs/MUZIK.md).
+muzik/
+*.log
+.DS_Store
+Thumbs.db

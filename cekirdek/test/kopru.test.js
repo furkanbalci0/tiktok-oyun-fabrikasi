@@ -1,0 +1,114 @@
+// Köprü testleri: ileti çevirisi, deneme kipi, kopma / yeniden bağlanma, sıralamayı saklama,
+// kütüphanenin eski ve yeni sürümünün TAKLİTLERİYLE uçtan uca akış. Çalıştırma: npm run test:kopru
+// Bu testler TikTok'a HİÇ bağlanmaz: gerçek kütüphane yerine geçici klasörlerdeki taklitler kullanılır.
+'use strict';
+const { spawn } = require('child_process'); const fs = require('fs'), os = require('os'), path = require('path'), http = require('http');
+const { KOK, CIKTI, tarayici, raporla, kontrolcu } = require('./ortak');
+const { sonuc, kontrol } = kontrolcu();
+const S = CIKTI, GECICI = fs.mkdtempSync(path.join(os.tmpdir(), 'mendil-kopru-')); // depo dışı: gerçek node_modules görünmesin
+const bekle = ms => new Promise(r => setTimeout(r, ms));
+const al = url => new Promise((res, rej) => http.get(url, r => { let d = ''; r.on('data', c => d += c); r.on('end', () => res({ kod: r.statusCode, govde: d })); }).on('error', rej));
+function baslat(klasor, args) { const c = spawn(process.execPath, ['kopru.js', ...args], { cwd: klasor }); c.cikti = ''; c.stdout.on('data', d => c.cikti += d); c.stderr.on('data', d => c.cikti += d); return c; }
+
+(async () => {
+  // ---- 1. çeviri birim testleri
+  const { cevir } = require(path.join(KOK, 'kopru.js'));
+  const v1 = { uniqueId: 'ayse', nickname: 'Ayşe', userId: '6813181309701718022' };
+  kontrol('Köprü: eski sürüm yorum', JSON.stringify(cevir('chat', { ...v1, comment: 'halay!' })) === JSON.stringify({ tip: 'yorum', kullanici: { id: 'ayse', ad: 'Ayşe' }, metin: 'halay!' }));
+  kontrol('Köprü: eski sürüm seri hediye sürerken yok sayılır', cevir('gift', { ...v1, giftType: 1, repeatEnd: false, repeatCount: 2, diamondCount: 5 }) === null);
+  const g1 = cevir('gift', { ...v1, giftType: 1, repeatEnd: true, repeatCount: 3, diamondCount: 5 });
+  kontrol('Köprü: eski sürüm seri bitince 5×3 sayılır', g1.jeton === 5 && g1.adet === 3, g1);
+  const g2 = cevir('gift', { ...v1, giftType: 2, repeatCount: 1, diamondCount: 29999 });
+  kontrol('Köprü: tek seferlik büyük hediye', g2.jeton === 29999 && g2.adet === 1, g2);
+  const v2u = { user: { uniqueId: 'memo', nickname: 'Memo', userId: 6813181309701718022n } };
+  const c2 = cevir('chat', { ...v2u, comment: 'selam' });
+  kontrol('Köprü: yeni sürüm iç içe kullanıcı, büyük sayılı kimlik', c2.kullanici.id === 'memo' && c2.metin === 'selam' && JSON.stringify(c2).length > 0, c2);
+  kontrol('Köprü: yeni sürüm seri (sayı olarak 0/1)', cevir('gift', { ...v2u, giftDetails: { giftType: 1, diamondCount: 10 }, repeatCount: 4, repeatEnd: 0 }) === null && cevir('gift', { ...v2u, giftDetails: { giftType: 1, diamondCount: 10 }, repeatCount: 4, repeatEnd: 1 }).jeton === 10);
+  kontrol('Köprü: beğeni sayısı ve büyük sayı', cevir('like', { ...v1, likeCount: 15 }).adet === 15 && cevir('like', { ...v2u, likeCount: 15n }).adet === 15);
+  kontrol('Köprü: kimliksiz ya da bozuk veri yok sayılır', cevir('chat', {}) === null && cevir('gift', null) === null && cevir('bilinmeyen', v1) === null);
+  kontrol('Köprü: yalnız takma adı olan kullanıcı', cevir('follow', { nickname: 'Sadece Ad' }).kullanici.id === 'Sadece Ad');
+
+  const b = await tarayici();
+  const hatalar = [];
+  const sayfaAc = async (ctx, url) => { const p = await ctx.newPage(); await p.addInitScript(() => { window.MENDIL_MUZIK_KAPALI = true; }); p.on('pageerror', e => hatalar.push(e.message)); p.on('console', m => { if (m.type() === 'error' && !/ERR_TUNNEL|Failed to load resource|WebSocket connection/.test(m.text())) hatalar.push(m.text()); }); await p.goto(url); return p; };
+
+  // ---- 2. deneme kipi uçtan uca
+  let k = baslat(KOK, ['--deneme', '--port', '8791']); await bekle(900);
+  const ctx = await b.newContext({ viewport: { width: 1280, height: 800 } });
+  let p = await sayfaAc(ctx, 'http://127.0.0.1:8791/'); await bekle(7000);
+  let d = await p.evaluate(() => ({ ...MendilKimde.durum(), rozet: document.getElementById('bag-rozet').textContent, ileti: document.getElementById('bag-ileti').textContent, oto: document.getElementById('oto').textContent, not: document.getElementById('panel-not').textContent, adres: document.getElementById('bag-adres').value }));
+  kontrol('Köprüden açılan sayfa kendiliğinden bağlanır', d.bagli && d.rozet === 'Bağlı' && d.adres === 'ws://127.0.0.1:8791/olay', { rozet: d.rozet, adres: d.adres, ileti: d.ileti });
+  kontrol('Köprüden gelen olaylar oyuna işlenir', d.alinan > 8 && d.kisi >= 3, { alinan: d.alinan, kisi: d.kisi });
+  kontrol('Gerçek yayın kipinde sahte izleyici kapalı ve sahte ad yok', /kapalı/.test(d.oto) && d.sira.every(x => x[0].startsWith('D. ')), { oto: d.oto, adlar: d.sira.map(x => x[0]) });
+  kontrol('Süren seri sayılmadı: jetonlar 15\'in katı', d.sira.every(x => x[1] % 15 === 0) && d.sira.some(x => x[1] >= 15), d.sira.map(x => x[1]));
+  const dr = JSON.parse((await al('http://127.0.0.1:8791/durum')).govde);
+  kontrol('Köprü durum adresi çalışır', dr.bagliSayfa === 1 && dr.sayac.yorum > 0 && dr.sayac.hediye > 0, dr);
+  kontrol('Köprü bilinmeyen adrese 404 döner', (await al('http://127.0.0.1:8791/../../etc/passwd')).kod === 404 && (await al('http://127.0.0.1:8791/kopru.js')).kod === 404);
+  // isteğe bağlı müzik klasörü: yalnız düz adlı .js ve ses dosyaları, yalnız muzik/ içinden
+  const muzikKlasor = path.join(KOK, 'muzik'), klasorVardi = fs.existsSync(muzikKlasor), denemeDosya = path.join(muzikKlasor, '_kopru-test.js');
+  fs.mkdirSync(muzikKlasor, { recursive: true }); fs.writeFileSync(denemeDosya, '0123456789');
+  const ham = (yol, baslik) => new Promise((res, rej) => http.get({ host: '127.0.0.1', port: 8791, path: yol, headers: baslik || {} }, r => { let g = ''; r.on('data', c => g += c); r.on('end', () => res({ kod: r.statusCode, govde: g, aralik: r.headers['content-range'] })); }).on('error', rej));
+  const mz = { tam: await ham('/muzik/_kopru-test.js'), parca: await ham('/muzik/_kopru-test.js', { range: 'bytes=2-5' }), son: await ham('/muzik/_kopru-test.js', { range: 'bytes=-3' }), tasan: await ham('/muzik/_kopru-test.js', { range: 'bytes=50-60' }),
+    disari: [await ham('/muzik/../kopru.js'), await ham('/muzik/..%2Fkopru.js'), await ham('/muzik/%2e%2e/kopru.js'), await ham('/muzik/..\\kopru.js'), await ham('/muzik/alt/_kopru-test.js'), await ham('/muzik/_kopru-test.html'), await ham('/muzik/yok.mp3'), await ham('/muzik/')] };
+  fs.unlinkSync(denemeDosya); if (!klasorVardi) fs.rmdirSync(muzikKlasor);
+  kontrol('Köprü müzik klasöründeki dosyayı sunar, aralık isteğini karşılar', mz.tam.kod === 200 && mz.tam.govde === '0123456789' && mz.parca.kod === 206 && mz.parca.govde === '2345' && mz.parca.aralik === 'bytes 2-5/10' && mz.son.govde === '789' && mz.tasan.kod === 416, { tam: mz.tam.kod, parca: mz.parca, son: mz.son.govde, tasan: mz.tasan.kod });
+  kontrol('Köprü müzik adresinden klasör dışına ya da başka türde dosyaya çıkılmaz', mz.disari.every(x => x.kod === 404), mz.disari.map(x => x.kod));
+  await p.locator('#sahne').screenshot({ path: S + '/k-deneme.png' });
+  // ---- 3. köprü kapanıp açılınca
+  k.kill('SIGKILL'); await bekle(2500);
+  d = await p.evaluate(() => ({ bagli: MendilKimde.durum().bagli, rozet: document.getElementById('bag-rozet').textContent, ileti: document.getElementById('bag-ileti').textContent, kisi: MendilKimde.durum().kisi }));
+  kontrol('Köprü kapanınca oyun durmaz, durumu bildirir', !d.bagli && /koptu/.test(d.ileti) && d.kisi >= 3, d);
+  const onceAlinan = await p.evaluate(() => MendilKimde.durum().alinan);
+  k = baslat(KOK, ['--deneme', '--port', '8791']); await bekle(7000);
+  d = await p.evaluate(() => ({ bagli: MendilKimde.durum().bagli, alinan: MendilKimde.durum().alinan, rozet: document.getElementById('bag-rozet').textContent }));
+  kontrol('Köprü yeniden açılınca oyun kendiliğinden yeniden bağlanır', d.bagli && d.alinan > onceAlinan + 3, { once: onceAlinan, sonra: d.alinan, rozet: d.rozet });
+  // ---- 4. sayfa yenilenince sıralama geri gelir
+  await bekle(5500); const sakli = await p.evaluate(() => MendilKimde.durum().sira.filter(x => x[1] > 0));
+  k.kill('SIGKILL'); await bekle(400); k = baslat(KOK, ['--deneme', '--port', '8791']); await bekle(600);
+  await p.reload(); await bekle(350);
+  const geri = await p.evaluate(() => MendilKimde.durum().sira.filter(x => x[1] > 0));
+  kontrol('Sayfa yenilenince jeton sıralaması geri yüklenir', geri.length >= sakli.length - 1 && geri.length > 0 && geri[0][1] >= sakli[0][1] - 30, { once: sakli.slice(0, 3), sonra: geri.slice(0, 3) });
+  await p.close();
+  // yalnız sahne görünümü köprüden
+  const y = await sayfaAc(await b.newContext({ viewport: { width: 540, height: 960 } }), 'http://127.0.0.1:8791/#yayin'); await bekle(4000);
+  const yd = await y.evaluate(() => ({ panel: getComputedStyle(document.getElementById('panel')).display, bagli: MendilKimde.durum().bagli, ses: MendilKimde.durum().ses, sesDugme: document.getElementById('ses-cagri').hidden }));
+  kontrol('Köprüden #yayin: yalnız sahne, bağlı, ses kendiliğinden başlar (tarayıcı izin verirse)', yd.panel === 'none' && yd.bagli && yd.ses && yd.sesDugme, yd);
+  await y.screenshot({ path: S + '/k-yayin.png' }); await y.close();
+  // aynı kapı ikinci kez
+  const k2 = baslat(KOK, ['--deneme', '--port', '8791']); await bekle(900);
+  kontrol('Kapı doluysa anlaşılır ileti verip kapanır', /kapı dolu/.test(k2.cikti) && k2.exitCode === 1, k2.cikti.trim().slice(0, 90));
+  k.kill('SIGKILL');
+
+  // ---- 5. kütüphane yokken
+  const bos = path.join(GECICI, 'kutuphanesiz'); fs.mkdirSync(bos); for (const d of ['kopru.js', 'mendil-kimde.html']) fs.copyFileSync(path.join(KOK, d), path.join(bos, d));
+  const k3 = baslat(bos, ['deneme_kullanici', '--port', '8792']); await bekle(1200);
+  const dr3 = JSON.parse((await al('http://127.0.0.1:8792/durum')).govde);
+  kontrol('Kütüphane kurulu değilken ne yapılacağını söyler, oyun yine açılır', /npm install/.test(k3.cikti) && /npm install/.test(dr3.durum) && (await al('http://127.0.0.1:8792/')).kod === 200, dr3.durum);
+  k3.kill('SIGKILL');
+  const k4 = baslat(bos, []); await bekle(500);
+  kontrol('Kullanıcı adı verilmezse kullanım bilgisini yazar', /Kullanım/.test(k4.cikti) && k4.exitCode === 1);
+
+  // ---- 6. sahte kütüphanelerle: eski sürüm, yeni sürüm, yayın kapalı
+  const sahte = {
+    eski: `const E=require('events');class WebcastPushConnection extends E{constructor(u,o){super();this.u=u;global.__secenek=o;}connect(){setTimeout(()=>{const u={uniqueId:'eski_ayse',nickname:'Eski Ayşe',userId:'681318130970171802'};this.emit('chat',{...u,comment:'eski sürümden selam'});this.emit('like',{...u,likeCount:20});this.emit('gift',{...u,giftType:1,repeatEnd:false,repeatCount:1,diamondCount:1});this.emit('gift',{...u,giftType:1,repeatEnd:false,repeatCount:2,diamondCount:1});this.emit('gift',{...u,giftType:1,repeatEnd:true,repeatCount:7,diamondCount:1});this.emit('follow',{uniqueId:'eski_cem',nickname:'Eski Cem'});this.emit('gift',{uniqueId:'eski_cem',nickname:'Eski Cem',giftType:2,repeatCount:1,diamondCount:500});this.emit('roomUser',{viewerCount:3});this.emit('error',{info:'deneme uyarısı'});},2500);return Promise.resolve({roomId:'123'});}disconnect(){}}module.exports={WebcastPushConnection};`,
+    yeni: `const E=require('events');const WebcastEvent={CHAT:'chatX',GIFT:'giftX',LIKE:'likeX',FOLLOW:'followX',SHARE:'shareX',MEMBER:'memberX',STREAM_END:'endX'};const ControlEvent={DISCONNECTED:'discX',ERROR:'errX'};class TikTokLiveConnection extends E{constructor(u){super();}async connect(){setTimeout(()=>{const user={uniqueId:'yeni_memo',nickname:'Yeni Memo',userId:6813181309701718022n};this.emit('chatX',{user,comment:'yeni sürümden selam'});this.emit('giftX',{user,giftDetails:{giftType:1,diamondCount:10},repeatCount:2,repeatEnd:0});this.emit('giftX',{user,giftDetails:{giftType:1,diamondCount:10},repeatCount:6,repeatEnd:1});this.emit('likeX',{user,likeCount:9});this.emit('followX',{user:{uniqueId:'yeni_sude',nickname:'Yeni Sude'}});this.emit('chat',{user,comment:'yanlış adlı olay, gelmemeli'});},2500);return {roomId:'456'};}disconnect(){}}module.exports={TikTokLiveConnection,WebcastEvent,ControlEvent};`,
+    kapali: `const E=require('events');class WebcastPushConnection extends E{connect(){return Promise.reject(new Error('LIVE has ended'));}disconnect(){}}module.exports={WebcastPushConnection};`
+  };
+  let kapi = 8793;
+  for (const [ad, kod] of Object.entries(sahte)) {
+    const kl = path.join(GECICI, 'sahte-' + ad); fs.mkdirSync(path.join(kl, 'node_modules/tiktok-live-connector'), { recursive: true });
+    fs.writeFileSync(path.join(kl, 'node_modules/tiktok-live-connector/index.js'), kod); for (const d of ['kopru.js', 'mendil-kimde.html']) fs.copyFileSync(path.join(KOK, d), path.join(kl, d));
+    const kp = ++kapi, c = baslat(kl, ['@Test_Kullanici', '--port', String(kp)]); await bekle(700);
+    if (ad === 'kapali') { await bekle(600); const q = JSON.parse((await al('http://127.0.0.1:' + kp + '/durum')).govde); kontrol('Yayın kapalıyken: açık dille söyler ve kendiliğinden yeniden dener', /@Test_Kullanici şu an canlı yayında değil/.test(q.durum) && /saniye sonra yeniden/.test(q.durum), q.durum); c.kill('SIGKILL'); continue; }
+    const pg = await sayfaAc(await b.newContext({ viewport: { width: 1280, height: 800 } }), 'http://127.0.0.1:' + kp + '/'); await bekle(600);
+    const c2 = c; await bekle(3200); // sahte kütüphane olayları bağlandıktan 2,5 sn sonra yollar
+    const q = await pg.evaluate(() => ({ ...MendilKimde.durum(), ileti: document.getElementById('bag-ileti').textContent, gunluk: document.getElementById('gunluk').textContent }));
+    if (ad === 'eski') kontrol('Eski sürüm kütüphaneyle uçtan uca: yorum, seri hediye (1×7), tek hediye (500), takip', q.bagli && JSON.stringify(q.sira) === JSON.stringify([['Eski Cem', 500], ['Eski Ayşe', 7]]) && /Test_Kullanici yayınına bağlandı/.test(q.ileti) && /oda 123/.test(q.ileti), { sira: q.sira, ileti: q.ileti });
+    else kontrol('Yeni sürüm kütüphaneyle uçtan uca: sabit adları, iç içe veri, seri hediye (10×6)', q.bagli && JSON.stringify(q.sira) === JSON.stringify([['Yeni Memo', 60], ['Yeni Sude', 0]]) && !/gelmemeli/.test(q.gunluk), { sira: q.sira, ileti: q.ileti });
+    c2.kill('SIGKILL'); await pg.close();
+  }
+  kontrol('Köprü testlerinde sayfada hata çıkmadı', hatalar.length === 0, hatalar.slice(0, 4).join(' | '));
+  await b.close();
+  fs.rmSync(GECICI, { recursive: true, force: true });
+  process.exit(raporla(sonuc) ? 1 : 0);
+})().catch(e => { console.error('TEST ÇÖKTÜ', e); process.exit(1); });
