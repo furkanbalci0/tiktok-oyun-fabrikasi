@@ -152,7 +152,9 @@ const { sonuc, kontrol } = kontrolcu();
   kontrol('1000+ jeton: gönderen "müsait bir yerde" sırasına girer', yalniz(kd[1000], 'teyp', 'kasis', 'sollama', 'durak') && kd[50000].durak === 1, [kd[1000], kd[50000]]);
 
   // gösteri: dolmuş durur, gönderen ayağa kalkar, büyür ve ortaya gelir; adı büyük yazılır
+  // Sabit süre beklemek yük altında kişiyi yolun ortasında yakalıyordu: ortaya varana dek beklenir (en çok 12 sn).
   await p.waitForTimeout(3600);
+  await p.waitForFunction(() => { const g = CanliOyun._test.D.durak; return g && g.yakin && Math.abs(g.k.p.kafa.x - 360) < 80; }, null, { timeout: 12000 }).catch(() => { });
   const gs = await p.evaluate(() => {
     const D = CanliOyun._test.D, g = D.durak;
     return g && { ad: g.k.ad, yildiz: g.k.yildiz, ayakta: g.ayakta, yakin: g.yakin, otur: +g.k.otur.toFixed(2), olcek: +g.k.olcek.toFixed(2), hiz: +D.hiz.toFixed(2), ortada: Math.round(g.k.p.kafa.x), yaricap540: +(0.27 * g.k.g.boy * g.k.p.kafa.s * 0.75).toFixed(1), enUstAd: Math.round(Math.min(...[...D.oy.values()].filter(k => k.et).map(k => k.etY))) };

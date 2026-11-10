@@ -382,6 +382,11 @@ Ortak parçalar `cekirdek/test/ortak.js`'te: oyun adı ilk bağımsız değişke
 7. Çekirdek testleri (`cekirdek/test/cekirdek.test.js <ad>`) her oyunda geçmelidir: yorum oyuna sokar, beğeni
    coşkuyu artırır, hediye sıralamayı değiştirir, en çok hediye atan liderdir, kalabalık `kapasite`de
    sınırlanır, 1080×1920'de en kalabalık hâlde kare başına işlem 33 ms'nin altındadır.
+8. Yazı tipleri Türkçe harflerin tamamını taşır. Çekirdek başlıkta Paytone One, gövdede Rubik kullanır
+   (`araclar/derle.js` içindeki `YAZI_TIPI`, `cekirdek/stil.css` içindeki `--baslik`). Yazı tipini değiştirmeden
+   önce Ş, ş, Ğ, ğ, İ, ı harflerinin dosyada bulunduğunu doğrula; eksik harf yedek yazı tipinden gelir ve
+   kelimenin içinde farklı kalınlıkta görünür. Testler web yazı tiplerini istemediği için bunu yakalamaz:
+   kareye bakarak denetlenir.
 
 ## Örnek
 

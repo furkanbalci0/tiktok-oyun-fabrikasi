@@ -122,6 +122,13 @@ Sık takılınan yerler:
   kendi adını değiştir; `const` çakışmasında derleme durur.
 - `00-ayar.js` çekirdekten önce çalışır: orada `ALAN_UST`, `ETIKET_PAY` gibi çekirdek adları kullanılamaz
   (`ustSinir: true`, `ustPx: 36` gibi değer yaz).
+- Tuvale başlık yazısı çizerken çekirdeğin yazı tiplerini kullan: `'30px "Paytone One", Rubik, system-ui,
+  sans-serif'` (başlık) ya da `'700 21px Rubik, system-ui, sans-serif'` (gövde). Başka yazı tipi ekleyeceksen
+  önce Ş, ş, Ğ, ğ, İ, ı harflerinin o yazı tipinde bulunduğunu doğrula: eksik harf başka yazı tipinden gelir ve
+  kelimenin ortasında ince, yabancı bir harf olarak görünür (eski başlık yazı tipinde "USTA İŞ BAŞINDA!" böyle
+  çıkıyordu). Karede Türkçe harfli her yazıya yakından bak.
+- Ön sırada yan yana duran iri başlı kişiler arasında en az 0,57 m bırak; iki sıkı sıra tek bir baş yumağına
+  döner, adlar yüzlerin üstüne biner. Televizyon gibi bir nesnenin altı ile yorum alanı arasına tek sıra sığar.
 
 ## 4. Kareye bak, düzelt, yine bak
 
