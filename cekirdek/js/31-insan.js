@@ -1,30 +1,73 @@
-/* ÇİZİM — eklemlerden gövde parçaları üretir, uzaktan yakına sıralayıp çizer.
- * liste + kap() + ozel(): çizim listesi · karakterEkle(k): bir karakterin bütün parçaları
- * kafaCiz: yüz, saç, yazma, kasket (baş döndükçe yüz hatları kayar) · davulCiz · mendilCiz
+/* İNSAN TAKIMI — iri başlı, kısa gövdeli "chibi" insan: eklemler, kollar, bekleme pozu, gövde ve baş çizimi.
+ * Oyun izleyicileri insan olarak çizecekse bunları kullanır; başka bir şey çizecekse hiç çağırmaz.
+ * iskeletKur(k, poz): pozdan eklemleri (k.j) kurar · kolKur(k): iki kolu ellere (j.haL / j.haR) uzatır
+ * pozBekle(k): vuruşla sallanan bekleme pozu · insanEkle(k): gövde + baş çizim listesine; k.et kurulur
+ * kafaCiz(k, ph): yalnız baş (yüz, saç, yazma, kasket; baş döndükçe yüz hatları kayar)
+ * Baş boyun yarısını tutar ki kalabalıkta da yüzler okunsun.
  */
-/* ---- çizim listesi (uzaktan yakına sıralanır) ---- */
-const liste = [];
-function kap(pa, ra, pb, rb, renk, d) {
-  if (!pa.ok || !pb.ok)
-    return;
-  liste.push({ d: d === undefined ? (pa.d + pb.d) / 2 : d, t: 0, x1: pa.x, y1: pa.y, r1: ra * pa.s, x2: pb.x, y2: pb.y, r2: rb * pb.s, c: renk, w: Math.max(1, (pa.s + pb.s) * 0.0065) });
+// Gövde ölçüleri (karakterin boyuyla, k.g.boy, çarpılır; metre)
+const KALCA = 0.27, GOGUS = 0.2, KAFA_Y = 0.47, KAFA_R = 0.27, BACAK = 0.135, KOL = 0.16;
+
+// poz: { hipX, hipY, egim, yat, omL, omR, aS, aL }
+//   hipX: kalçanın yana kayması · hipY: kalça yüksekliği (KALCA ayakta durur; zıplayınca artar, çökünce azalır)
+//   egim: öne (+) / arkaya (−) eğilme · yat: yana yatma · omL / omR: omuzların kalkması
+//   aS / aL: sağ ve sol ayak [yana, ileri, yukarı] (karakterin yerel ekseninde, metre)
+// Karakterin yerinden (k.x, k.z, k.y0) ve yönünden (k.yon) eklemleri kurar. Bırakır: k._W(yana, yukarı, ileri)
+// yerel → dünya çevirici, k._hipX, k._hipY. Ellerin yerini (j.haL, j.haR) çağıran koyar, sonra kolKur(k).
+function iskeletKur(k, poz) {
+  const g = k.g, boy = g.boy, j = k.j;
+  const fx = Math.sin(k.yon), fz = Math.cos(k.yon), lx = -fz, lz = fx;
+  k.f[0] = fx;
+  k.f[2] = fz;
+  k.l[0] = lx;
+  k.l[2] = lz;
+  const W = (a, y, cc) => [k.x + (a * lx + cc * fx) * boy, k.y0 + y * boy, k.z + (a * lz + cc * fz) * boy];
+  const hipX = poz.hipX, hipY = poz.hipY, egim = poz.egim, yat = poz.yat, aS = poz.aS, aL = poz.aL;
+  const vurus = 0.5 + 0.5 * Math.cos(TAU * B); // vuruş anında 1
+  j.hip = W(hipX, hipY, 0);
+  j.gogus = W(hipX + yat * 3, hipY + GOGUS, egim);
+  j.kafa = W(hipX + yat * 5, hipY + KAFA_Y + 0.012 * vurus, egim * 1.4 + 0.01);
+  j.omL = W(hipX + yat * 3 + 0.15, hipY + GOGUS + 0.01 + poz.omL, egim);
+  j.omR = W(hipX + yat * 3 - 0.15, hipY + GOGUS + 0.01 + poz.omR, egim);
+  j.kbL = W(hipX + 0.075, hipY - 0.02, 0);
+  j.kbR = W(hipX - 0.075, hipY - 0.02, 0);
+  j.ayL = W(aL[0], aL[2] + 0.04, aL[1]);
+  j.ayR = W(aS[0], aS[2] + 0.04, aS[1]);
+  const ileri = [fx, 0.15, fz];
+  j.dzL = ik(j.kbL, j.ayL, BACAK * boy, BACAK * boy, ileri, j.dzL || [0, 0, 0]);
+  j.dzR = ik(j.kbR, j.ayR, BACAK * boy, BACAK * boy, ileri, j.dzR || [0, 0, 0]);
+  k._W = W;
+  k._hipY = hipY;
+  k._hipX = hipX;
+  return W;
 }
-function ozel(d, fn) { liste.push({ d, t: 1, fn }); }
-function kapYol(x1, y1, r1, x2, y2, r2) {
-  const a = Math.atan2(y2 - y1, x2 - x1);
-  c.beginPath();
-  c.arc(x1, y1, r1, a + HP, a - HP);
-  c.arc(x2, y2, r2, a - HP, a + HP);
-  c.closePath();
+// Omuzdan ele iki kol: dirsekler aşağı ve geriye bükülür.
+function kolKur(k) {
+  const j = k.j, boy = k.g.boy;
+  const kutupR = [-k.f[0] * 0.6 - k.l[0] * 0.5, -0.7, -k.f[2] * 0.6 - k.l[2] * 0.5], kutupL = [-k.f[0] * 0.6 + k.l[0] * 0.5, -0.7, -k.f[2] * 0.6 + k.l[2] * 0.5];
+  j.drR = ik(j.omR, j.haR, KOL * boy, KOL * boy, kutupR, j.drR || [0, 0, 0]);
+  j.drL = ik(j.omL, j.haL, KOL * boy, KOL * boy, kutupL, j.drL || [0, 0, 0]);
+}
+// Bekleme pozu: her vuruşta hafifçe çöker, iki vuruşta bir sırayla ayak kaldırır, dört vuruşta bir yana salınır.
+// Dönen nesne değiştirilebilir (ör. egim, zıplama için hipY ve ayak yüksekliği).
+function pozBekle(k) {
+  const t2 = ((B % 2) + 2) % 2, vurus = 0.5 + 0.5 * Math.cos(TAU * B);
+  return {
+    hipX: 0, hipY: KALCA - 0.03 * vurus, egim: 0, yat: Math.sin(TAU * B / 4) * 0.02, omL: 0, omR: 0,
+    aS: [-0.08, 0, t2 < 1 ? Math.sin(t2 * Math.PI) * 0.045 : 0], aL: [0.08, 0, t2 >= 1 ? Math.sin((t2 - 1) * Math.PI) * 0.045 : 0]
+  };
 }
 
 const SERIT = ['#f2b632', '#e23d2f', '#3d5bd0', '#f6ecd9', '#22b8a7'];
-function karakterEkle(k) {
+// Eklemlerden gövde ve başı çizim listesine ekler. Ekrana düşmüş eklemler k.p'ye yazılır (oyun kendi
+// eklemlerini — ör. çalgı — k.j'ye koyduysa onlar da k.p'de bulunur). Çizildiyse true döner ve k.et kurulur.
+function insanEkle(k) {
   const j = k.j, g = k.g, p = k.p, boy = g.boy;
+  k.et = null;
   for (const n in j)
     p[n] = pr(j[n]);
   if (!p.hip.ok || !p.kafa.ok)
-    return;
+    return false;
   const bacak = g.kadin ? '#3a2a3c' : g.alt;
   for (const y of ['L', 'R']) {
     const kb = p['kb' + y], dz = p['dz' + y], ay = p['ay' + y];
@@ -74,28 +117,18 @@ function karakterEkle(k) {
     if (ha.ok)
       liste.push({ d: ha.d - 0.02, t: 2, x: ha.x, y: ha.y, r: 0.055 * boy * ha.s, c: g.ten, w: Math.max(1, ha.s * 0.011) });
   }
-  ozel(p.kafa.d - 0.05, () => kafaCiz(k, p.kafa));
-  if (k.mod === 'davulcu') {
-    const d0 = p.davul;
-    ozel(d0.d - 0.2, () => davulCiz(k));
-    kap(p.haR, 0.02, p.tokmak, 0.02, '#8a5a2c', p.haR.d - 0.25);
-    if (p.tokmak.ok)
-      liste.push({ d: p.tokmak.d - 0.26, t: 2, x: p.tokmak.x, y: p.tokmak.y, r: 0.045 * p.tokmak.s, c: '#f6ecd9', w: 1.5 });
-    kap(p.haL, 0.012, p.cubuk, 0.008, '#caa46a', p.haL.d - 0.25);
-  }
-  else if (k.mod === 'zurnaci') {
-    // Zurna başın önünde durur; baştan sonra çizilsin diye derinliği öne çekilir.
-    kap(p.agiz, 0.02, p.zurnaUc, 0.06, '#7a4a22', p.kafa.d - 0.4);
-    if (p.zurnaUc.ok)
-      liste.push({ d: p.kafa.d - 0.42, t: 2, x: p.zurnaUc.x, y: p.zurnaUc.y, r: 0.064 * p.zurnaUc.s, c: '#caa46a', w: 1.5 });
-  }
-  if (k.mendilEl && k.yer > 0.9) {
-    const el = p['ha' + k.mendilEl];
-    // Mendil elin dış yanına, yukarı doğru sallanır (ekranda el başın solundaysa sola, sağındaysa sağa).
-    if (el.ok)
-      ozel(el.d - 0.1, () => mendilCiz(el.x, el.y, el.s * 0.8, (el.x < p.kafa.x ? -2.3 : -0.84) + 0.45 * Math.sin(TAU * B), 1));
-  }
+  const ph = p.kafa;
+  ozel(ph.d - 0.05, () => kafaCiz(k, ph));
+  const et = k._et || (k._et = { x: 0, y: 0, s: 0, d: 0 });
+  et.x = ph.x;
+  et.y = ph.y - KAFA_R * k.g.boy * ph.s;
+  et.s = ph.s;
+  et.d = ph.d;
+  k.et = et;
+  return true;
 }
+// Baş. Bayraklar: k.guler (hep güler), k.ciddi (hiç gülmez), k.ufle (yanaklar şişkin, ağız kapalı: üflemeli çalgı).
+// Bunlar yoksa hediye sevinci süresince (B < k.zip1) ve kalabalık coşkunken (D.cosku > 0.72) güler.
 function kafaCiz(k, ph) {
   const g = k.g, R = KAFA_R * g.boy * ph.s, x0 = ph.x, y0 = ph.y, f = k.f, l = k.l;
   const ku = kam.bu, kf = kam.bf;
@@ -140,14 +173,14 @@ function kafaCiz(k, ph) {
   }
   c.restore();
   if (fd < 0.3) {
-    // Yüz: iri göz, al yanak, açık gülüş. Hediye atan, solo yapan ve coşkun kalabalık gözünü kısarak güler.
+    // Yüz: iri göz, al yanak, açık gülüş. Gülen gözünü kısarak güler.
     const kirp = (zaman + g.salin * 4.3) % 4.3 < 0.12;
-    const guler = k.mod === 'halay' && (B < k.zip1 || k.solo || D.cosku > 0.72);
+    const guler = !k.ciddi && (k.guler || B < k.zip1 || D.cosku > 0.72);
     for (const s of [-1, 1]) {
       const y = N(s * 0.6, -0.3, 0.68);
       if (y.d < 0) {
         c.globalAlpha = 0.5;
-        daire(y.x, y.y, R * (k.mod === 'zurnaci' ? 0.22 : 0.15), '#f0705f');
+        daire(y.x, y.y, R * (k.ufle ? 0.22 : 0.15), '#f0705f');
         c.globalAlpha = 1;
       }
       const e = N(s * 0.36, -0.04, 0.88);
@@ -169,7 +202,7 @@ function kafaCiz(k, ph) {
       }
     }
     const m = N(0, -0.42, 0.84);
-    if (m.d < 0 && k.mod !== 'zurnaci') {
+    if (m.d < 0 && !k.ufle) {
       c.beginPath();
       c.arc(m.x, m.y - R * 0.05, R * (guler ? 0.17 : 0.13), 0, Math.PI);
       c.closePath();
@@ -218,77 +251,4 @@ function kafaCiz(k, ph) {
       for (const s of [-0.5, 0, 0.5])
         daire(t.x + s * R * 0.7, t.y - Math.abs(s) * R * -0.12, R * 0.05, '#ffd166');
   }
-}
-function davulCiz(k) {
-  const p = k.p, a = p.davulL, b = p.davulR;
-  if (!a.ok || !b.ok)
-    return;
-  const yakinA = a.d < b.d, uz = yakinA ? b : a, yk = yakinA ? a : b, cap = 0.21 * k.g.boy, r1 = cap * uz.s, r2 = cap * yk.s;
-  const ac = Math.atan2(yk.y - uz.y, yk.x - uz.x), ek = Math.abs(k.l[0] * kam.f[0] + k.l[2] * kam.f[2]), dar = 0.18 + 0.82 * ek;
-  const nx = -Math.sin(ac), ny = Math.cos(ac);
-  c.lineWidth = Math.max(1, yk.s * 0.012);
-  c.strokeStyle = MUREKKEP;
-  c.beginPath();
-  c.ellipse(uz.x, uz.y, r1 * dar, r1, ac, 0, TAU);
-  c.fillStyle = '#e9dcc0';
-  c.fill();
-  c.stroke();
-  c.beginPath();
-  c.moveTo(uz.x + nx * r1, uz.y + ny * r1);
-  c.lineTo(yk.x + nx * r2, yk.y + ny * r2);
-  c.lineTo(yk.x - nx * r2, yk.y - ny * r2);
-  c.lineTo(uz.x - nx * r1, uz.y - ny * r1);
-  c.closePath();
-  c.fillStyle = '#b5482f';
-  c.fill();
-  c.stroke();
-  c.strokeStyle = '#ffd166';
-  c.lineWidth = Math.max(1, yk.s * 0.014);
-  for (let i = -2; i <= 2; i++) {
-    const t = i / 2.6;
-    c.beginPath();
-    c.moveTo(uz.x + nx * r1 * t, uz.y + ny * r1 * t);
-    c.lineTo(yk.x + nx * r2 * (t + 0.19), yk.y + ny * r2 * (t + 0.19));
-    c.stroke();
-  }
-  c.strokeStyle = MUREKKEP;
-  c.lineWidth = Math.max(1, yk.s * 0.012);
-  const vur = 1 + (yakinA ? calgi.tekP : calgi.dumP) * 0.05;
-  c.beginPath();
-  c.ellipse(yk.x, yk.y, r2 * dar * vur, r2 * vur, ac, 0, TAU);
-  c.fillStyle = '#f6ecd9';
-  c.fill();
-  c.stroke();
-  c.beginPath();
-  c.ellipse(yk.x, yk.y, r2 * dar * 0.55, r2 * 0.55, ac, 0, TAU);
-  c.strokeStyle = 'rgba(8,10,28,.25)';
-  c.stroke();
-  c.strokeStyle = MUREKKEP;
-}
-function mendilCiz(x, y, s, aci, parlak) {
-  const b = 0.3 * s, dal = Math.sin(zaman * 14) * 0.25;
-  c.save();
-  c.translate(x, y);
-  c.rotate(aci);
-  if (parlak) {
-    c.globalAlpha = 0.25;
-    c.beginPath();
-    c.arc(b * 0.5, 0, b * 0.9, 0, TAU);
-    c.fillStyle = '#ffd166';
-    c.fill();
-    c.globalAlpha = 1;
-  }
-  c.beginPath();
-  c.moveTo(0, 0);
-  c.quadraticCurveTo(b * 0.5, -b * (0.5 + dal), b, -b * 0.28);
-  c.lineTo(b * 0.78, b * 0.12);
-  c.lineTo(b * 1.02, b * 0.42);
-  c.quadraticCurveTo(b * 0.45, b * (0.3 - dal), 0, 0);
-  c.closePath();
-  c.fillStyle = '#e23d2f';
-  c.fill();
-  c.lineWidth = Math.max(1.5, s * 0.016);
-  c.strokeStyle = '#ffd166';
-  c.stroke();
-  c.restore();
 }

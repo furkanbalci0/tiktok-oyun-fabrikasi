@@ -1,16 +1,32 @@
-/* İSKELET — kamera, perspektif ve karakterlerin eklem konumları.
- * kam + kamKur + pr(): 3B noktayı 720×1280 sanal tuvale düşürür · ik(): iki kemikli ters kinematik (diz, dirsek)
- * ayakSag / ayakSol: 4 vuruşluk halay adımı · iskelet(k): bir karakterin o anki eklemleri (k.j)
- * kollar(k, onceki, sonraki): komşularla el ele tutuşma; halay başının boş eli mendil sallar
+/* SAHNE — tuval, tema renkleri, kamera, perspektif, çizim listesi, ad etiketleri. Oyundan bağımsızdır.
+ * RENK: tema (OYUN.renk ezer) · kam + kamKur + pr(): 3B noktayı 720×1280 sanal tuvale düşürür
+ * ik(): iki kemikli ters kinematik (diz, dirsek) · liste + kap / top / ozel + listeCiz(): uzaktan yakına çizim
+ * kameraSigdir(noktalar, dt): verilen yer noktaları ALAN_UST–ALAN_ALT şeridine sığacak kadar uzaklaşır
+ * golge: ayak gölgesi · etiketCiz(ekler): ad etiketleri ve konuşma balonları · kenarKarart: köşeleri karartır
  * Eksenler: x sağ, y yukarı, z kameradan uzağa. Karakterin yerel ekseni: x = kendi solu, z = baktığı yön.
- * Karakterler iri başlı, kısa gövdelidir: baş boyun yarısını tutar ki kalabalıkta da yüzler okunsun.
  */
 const tuval = $('tuval'), c = tuval.getContext('2d');
-const GW = 720, GH = 1280, MUREKKEP = '#080a1c';
-// Dar açılı, yüksekten bakan kamera: halkanın önündeki ile arkasındaki arasında boy farkı az kalır.
-const kam = { yaw: 0, egim: 0.62, D: 14, tx: 0, ty: 0, tz: 0, F: 1400, cx: 360, cy: 760, C: [0, 0, 0], r: [1, 0, 0], u: [0, 1, 0], f: [0, 0, 1] };
-// Gövde ölçüleri (karakterin boyuyla çarpılır)
-const KALCA = 0.27, GOGUS = 0.2, KAFA_Y = 0.47, KAFA_R = 0.27, BACAK = 0.135, KOL = 0.16, ADIM = 0.6;
+const GW = 720, GH = 1280;
+// Tema renkleri. CSS'te aynı adlar --zemin, --zemin-2 … olarak kullanılır; panel açılışta bunları RENK'ten yazar.
+// Renkler #rrggbb biçiminde verilmeli (yarı saydam tonlar bunlardan türetilir).
+const RENK = Object.assign({
+  zemin: '#0e1230', zemin2: '#171d47', zemin3: '#232b63', cizgi: '#343d80',
+  vurgu: '#ffd166', sicak: '#e23d2f', serin: '#22b8a7', acik: '#f6ecd9', soluk: '#a9b0dc', murekkep: '#080a1c'
+}, OYUN.renk || {});
+const MUREKKEP = RENK.murekkep;
+function renkSaydam(hex, a) {
+  const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(String(hex));
+  if (!m)
+    return hex;
+  const h = m[1].length === 3 ? m[1].replace(/./g, x => x + x) : m[1], n = parseInt(h, 16);
+  return 'rgba(' + (n >> 16) + ',' + (n >> 8 & 255) + ',' + (n & 255) + ',' + a + ')';
+}
+// Dar açılı, yüksekten bakan kamera: öndeki ile arkadaki arasında boy farkı az kalır.
+// OYUN.kamera { egim, F, enYakin, ustPay, altPay } varsayılanları ezer.
+const kam = Object.assign({ yaw: 0, egim: 0.62, D: 14, tx: 0, ty: 0, tz: 0, F: 1400, cx: 360, cy: 760, ustPay: 1.5, altPay: 0.15 }, OYUN.kamera || {},
+  { C: [0, 0, 0], r: [1, 0, 0], u: [0, 1, 0], f: [0, 0, 1], son: { enX: 0, hd: 0 } });
+if (!(kam.enYakin > 0))
+  kam.enYakin = kam.F / 190;
 function kamKur() {
   const cp = Math.cos(kam.egim), sp = Math.sin(kam.egim), sy = Math.sin(kam.yaw), cy = Math.cos(kam.yaw);
   kam.f = [sy * cp, -sp, cy * cp];
@@ -25,6 +41,7 @@ function kamKur() {
   const eb = kam.egim * 0.3, cb = Math.cos(eb), sb = Math.sin(eb), bf = kam.bf = [sy * cb, -sb, cy * cb];
   kam.bu = [bf[1] * r[2] - bf[2] * r[1], bf[2] * r[0] - bf[0] * r[2], bf[0] * r[1] - bf[1] * r[0]];
 }
+// Dünyadaki [x, y, z] noktası → ekranda { x, y }, ölçek s (1 metre kaç piksel), derinlik d, görünür mü ok.
 function pr(v) {
   const x = v[0] - kam.C[0], y = v[1] - kam.C[1], z = v[2] - kam.C[2];
   const d = x * kam.f[0] + y * kam.f[1] + z * kam.f[2];
@@ -33,6 +50,7 @@ function pr(v) {
   const s = kam.F / d;
   return { x: kam.cx + (x * kam.r[0] + z * kam.r[2]) * s, y: kam.cy - (x * kam.u[0] + y * kam.u[1] + z * kam.u[2]) * s, s, d, ok: true };
 }
+// a'dan b'ye uzanan iki kemik (l1, l2): ortadaki eklemi kutup yönüne doğru büker, sonucu out'a yazar.
 function ik(a, b, l1, l2, kutup, out) {
   let dx = b[0] - a[0], dy = b[1] - a[1], dz = b[2] - a[2], gd = Math.hypot(dx, dy, dz) || 1e-4;
   const nx = dx / gd, ny = dy / gd, nz = dz / gd, d = Math.min(gd, (l1 + l2) * 0.999);
@@ -46,190 +64,219 @@ function ik(a, b, l1, l2, kutup, out) {
   return out;
 }
 
-// Halay adımı: 4 vuruşluk döngü. Sağa bas, sol ayağı çaprazla, sol tekme, sağ tekme.
-// Değerler uzun bacaklı ölçüdedir; iskelet() kısa bacağa ADIM ile küçültür.
-function ayakSag(u, g) {
-  if (u < 0.6) {
-    const t = u / 0.6;
-    return [lerp(-0.10, -0.30, t), 0, Math.sin(t * Math.PI) * 0.07];
-  }
-  if (u < 2)
-    return [-0.30, 0, 0];
-  if (u < 2.5) {
-    const t = (u - 2) / 0.5;
-    return [lerp(-0.30, -0.24, t), 0, Math.sin(t * Math.PI) * 0.04];
-  }
-  if (u < 3)
-    return [-0.24, 0, 0];
-  const t = u - 3, s = Math.sin(t * Math.PI);
-  return [lerp(-0.24, -0.10, t), s * 0.2 * g, s * 0.16 * g];
+/* ---- çizim listesi (uzaktan yakına sıralanır) ---- */
+// Her karede çekirdek listeyi boşaltır, oyunCiz() doldurur, çekirdek derinliğe göre sıralayıp çizer.
+// d büyük = uzak. Aynı derinlikteki parçalar eklendikleri sırayla çizilir.
+const liste = [];
+// İki ucu farklı yarıçaplı kapsül (kol, bacak, gövde). pa / pb: pr() sonucu, ra / rb: metre cinsinden yarıçap.
+function kap(pa, ra, pb, rb, renk, d) {
+  if (!pa.ok || !pb.ok)
+    return;
+  liste.push({ d: d === undefined ? (pa.d + pb.d) / 2 : d, t: 0, x1: pa.x, y1: pa.y, r1: ra * pa.s, x2: pb.x, y2: pb.y, r2: rb * pb.s, c: renk, w: Math.max(1, (pa.s + pb.s) * 0.0065) });
 }
-function ayakSol(u, g) {
-  if (u < 1)
-    return [0.10, 0, 0];
-  if (u < 1.6) {
-    const t = (u - 1) / 0.6;
-    return [lerp(0.10, -0.12, t), 0.04 * t, Math.sin(t * Math.PI) * 0.07];
+// Mürekkep çizgili daire (el, top, uç). r metre; cizgi verilmezse ölçeğe göre seçilir.
+function top(p, r, renk, d, cizgi) {
+  if (!p.ok)
+    return;
+  liste.push({ d: d === undefined ? p.d : d, t: 2, x: p.x, y: p.y, r: r * p.s, c: renk, w: cizgi === undefined ? Math.max(1, p.s * 0.011) : cizgi });
+}
+// Serbest çizim: fn sırası gelince doğrudan c ile çizer.
+function ozel(d, fn) { liste.push({ d, t: 1, fn }); }
+function kapYol(x1, y1, r1, x2, y2, r2) {
+  const a = Math.atan2(y2 - y1, x2 - x1);
+  c.beginPath();
+  c.arc(x1, y1, r1, a + HP, a - HP);
+  c.arc(x2, y2, r2, a - HP, a + HP);
+  c.closePath();
+}
+function listeCiz() {
+  liste.sort((a, b) => b.d - a.d);
+  c.strokeStyle = MUREKKEP;
+  for (const o of liste) {
+    if (o.t === 0) {
+      kapYol(o.x1, o.y1, o.r1, o.x2, o.y2, o.r2);
+      c.fillStyle = o.c;
+      c.fill();
+      c.lineWidth = o.w;
+      c.strokeStyle = MUREKKEP;
+      c.stroke();
+    }
+    else if (o.t === 2) {
+      c.beginPath();
+      c.arc(o.x, o.y, o.r, 0, TAU);
+      c.fillStyle = o.c;
+      c.fill();
+      c.lineWidth = o.w;
+      c.strokeStyle = MUREKKEP;
+      c.stroke();
+    }
+    else
+      o.fn();
   }
-  if (u < 2)
-    return [-0.12, 0.04, 0];
-  if (u < 3) {
-    const t = u - 2, s = Math.sin(t * Math.PI);
-    return [lerp(-0.12, 0.02, t), 0.04 * (1 - t) + s * 0.3 * g, s * 0.22 * g];
-  }
-  if (u < 3.5)
-    return [0.02, 0, 0];
-  const t = (u - 3.5) / 0.5;
-  return [lerp(0.02, 0.10, t), 0, Math.sin(t * Math.PI) * 0.03];
 }
 
-function iskelet(k, dt) {
-  const g = k.g, boy = g.boy, j = k.j, b = B;
-  const fx = Math.sin(k.yon), fz = Math.cos(k.yon), lx = -fz, lz = fx;
-  k.f[0] = fx;
-  k.f[2] = fz;
-  k.l[0] = lx;
-  k.l[2] = lz;
-  const W = (a, y, cc) => [k.x + (a * lx + cc * fx) * boy, k.y0 + y * boy, k.z + (a * lz + cc * fz) * boy];
-  const cos = D.cosku, guc = 1 + cos * 0.6;
-  let hipX = 0, hipY = KALCA, egim = 0, yat = 0, omL = 0, omR = 0, zipla = 0;
-  let aS = [-0.07, 0, 0], aL = [0.07, 0, 0];
-  let elR = null, elL = null; // serbest el hedefleri (yerel)
-  const vurus = 0.5 + 0.5 * Math.cos(TAU * b); // vuruş anında 1
-  if (k.mod === 'halay') {
-    const y = k.yer, u = ((b % 4) + 4) % 4;
-    // koşu
-    const ph = k.kos * 7, ky = 1 - y;
-    const ksS = [-0.11, Math.sin(ph) * 0.2, Math.max(0, Math.cos(ph)) * 0.16], ksL = [0.11, -Math.sin(ph) * 0.2, Math.max(0, -Math.cos(ph)) * 0.16];
-    let hS = ayakSag(u, guc), hL = ayakSol(u, guc);
-    let X = u < 2 ? -0.2 * yumusak(u / 2) : -0.2 * (1 - yumusak((u - 2) / 2));
-    let cok = 0, omuz = cos * 0.01 * Math.sin(TAU * b * 2);
-    const hr = D.hareket;
-    if (hr && b >= hr.bas && b < hr.bas + hr.sure) {
-      const hu = b - hr.bas;
-      if (hr.tip === 'cok') {
-        cok = 0.11 * Math.pow(Math.sin(Math.PI * hu / 2), 2);
-      }
-      else if (hr.tip === 'omuz') {
-        omuz = 0.045 * Math.sin(TAU * hu * 2);
-        egim -= 0.03;
-      }
-    }
-    if (k.solo) {
-      const su = b - (D.solo ? D.solo.bas : b), t2 = ((su % 2) + 2) % 2, sq = 0.05 + 0.04 * Math.sin(Math.PI * su);
-      hS = t2 < 1 ? [-0.14, Math.sin(t2 * Math.PI) * 0.32, Math.sin(t2 * Math.PI) * 0.3] : [-0.14, 0, 0];
-      hL = t2 >= 1 ? [0.14, Math.sin((t2 - 1) * Math.PI) * 0.32, Math.sin((t2 - 1) * Math.PI) * 0.3] : [0.14, 0, 0];
-      X = 0;
-      cok = Math.max(0, sq);
-      const yuk = 0.48 + 0.04 * Math.sin(TAU * su);
-      elR = [-0.3, yuk, 0.05];
-      elL = [0.3, yuk - 0.08 * Math.sin(TAU * su), 0.05];
-      omuz = 0.04 * Math.sin(TAU * su * 2);
-    }
-    if (b >= k.zip0 && b < k.zip1)
-      zipla = 0.3 * Math.abs(Math.sin(Math.PI * (b - k.zip0)));
-    const kc = 1 - cok * 5;
-    aS = [lerp(ksS[0], hS[0], y) * ADIM, lerp(ksS[1], hS[1] * kc, y) * ADIM, lerp(ksS[2], hS[2] * kc, y) * ADIM + zipla * 0.8];
-    aL = [lerp(ksL[0], hL[0], y) * ADIM, lerp(ksL[1], hL[1] * kc, y) * ADIM, lerp(ksL[2], hL[2] * kc, y) * ADIM + zipla * 0.8];
-    hipX = X * y * ADIM;
-    hipY = KALCA - (0.022 + cos * 0.02) * vurus * y - cok * y + zipla - ky * 0.02 * Math.abs(Math.sin(ph));
-    omL = omuz;
-    omR = -omuz;
-    egim += ky * 0.05;
-    yat = Math.sin(TAU * b / 2 + g.salin) * 0.016 * y;
-    if (elR) {
-      elR[1] += hipY;
-      elL[1] += hipY;
-    }
-    else {
-      elR = [-0.2 - ky * 0.04, hipY + 0.06, 0.04 + ky * Math.sin(ph) * 0.14];
-      elL = [0.2 + ky * 0.04, hipY + 0.06, 0.04 - ky * Math.sin(ph) * 0.14];
-    }
+/* ---- kamera: oyuncular yayın alanına sığsın ---- */
+// Sahnenin oyuncular için ayrılan dikey şeridi (sanal 1280 satırda): üstü HUD, altı TikTok'un yorum alanı.
+const ALAN_UST = 505, ALAN_ALT = 1006;
+let kamCy = kam.cy;
+// noktalar: kadraja girmesi gereken yer noktaları [[x, z], …] (oyunKamera() döndürür). Kamera sağa sola
+// dönmez, ortaya bakar; bu yüzden yalnız |x| önemlidir. Sonuç yumuşakça yaklaşır; kam.son = { enX, hd }
+// (en geniş |x| ve derinliğin yarısı) oyunun zeminini kalabalığa göre büyütmesi için saklanır.
+function kameraSigdir(noktalar, dt) {
+  let mnZ = Infinity, mxZ = -Infinity;
+  for (const n of noktalar) {
+    if (n[1] < mnZ)
+      mnZ = n[1];
+    if (n[1] > mxZ)
+      mxZ = n[1];
   }
-  else {
-    const t2 = ((b % 2) + 2) % 2;
-    aS = [-0.08, 0, t2 < 1 ? Math.sin(t2 * Math.PI) * 0.045 : 0];
-    aL = [0.08, 0, t2 >= 1 ? Math.sin((t2 - 1) * Math.PI) * 0.045 : 0];
-    hipY = KALCA - 0.03 * vurus;
-    yat = Math.sin(TAU * b / 4) * 0.02;
-    if (k.mod === 'davulcu')
-      egim = -0.02;
-    else
-      egim = -0.015 - calgi.perde * 0.004;
+  if (!(mxZ >= mnZ))
+    mnZ = mxZ = 0;
+  const hd = (mxZ - mnZ) / 2, zOrta = (mnZ + mxZ) / 2, se = Math.sin(kam.egim), ce = Math.cos(kam.egim), kk = Math.min(1, dt * 1.6);
+  // Genişlik: kameraya yakın duran daha iri göründüğü için her nokta kendi derinliğiyle hesaba girer.
+  let hD = kam.enYakin, ust = 0, alt = 0, enX = 0;
+  for (const n of noktalar) {
+    const x = Math.abs(n[0]);
+    hD = Math.max(hD, (x + 0.55) * kam.F / 322 - (n[1] - zOrta) * ce);
+    enX = Math.max(enX, x);
   }
-  j.hip = W(hipX, hipY, 0);
-  j.gogus = W(hipX + yat * 3, hipY + GOGUS, egim);
-  j.kafa = W(hipX + yat * 5, hipY + KAFA_Y + 0.012 * vurus, egim * 1.4 + 0.01);
-  j.omL = W(hipX + yat * 3 + 0.15, hipY + GOGUS + 0.01 + omL, egim);
-  j.omR = W(hipX + yat * 3 - 0.15, hipY + GOGUS + 0.01 + omR, egim);
-  j.kbL = W(hipX + 0.075, hipY - 0.02, 0);
-  j.kbR = W(hipX - 0.075, hipY - 0.02, 0);
-  j.ayL = W(aL[0], aL[2] + 0.04, aL[1]);
-  j.ayR = W(aS[0], aS[2] + 0.04, aS[1]);
-  const ileri = [fx, 0.15, fz];
-  j.dzL = ik(j.kbL, j.ayL, BACAK * boy, BACAK * boy, ileri, j.dzL || [0, 0, 0]);
-  j.dzR = ik(j.kbR, j.ayR, BACAK * boy, BACAK * boy, ileri, j.dzR || [0, 0, 0]);
-  k._W = W;
-  k._hipY = hipY;
-  k._hipX = hipX;
-  // çalgıcıların elleri
-  if (k.mod === 'davulcu') {
-    j.davul = W(0.01, hipY + 0.09, 0.22);
-    j.davulL = W(0.17, hipY + 0.09, 0.22);
-    j.davulR = W(-0.15, hipY + 0.09, 0.22);
-    const kal = 1 - calgi.dumP, kal2 = 1 - calgi.tekP;
-    j.haR = W(-0.27 - kal * 0.07, hipY + 0.12 + kal * 0.2, 0.2);
-    j.haL = W(0.23, hipY + 0.3 + kal2 * 0.07, 0.24);
-    j.tokmak = W(-0.17 - kal * 0.04, hipY + 0.1 + kal * 0.08, 0.22);
-    j.cubuk = W(0.11, hipY + 0.2 + kal2 * 0.1, 0.32);
+  for (let i = 0; i < 5; i++) {
+    // en arkadakinin adının üstü ve en öndekinin ayağı, hedef noktaya göre ekranda ne kadar yer tutuyor
+    ust = (hd * se + kam.ustPay * ce) * kam.F / (hD + hd * ce);
+    alt = (hd * se + kam.altPay) * kam.F / (hD - hd * ce);
+    if (ust + alt <= ALAN_ALT - ALAN_UST)
+      break;
+    hD *= (ust + alt) / (ALAN_ALT - ALAN_UST);
   }
-  else if (k.mod === 'zurnaci') {
-    const kalk = 0.02 + calgi.perde * 0.012 + 0.025 * Math.sin(TAU * b / 2);
-    j.agiz = W(hipX + yat * 5, hipY + KAFA_Y - 0.09, KAFA_R * 0.9);
-    j.zurnaUc = W(hipX + yat * 5, hipY + 0.26 + kalk * 2.2, 0.62);
-    j.haR = W(hipX - 0.03, hipY + 0.34 + kalk * 0.6, 0.33);
-    j.haL = W(hipX + 0.03, hipY + 0.3 + kalk * 1.3, 0.45);
-  }
-  else {
-    k._elR = elR;
-    k._elL = elL;
-  }
+  const hCy = ALAN_UST + ust + (ALAN_ALT - ALAN_UST - ust - alt) / 2;
+  kam.D += (hD - kam.D) * kk;
+  kam.tz += (zOrta - kam.tz) * kk;
+  kam.tx += (0 - kam.tx) * kk;
+  kamCy += (hCy - kamCy) * kk;
+  // hafif sağa sola salınım ve hediye sarsıntısı (D.sarsinti 0–1; oyun artırır, burada söner)
+  kam.yaw = azHareket ? 0 : 0.035 * Math.sin(zaman * 0.21);
+  D.sarsinti *= Math.exp(-dt * 5);
+  kam.cx = 360 + (azHareket ? 0 : Math.sin(zaman * 60) * D.sarsinti * 6);
+  kam.cy = kamCy + (azHareket ? 0 : Math.cos(zaman * 53) * D.sarsinti * 6);
+  kam.son.enX = enX;
+  kam.son.hd = hd;
+  kamKur();
 }
-function kollar(k, onceki, sonraki) {
-  const j = k.j, W = k._W, boy = k.g.boy, bagli = a => a && a.yer > 0.9 && !a.solo && !a.cikiyor;
-  if (k.mod === 'halay') {
-    const ben = bagli(k);
-    // Herkes kameraya döndüğü için komşu, yayın neresinde durduğuna göre sağda ya da solda kalır.
-    let solda = null, sagda = null;
-    if (ben)
-      for (const a of [onceki, sonraki]) {
-        if (!bagli(a))
-          continue;
-        const yan = (a.x - k.x) * k.l[0] + (a.z - k.z) * k.l[2];
-        if (yan >= 0 ? !solda : !!sagda)
-          solda = solda || a;
-        else
-          sagda = a;
-      }
-    // İki komşu da aynı orta noktaya uzanır; eller orada buluşur.
-    const orta = a => [(j.hip[0] + a.j.hip[0]) / 2, (j.hip[1] + a.j.hip[1]) / 2 + 0.04, (j.hip[2] + a.j.hip[2]) / 2];
-    const eL = k._elL, eR = k._elR;
-    k.bagL = !!solda;
-    k.bagR = !!sagda;
-    j.haL = solda ? orta(solda) : W(k._hipX + eL[0], eL[1], eL[2]);
-    j.haR = sagda ? orta(sagda) : W(k._hipX + eR[0], eR[1], eR[2]);
-    k.mendilEl = null;
-    if (k === D.lider && ben && !D.mendilUcus) {
-      const el = !sagda ? 'R' : !solda ? 'L' : null;
-      if (el) {
-        const s = el === 'R' ? -1 : 1, th = TAU * B;
-        // El başın yanından yukarı uzanır; mendil yüzü kapatmasın.
-        j['ha' + el] = W(k._hipX + s * (0.37 + 0.05 * Math.cos(th)), k._hipY + 0.5 + 0.06 * Math.sin(th), 0.05);
-        k.mendilEl = el;
+
+/* ---- gölge, ad etiketleri, konuşma balonları, kenar karartması ---- */
+// Yerdeki gölge: (x, z) noktasında rx × rz metrelik elips.
+function golge(x, z, rx, rz) {
+  const g = pr([x, 0, z]);
+  if (!g.ok)
+    return;
+  c.fillStyle = 'rgba(40,24,30,.34)';
+  c.beginPath();
+  c.ellipse(g.x, g.y, rx * g.s, rz * g.s, 0, 0, TAU);
+  c.fill();
+}
+// k.et = { x, y, s, d }: etiketin oturacağı yer (başın tepesi), ölçek ve derinlik. insanEkle kendisi kurar;
+// insan çizmeyen oyun her karede kendisi yazar. Çekirdek her karede izleyicilerin k.et'ini boşaltır.
+// ekler: izleyici olmayan, etiketi olacak oyuncular (oyunEkAdlar()); k.ozel olanlar vurgu rengiyle yazılır.
+function etiketCiz(ekler) {
+  const adlar = ekler.filter(k => k && k.et);
+  for (const k of D.oy.values())
+    if (k.et && !k.cikiyor)
+      adlar.push(k);
+  c.textAlign = 'center';
+  c.textBaseline = 'middle';
+  c.lineJoin = 'round';
+  // Yer yetmeyince kimin adı kalır: lider, yıldız, özel oyuncular, son konuşanlar, ilk beş, öndekiler.
+  const onc = k => (k === D.lider ? 2000 : 0) + (k.yildiz ? 1500 : 0) + (k.ozel ? 900 : 0) + (zaman - k.son < 6 ? 600 - (zaman - k.son) * 20 : 0) + (!k.ozel && k.sn < 5 ? 200 - k.sn : 0) - k.et.d;
+  const kutular = [], sirali = adlar.slice().sort((a, b) => onc(b) - onc(a));
+  for (const k of sirali) {
+    const et = k.et, bas = k === D.lider, yeniMi = !k.ozel && zaman - k.yeni < 3;
+    const punto = clamp(Math.round(et.s * 0.17), 13, 18) + (bas ? 4 : 0), yk = punto + 9, tac = bas ? punto * 1.05 : 0;
+    c.font = (bas ? '700 ' : '500 ') + punto + 'px Rubik, system-ui, sans-serif';
+    if (k.adYazi !== k.ad + punto) {
+      k.adYazi = k.ad + punto;
+      k.adW = c.measureText(k.ad).width;
+    }
+    const w = k.adW + punto * 1.1 + tac, y0 = et.y - 5;
+    const x = clamp(et.x, w / 2 + 4, GW - w / 2 - 4);
+    let y = null;
+    for (const dy of [0, -(yk + 2), -(yk + 2) * 2]) {
+      const a = x - w / 2, u = y0 + dy - yk;
+      if (!kutular.some(q => a < q[0] + q[2] && a + w > q[0] && u < q[1] + q[3] && u + yk > q[1])) {
+        y = y0 + dy;
+        break;
       }
     }
+    k.etY = y0 - yk;
+    if (y === null) {
+      if (onc(k) < 500)
+        continue;
+      y = y0;
+    }
+    k.etY = y - yk;
+    kutular.push([x - w / 2, y - yk, w, yk]);
+    c.fillStyle = bas ? RENK.vurgu : renkSaydam(MUREKKEP, 0.78);
+    c.beginPath();
+    c.roundRect(x - w / 2, y - yk, w, yk, yk / 2);
+    c.fill();
+    if (bas) {
+      c.lineWidth = 2.5;
+      c.strokeStyle = MUREKKEP;
+      c.stroke();
+      // taç: liderin işareti
+      const tx = x - w / 2 + punto * 0.5, ty = y - yk / 2, b = punto * 0.42;
+      c.fillStyle = RENK.sicak;
+      c.beginPath();
+      c.moveTo(tx, ty + b * 0.7);
+      c.lineTo(tx - b * 0.15, ty - b * 0.6);
+      c.lineTo(tx + b * 0.45, ty);
+      c.lineTo(tx + b, ty - b * 0.85);
+      c.lineTo(tx + b * 1.55, ty);
+      c.lineTo(tx + b * 2.15, ty - b * 0.6);
+      c.lineTo(tx + b * 2, ty + b * 0.7);
+      c.closePath();
+      c.fill();
+    }
+    c.fillStyle = bas ? MUREKKEP : yeniMi ? '#5fe0d0' : k.ozel ? RENK.vurgu : RENK.acik;
+    c.fillText(k.ad, x + tac / 2, y - yk / 2 + 1);
   }
-  const kutupR = [-k.f[0] * 0.6 - k.l[0] * 0.5, -0.7, -k.f[2] * 0.6 - k.l[2] * 0.5], kutupL = [-k.f[0] * 0.6 + k.l[0] * 0.5, -0.7, -k.f[2] * 0.6 + k.l[2] * 0.5];
-  j.drR = ik(j.omR, j.haR, KOL * boy, KOL * boy, kutupR, j.drR || [0, 0, 0]);
-  j.drL = ik(j.omL, j.haL, KOL * boy, KOL * boy, kutupL, j.drL || [0, 0, 0]);
+  for (const k of adlar) {
+    if (!k.balon)
+      continue;
+    const ya = zaman - k.balon.t0;
+    if (ya > 3.4) {
+      k.balon = null;
+      continue;
+    }
+    const et = k.et, al = Math.min(1, ya * 8, (3.4 - ya) * 4), by = (k.etY ?? et.y - 60) - 12;
+    c.font = '700 21px Rubik, system-ui, sans-serif';
+    const w = Math.min(330, c.measureText(k.balon.m).width + 28), x = clamp(et.x, w / 2 + 8, GW - w / 2 - 8);
+    c.globalAlpha = al;
+    c.fillStyle = RENK.vurgu;
+    c.strokeStyle = MUREKKEP;
+    c.lineWidth = 2.5;
+    c.beginPath();
+    c.roundRect(x - w / 2, by - 36, w, 36, 14);
+    c.fill();
+    c.stroke();
+    c.beginPath();
+    c.moveTo(et.x - 8, by - 2);
+    c.lineTo(et.x, by + 9);
+    c.lineTo(et.x + 8, by - 2);
+    c.stroke();
+    c.fill();
+    c.fillStyle = MUREKKEP;
+    c.fillText(k.balon.m, x, by - 17, w - 18);
+    c.globalAlpha = 1;
+  }
+  c.textBaseline = 'alphabetic';
+}
+let kenarBoya = null;
+function kenarKarart() {
+  if (!kenarBoya) {
+    kenarBoya = c.createRadialGradient(GW / 2, GH * 0.58, GH * 0.32, GW / 2, GH * 0.58, GH * 0.74);
+    kenarBoya.addColorStop(0, renkSaydam(MUREKKEP, 0));
+    kenarBoya.addColorStop(1, renkSaydam(MUREKKEP, 0.5));
+  }
+  c.fillStyle = kenarBoya;
+  c.fillRect(0, 0, GW, GH);
 }

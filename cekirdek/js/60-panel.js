@@ -1,7 +1,10 @@
-/* PANEL VE AÇILIŞ — deneme panelinin düğmeleri, sahnenin boyutlandırılması, oyunun başlatılması.
- * boyutla: sahneyi 9:16 tutar · yayinModu: yalnız sahne görünümü (#yayin) · baslat: her şeyi bağlar ve döngüyü açar
- * window.MendilKimde: dışarıya açık arayüz (olay, baglan, kes, cevir, durum, _test). Testler bunu kullanır.
+/* PANEL VE AÇILIŞ — sayfa yazıları, deneme panelinin düğmeleri, sahnenin boyutlandırılması, oyunun başlatılması.
+ * sayfaYaz: logo, nasıl oynanır, başlıklar, kademe tablosu ve tema renkleri OYUN'dan · boyutla: sahneyi 9:16 tutar
+ * yayinModu: yalnız sahne görünümü (#yayin) · baslat: tohum kalabalığı kurar, oyunBaslat(kayit) çağırır, döngüyü açar
+ * window.CanliOyun: dışarıya açık arayüz (olay, baglan, kes, cevir, durum, _test). Testler bunu kullanır.
+ * Açılış bütün parçalar çalıştıktan sonra (mikro görevde) yapılır: oyunun üst düzey const'ları kancalarda hazırdır.
  */
+const KANCA_DURUM = typeof oyunDurum === 'function' ? oyunDurum : null;
 function otoAyarla(v) { oto = v; const b = $('oto'); b.textContent = 'Otomatik izleyici: ' + (v ? 'açık' : 'kapalı'); b.classList.toggle('secili', v); b.setAttribute('aria-pressed', v); }
 async function sesDegistir(ac) {
   if (ac) {
@@ -40,7 +43,46 @@ function yayinModu(v) { document.body.classList.toggle('yayin', v); try {
 }
 catch (e) { } boyutla(); }
 
+// Sayfadaki oyuna özgü her yazı OYUN'dan gelir (hepsi textContent; HTML yazılmaz).
+function sayfaYaz() {
+  const kok = document.documentElement.style;
+  for (const [ad, css] of [['zemin', '--zemin'], ['zemin2', '--zemin-2'], ['zemin3', '--zemin-3'], ['cizgi', '--cizgi'], ['vurgu', '--vurgu'], ['sicak', '--sicak'], ['serin', '--serin'], ['acik', '--acik'], ['soluk', '--soluk'], ['murekkep', '--murekkep']])
+    kok.setProperty(css, RENK[ad]);
+  const y = OYUN.yazi, logo = $('logo'), lp = [].concat(OYUN.logo || OYUN.ad || '').map(String);
+  logo.textContent = '';
+  logo.append(lp[0] + (lp.length > 1 ? ' ' : ''));
+  if (lp.length > 1) {
+    const b = document.createElement('b');
+    b.textContent = lp.slice(1).join(' ');
+    logo.append(b);
+  }
+  for (const tur of ['yorum', 'begeni', 'hediye']) {
+    const s = $('nasil-' + tur), m = OYUN.nasil[tur];
+    if (m)
+      s.append(String(m));
+    else
+      s.hidden = true;
+  }
+  $('sira-baslik').textContent = y.sira;
+  $('gosterge-baslik').textContent = y.gosterge;
+  $('ses-cagri').textContent = y.ses;
+  tuval.setAttribute('aria-label', y.sahne);
+  $('s-yorum-not').textContent = y.giris;
+  $('s-takip-not').textContent = y.giris;
+  $('bosalt').textContent = y.bosalt;
+  // kademe tablosu: küçükten büyüğe
+  const tablo = $('kademe-tablo');
+  for (const kd of [...KADEME].reverse()) {
+    const tr = document.createElement('tr'), a = document.createElement('td'), b = document.createElement('td');
+    a.textContent = kd.min + '+ jeton';
+    b.textContent = kd.etki || kd.ad;
+    tr.append(a, b);
+    tablo.append(tr);
+  }
+}
+
 function baslat(kayit) {
+  sayfaYaz();
   // panel düğmeleri
   HAVALAR.forEach((h, i) => {
     const b = document.createElement('button');
@@ -85,7 +127,8 @@ function baslat(kayit) {
   $('s-begeni').onclick = () => { ilkDokunus(); olay({ tip: 'begeni', kullanici: sahteKim(), adet: 15 }); };
   $('s-takip').onclick = () => { ilkDokunus(); olay({ tip: 'takip', kullanici: sahteKim() }); };
   $('oto').onclick = () => otoAyarla(!oto);
-  $('bosalt').onclick = () => { D.oy.clear(); D.soloKuyruk.length = 0; D.solo = null; D.hareket = null; D.mendilUcus = null; D.cosku = 0; siraImza = '?'; siraGuncelle(); otoAyarla(false); try {
+  // Boşalt: önce bütün oyuncular silinir, sonra oyun kendi durumunu sıfırlar (oyunBosalt), sonra sıra yeniden kurulur.
+  $('bosalt').onclick = () => { D.oy.clear(); D.cosku = 0; siraImza = '?'; oyunBosalt(); siraGuncelle(); otoAyarla(false); try {
     localStorage.removeItem(SAKLA);
   }
   catch (e) { } };
@@ -100,17 +143,17 @@ function baslat(kayit) {
   $('ses-cagri').onclick = () => { dokunuldu = true; sesDegistir(true); };
   $('ses-duzey').oninput = e => muzik.duzeyAyarla(e.target.value / 100 * 0.7);
   // Hazır parçalar: oyunun yanındaki muzik/liste.js varsa yüklenir ve müzik yalnız o parçalardan çalar;
-  // üretilen havaların düğmeleri gizlenir. Klasör yoksa hiçbir şey değişmez, üretilen davul zurna çalar.
+  // üretilen havaların düğmeleri gizlenir. Klasör yoksa hiçbir şey değişmez, üretilen müzik çalar.
   const kaynakYaz = () => {
     for (const x of $('parca-sec').children)
       x.classList.toggle('secili', muzik.hazirCal && x.id === 'parca-' + muzik.hz.no);
   };
   kare.kaynakYaz = kaynakYaz;
-  if (!window.MENDIL_MUZIK_KAPALI) {
+  if (!window.OYUN_MUZIK_KAPALI) {
     const ml = document.createElement('script');
     ml.src = 'muzik/liste.js';
     ml.onload = () => {
-      if (!muzik.hazirKur(window.MENDIL_MUZIK))
+      if (!muzik.hazirKur(window.OYUN_MUZIK))
         return;
       muzik.parcalar.forEach((p, i) => {
         const b = document.createElement('button');
@@ -143,24 +186,13 @@ function baslat(kayit) {
   addEventListener('resize', boyutla);
   if (window.ResizeObserver)
     new ResizeObserver(boyutla).observe(document.documentElement);
-  // başlangıç kalabalığı: sayfa boş açılmasın
-  const eski = kayit && Array.isArray(kayit.oyuncular) ? kayit.oyuncular : KOPRU ? (siraOku() || []) : null; // gerçek yayında sahte ad olmaz
-  const tohum = eski || [['zeyno.47', 320], ['urfalı_bekir', 140], ['gülizar_teyze', 60], ['dj_mahmut', 25], ['elif_naz', 10], ['hasan.usta', 5], ['pınar_34', 0], ['köyün_delisi', 0], ['berfin_gül', 0]].map(([ad, jeton]) => ({ id: 'sahte:' + ad, ad, jeton }));
+  // Başlangıç kalabalığı: sayfa boş açılmasın. Gerçek yayında sahte ad olmaz; saklanan sıra geri gelir.
+  const eski = kayit && Array.isArray(kayit.oyuncular) ? kayit.oyuncular : KOPRU ? (siraOku() || []) : null;
+  const tohum = eski || (OYUN.tohum || []).map(([ad, jeton]) => ({ id: 'sahte:' + ad, ad, jeton }));
   tohum.forEach((t, i) => { const k = karakterYap(String(t.id), String(t.ad)); k.jeton = +t.jeton || 0; k.katilim = i * 0.001; D.oy.set(k.id, k); });
   siraImza = '?';
   siraGuncelle();
-  D.R = D.Rhedef;
-  for (const k of D.sira) {
-    k.x = Math.sin(k.hedefAci) * D.R;
-    k.z = Math.cos(k.hedefAci) * D.R;
-    k.yer = 1;
-    k.yon = Math.PI;
-    k.yeni = -9;
-  }
-  davulcu.x = -2.4;
-  davulcu.z = 1;
-  zurnaci.x = 2.4;
-  zurnaci.z = 1;
+  oyunBaslat(kayit);
   if (kayit && typeof kayit.cosku === 'number')
     D.cosku = kayit.cosku;
   if (kayit && kayit.hava) {
@@ -172,7 +204,6 @@ function baslat(kayit) {
     }
   }
   document.body.classList.toggle('yayin', location.hash === '#yayin');
-  arkaHazirla();
   boyutla();
   kamKur();
   if (KOPRU) {
@@ -191,10 +222,15 @@ function baslat(kayit) {
 }
 
 // Dışarıya açık küçük arayüz: köprü yazanlar ve denemeler için.
-window.MendilKimde = {
+window.CanliOyun = {
   olay, baglan: a => Yayin.baglan(a), kes: () => Yayin.kes(), cevir: m => Yayin.cevir(m),
-  durum: () => ({ kisi: D.sira.length, halayBasi: D.lider && D.lider.ad, cosku: D.cosku, vurus: B, sira: D.sira.map(k => [k.ad, k.jeton]), kareMs: D.kareMs, parca: parca.length, bagli: !!(Yayin.ws && Yayin.ws.readyState === 1), alinan: Yayin.alinan, hava: muzik.hava.id, ses: muzik.acik }),
-  _test: { D, muzik, Muzik, HAVALAR, ayar, zamanEkle: sn => { zaman += sn; }, zaman: () => zaman },
+  durum: () => {
+    const d = { oyun: OYUN.id, kisi: D.sira.length, lider: D.lider && D.lider.ad, cosku: D.cosku, begeni: D.begeni, vurus: B, sira: D.sira.map(k => [k.ad, k.jeton]), kareMs: D.kareMs, parca: parca.length, bagli: !!(Yayin.ws && Yayin.ws.readyState === 1), alinan: Yayin.alinan, hava: muzik.hava.id, ses: muzik.acik };
+    if (KANCA_DURUM)
+      KANCA_DURUM(d);
+    return d;
+  },
+  _test: { D, muzik, Muzik, HAVALAR, ayar, OYUN, KADEME, zamanEkle: sn => { zaman += sn; }, zaman: () => zaman },
   async _sesTesti(sn, i) {
     const oc = new OfflineAudioContext(2, 44100 * sn, 44100), m = new Muzik();
     m.hava = HAVALAR[i || 0];
@@ -224,7 +260,9 @@ window.MendilKimde = {
   }
 };
 window.claude?.hot?.snapshot?.(() => ({ oyuncular: D.sira.map(k => ({ id: k.id, ad: k.ad, jeton: k.jeton })), cosku: D.cosku, hava: muzik.hava.id }));
-if (window.claude?.hot?.ready)
-  window.claude.hot.ready(baslat);
-else
-  baslat(window.claude?.hot?.data ?? {});
+queueMicrotask(() => {
+  if (window.claude?.hot?.ready)
+    window.claude.hot.ready(baslat);
+  else
+    baslat(window.claude?.hot?.data ?? {});
+});

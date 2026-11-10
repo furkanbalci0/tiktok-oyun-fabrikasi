@@ -1,0 +1,2924 @@
+<!DOCTYPE html>
+<!-- BU DOSYA ÜRETİLİR. Elle düzenleme: cekirdek/ ya da oyunlar/halay/js/ altını değiştir, sonra "node araclar/derle.js halay" çalıştır. -->
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mendil Kimde?</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Rubik:wght@400;500;700&display=swap">
+<style>
+body{margin:0}[hidden]{display:none!important}
+/* Yerleşim: solda 9:16 sahne (yayına giden görüntü), sağda deneme paneli; dar ekranda alt alta.
+   Renkler tema adlarıyla yazılır (--zemin, --vurgu …); panel açılışta bunları oyunun RENK ayarından doldurur. */
+:root{
+  color-scheme: dark;
+  --zemin:#0e1230; --zemin-2:#171d47; --zemin-3:#232b63; --cizgi:#343d80;
+  --vurgu:#ffd166; --sicak:#e23d2f; --serin:#22b8a7; --acik:#f6ecd9;
+  --soluk:#a9b0dc; --murekkep:#080a1c;
+  --baslik:'Lilita One','Rubik','Trebuchet MS',sans-serif;
+  --govde:'Rubik',system-ui,'Segoe UI',sans-serif;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{background:var(--zemin);color:var(--acik);font-family:var(--govde);font-size:14px;line-height:1.45}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--vurgu);outline-offset:2px}
+
+.duzen{height:100%;display:flex;gap:20px;justify-content:center;align-items:stretch;
+  padding-block:16px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.sahne{position:relative;flex:none;width:320px;height:569px;border-radius:18px;overflow:hidden;
+  background:var(--murekkep);container-type:size;align-self:center;box-shadow:0 0 0 1px var(--cizgi)}
+.sahne canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+
+/* ---- sahne üstü yazılar (yayında görünür) ---- */
+.hud{position:absolute;inset:0;pointer-events:none;font-size:3.1cqw}
+.hud-ust{position:absolute;top:8.2cqh;left:0;right:0;text-align:center}
+.logo{font-family:var(--baslik);font-size:9.4cqw;line-height:1;letter-spacing:.01em;color:var(--acik);
+  text-shadow:0 .5cqw 0 var(--sicak),0 1.2cqw 2.4cqw rgba(0,0,0,.55)}
+.logo b{color:var(--vurgu);font-weight:400}
+.nasil{display:flex;justify-content:center;gap:1.2cqw;margin-top:2cqw;flex-wrap:wrap;padding:0 2cqw}
+.nasil span{display:inline-flex;align-items:center;gap:1.1cqw;background:rgba(8,10,28,.62);
+  border:1px solid rgba(246,236,217,.18);border-radius:99px;padding:.8cqw 1.8cqw;font-weight:500;font-size:2.6cqw;white-space:nowrap}
+.nasil svg{width:3cqw;height:3cqw;flex:none}
+.sira{position:absolute;top:19.6cqh;left:3cqw;width:40cqw;font-size:2.8cqw}
+.sira h2,.cosku h2{margin:0 0 .8cqw;font-family:var(--baslik);font-weight:400;font-size:3.4cqw;letter-spacing:.03em;
+  color:var(--vurgu);text-shadow:0 .3cqw .8cqw rgba(0,0,0,.7)}
+.sira ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.5cqw}
+.sira li{display:flex;align-items:center;gap:1.4cqw;background:rgba(8,10,28,.6);border-radius:1.4cqw;padding:.45cqw 1.4cqw;min-width:0}
+.sira li .no{flex:none;width:3.5cqw;height:3.5cqw;border-radius:50%;background:var(--zemin-3);display:grid;place-items:center;
+  font-weight:700;font-size:2.2cqw}
+.sira li .ad{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500}
+.sira li .jt{flex:none;font-weight:700;font-variant-numeric:tabular-nums;color:var(--vurgu)}
+.sira li.bas{background:var(--sicak)}
+.sira li.bas .no{background:var(--vurgu);color:var(--murekkep)}
+.sira li.bas .jt{color:var(--acik)}
+.sira .bos{color:var(--soluk);background:rgba(8,10,28,.6);border-radius:1.6cqw;padding:1cqw 1.6cqw}
+.cosku{position:absolute;top:19.6cqh;right:3cqw;width:34cqw;text-align:right}
+.cosku .cubuk{height:3.4cqw;border-radius:99px;background:rgba(8,10,28,.65);border:1px solid rgba(246,236,217,.2);overflow:hidden}
+.cosku .dolu{height:100%;width:0;border-radius:99px;background:linear-gradient(90deg,var(--serin),var(--vurgu) 60%,var(--sicak))}
+.cosku .bilgi{margin-top:.8cqw;white-space:pre-line;line-height:1.3;font-size:2.7cqw;color:var(--acik);font-variant-numeric:tabular-nums;text-shadow:0 .2cqw .6cqw rgba(0,0,0,.8)}
+.bildirim{position:absolute;top:27.5cqh;right:3cqw;width:50cqw;display:flex;flex-direction:column;align-items:flex-end;gap:1cqw}
+.bildirim div{background:var(--acik);color:var(--murekkep);border-radius:2cqw 2cqw .4cqw 2cqw;padding:1.1cqw 2.2cqw;
+  font-weight:500;font-size:3cqw;max-width:100%;overflow-wrap:anywhere;animation:gir .25s ease-out both}
+.bildirim div b{color:var(--sicak)}
+.bildirim div.git{animation:cik .3s ease-in both}
+.pankart{position:absolute;left:0;right:0;top:21.5cqh;text-align:center;padding:2.4cqw 3cqw;
+  background:var(--sicak);border-block:.8cqw solid var(--vurgu);transform:rotate(-2deg) scale(1.04);animation:pankart 3.4s ease both}
+.pankart .b1{font-family:var(--baslik);font-size:6.6cqw;line-height:1.05;color:var(--acik)}
+.pankart .b2{font-weight:700;font-size:4cqw;color:var(--vurgu);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ses-cagri{position:absolute;left:50%;bottom:9cqh;transform:translateX(-50%);pointer-events:auto;
+  background:var(--vurgu);color:var(--murekkep);border:0;border-radius:99px;padding:2cqw 4.4cqw;font-weight:700;font-size:3.8cqw;
+  box-shadow:0 .8cqw 0 rgba(0,0,0,.35);white-space:nowrap}
+.cik-yayin{position:absolute;right:2cqw;top:2cqw;pointer-events:auto;background:rgba(8,10,28,.7);border:1px solid var(--cizgi);
+  border-radius:99px;padding:1cqw 2.4cqw;font-size:2.6cqw;opacity:0;transition:opacity .2s}
+.sahne:hover .cik-yayin,.cik-yayin:focus-visible{opacity:1}
+@keyframes gir{from{opacity:0;transform:translateX(6cqw)}to{opacity:1;transform:none}}
+@keyframes cik{to{opacity:0;transform:translateY(-2cqw)}}
+@keyframes pankart{0%{opacity:0;transform:rotate(-2deg) scale(1.6)}8%{opacity:1;transform:rotate(-2deg) scale(1.04)}
+  88%{opacity:1;transform:rotate(-2deg) scale(1.04)}100%{opacity:0;transform:rotate(-2deg) scale(.9)}}
+
+/* ---- deneme paneli (yayında görünmez) ---- */
+.panel{flex:0 1 400px;min-width:0;overflow:auto;display:flex;flex-direction:column;gap:18px;padding-right:4px}
+.panel h1{margin:0;font-family:var(--baslik);font-weight:400;font-size:26px;line-height:1.1}
+.panel .not{margin:4px 0 0;color:var(--soluk)}
+.bolum{border-top:1px solid var(--cizgi);padding-top:14px;display:flex;flex-direction:column;gap:10px}
+.bolum h2{margin:0;font-size:12px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--vurgu)}
+.satir{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.dugme{background:var(--zemin-3);border:1px solid var(--cizgi);border-radius:10px;padding:9px 12px;font-weight:500;line-height:1.2;text-align:left}
+.dugme:hover{border-color:var(--soluk)}
+.dugme:active{transform:translateY(1px)}
+.dugme.ana{background:var(--vurgu);border-color:var(--vurgu);color:var(--murekkep);font-weight:700}
+.dugme.secili{background:var(--serin);border-color:var(--serin);color:var(--murekkep);font-weight:700}
+.dugme small{display:block;font-weight:400;font-size:12px;opacity:.8}
+.hediyeler{display:grid;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:8px}
+.hediyeler .dugme{border-left:4px solid var(--sicak)}
+.hediyeler .dugme b{font-variant-numeric:tabular-nums}
+.alan{display:flex;flex-direction:column;gap:4px;min-width:0}
+.satir > .alan{flex:1 1 160px}
+.alan label,.etiket{font-size:12px;color:var(--soluk)}
+.alan input[type=text]{background:var(--murekkep);border:1px solid var(--cizgi);border-radius:8px;padding:8px 10px;min-width:0;width:100%}
+input[type=range]{accent-color:var(--vurgu);flex:1;min-width:80px}
+.gunluk{margin:0;padding:8px 10px;list-style:none;background:var(--murekkep);border:1px solid var(--cizgi);border-radius:8px;
+  height:132px;overflow:auto;font-size:12.5px;display:flex;flex-direction:column;gap:2px}
+.gunluk li{overflow-wrap:anywhere}
+.gunluk .tur{color:var(--serin);font-weight:700;margin-right:6px}
+.gunluk .tur.h{color:var(--vurgu)}
+.rozet{display:inline-flex;align-items:center;gap:6px;border-radius:99px;padding:3px 10px;font-size:12px;font-weight:700;background:var(--zemin-3)}
+.rozet::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--soluk)}
+.rozet.acik::before{background:var(--serin)}
+.rozet.hata::before{background:var(--sicak)}
+.aciklama{margin:0;color:var(--soluk);font-size:13px;max-width:62ch}
+details{border:1px solid var(--cizgi);border-radius:8px;padding:8px 10px}
+details summary{cursor:pointer;font-weight:500}
+pre{margin:8px 0 0;overflow-x:auto;font-size:12px;line-height:1.5;color:var(--acik);font-family:ui-monospace,Consolas,monospace}
+table{border-collapse:collapse;font-size:13px;width:100%}
+td,th{text-align:left;padding:4px 8px 4px 0;border-bottom:1px solid var(--zemin-3);vertical-align:top}
+th{color:var(--soluk);font-weight:500}
+td:first-child{font-variant-numeric:tabular-nums;white-space:nowrap}
+
+body.yayin .panel{display:none}
+body.yayin .duzen{padding:0;gap:0}
+body.yayin .sahne{border-radius:0;box-shadow:none}
+body:not(.yayin) .cik-yayin{display:none}
+
+@media (max-width:820px){
+  html,body{height:auto}
+  .duzen{flex-direction:column;align-items:center;height:auto}
+  .sahne{position:sticky;top:calc(env(safe-area-inset-top,0px) + 8px);z-index:5;align-self:center}
+  .panel{flex:none;width:100%;overflow:visible;padding-right:0}
+  body.yayin, body.yayin .duzen{height:100%}
+}
+@media (prefers-reduced-motion:reduce){
+  .bildirim div,.pankart{animation-duration:.01s}
+  .pankart{animation:none}
+}
+</style>
+</head>
+<body>
+<div class="duzen" id="duzen">
+  <div class="sahne" id="sahne">
+    <canvas id="tuval" width="720" height="1280" aria-label="Oyun sahnesi"></canvas>
+    <div class="hud">
+      <div class="hud-ust">
+        <div class="logo" id="logo"></div>
+        <div class="nasil">
+          <span id="nasil-yorum"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h12v8H7l-3 3v-3H2z" style="fill:var(--serin)"/></svg></span>
+          <span id="nasil-begeni"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 14S2 10 2 6a3 3 0 0 1 6-1 3 3 0 0 1 6 1c0 4-6 8-6 8z" style="fill:var(--sicak)"/></svg></span>
+          <span id="nasil-hediye"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 6h12v8H2zM1 4h14v3H1zM7 4h2v10H7z" style="fill:var(--vurgu)"/></svg></span>
+        </div>
+      </div>
+      <div class="sira"><h2 id="sira-baslik"></h2><ol id="sira-liste"></ol></div>
+      <div class="cosku"><h2 id="gosterge-baslik"></h2><div class="cubuk"><div class="dolu" id="cosku-dolu"></div></div><div class="bilgi" id="cosku-bilgi"></div></div>
+      <div class="bildirim" id="bildirim"></div>
+      <div id="pankart-yeri"></div>
+      <button class="ses-cagri" id="ses-cagri" type="button">Müziği başlat</button>
+      <button class="cik-yayin" id="cik-yayin" type="button">Paneli göster</button>
+    </div>
+  </div>
+
+  <div class="panel" id="panel">
+    <div>
+      <h1>Deneme paneli</h1>
+      <p class="not" id="panel-not">Yayın bağlı değil. Buradaki yorum, beğeni ve hediyelerin hepsi sahte izleyiciden gelir. Sahne, yayında izleyicinin göreceği görüntüdür.</p>
+    </div>
+
+    <div class="bolum">
+      <h2>Sahte izleyici</h2>
+      <div class="alan">
+        <label for="sahte-ad">İzleyici adı (boş bırakırsan rastgele biri gelir)</label>
+        <input type="text" id="sahte-ad" maxlength="18" placeholder="örn. kendi adın" autocomplete="off">
+      </div>
+      <div class="satir">
+        <button class="dugme" id="s-yorum" type="button">Yorum yaz<small id="s-yorum-not">sahneye girer</small></button>
+        <button class="dugme" id="s-begeni" type="button">15 beğeni<small>coşku artar</small></button>
+        <button class="dugme" id="s-takip" type="button">Takip et<small id="s-takip-not">sahneye girer</small></button>
+      </div>
+      <span class="etiket">Hediye gönder</span>
+      <div class="hediyeler" id="hediyeler"></div>
+      <div class="satir">
+        <button class="dugme secili" id="oto" type="button" aria-pressed="true">Otomatik izleyici: açık</button>
+        <span class="etiket">Kalabalık</span>
+        <span class="satir" id="hiz-sec" role="group" aria-label="Kalabalık hızı"></span>
+      </div>
+      <div class="satir">
+        <button class="dugme" id="bosalt" type="button">Sahneyi boşalt</button>
+        <button class="dugme" id="yayin-gor" type="button">Yalnızca sahneyi göster</button>
+      </div>
+    </div>
+
+    <div class="bolum">
+      <h2>Müzik</h2>
+      <div class="satir">
+        <button class="dugme ana" id="ses-dugme" type="button">Sesi aç</button>
+        <input type="range" id="ses-duzey" min="0" max="100" value="86" aria-label="Ses düzeyi">
+      </div>
+      <div class="satir" id="hava-sec" role="group" aria-label="Hava seçimi"></div>
+      <div class="satir"><button class="dugme secili" id="sirayla" type="button" aria-pressed="true">Havaları sırayla çal: açık</button></div>
+      <div class="alan" id="hazir-kutu" hidden>
+        <span class="etiket">Parçalar (muzik klasöründen; sırayla çalar)</span>
+        <div class="satir" id="parca-sec" role="group" aria-label="Parça seçimi"></div>
+      </div>
+    </div>
+
+    <div class="bolum">
+      <h2>Gelen olaylar</h2>
+      <ul class="gunluk" id="gunluk" aria-live="off"></ul>
+    </div>
+
+    <div class="bolum">
+      <h2>Yayın ayarları</h2>
+      <div class="satir"><button class="dugme secili" id="balon-dugme" type="button" aria-pressed="true">Yorum balonları: açık</button></div>
+      <div class="alan">
+        <label for="yasak">Balonlarda ve adlarda gizlenecek kelimeler (virgülle ayır)</label>
+        <input type="text" id="yasak" autocomplete="off" spellcheck="false" placeholder="örn. kelime1, kelime2">
+      </div>
+      <p class="aciklama">Bağlantı adresleri ve telefon numarası gibi uzun rakam dizileri balonlarda kendiliğinden gizlenir.</p>
+    </div>
+
+    <div class="bolum">
+      <h2>Gerçek yayın bağlantısı</h2>
+      <div class="satir"><span class="rozet" id="bag-rozet">Bağlı değil</span></div>
+      <p class="aciklama">TikTok, canlı yayındaki yorum ve hediyeleri okumak için resmi bir açık API sunmuyor. Oyun bu yüzden TikTok'a doğrudan değil, bilgisayarında çalışan köprü programına bağlanır. Paketteki köprüyü çalıştırınca açılan sayfa kendiliğinden bağlanır. Köprü yayını yalnızca okur; şifre ya da hesap girişi istemez.</p>
+      <div class="satir">
+        <div class="alan">
+          <label for="bag-adres">Köprü adresi</label>
+          <input type="text" id="bag-adres" placeholder="ws://localhost:PORT" autocomplete="off" spellcheck="false">
+        </div>
+        <button class="dugme" id="bag-dugme" type="button">Bağlan</button>
+      </div>
+      <p class="aciklama" id="bag-ileti"></p>
+      <table>
+        <thead><tr><th>Hediye değeri</th><th>Sahnede olan</th></tr></thead>
+        <tbody id="kademe-tablo"></tbody>
+      </table>
+      <details>
+        <summary>Köprünün göndermesi gereken ileti biçimi</summary>
+        <pre>{"event":"chat","data":{"uniqueId":"ayse","nickname":"Ayşe","comment":"selam!"}}
+{"event":"gift","data":{"uniqueId":"ayse","nickname":"Ayşe","diamondCount":5,"repeatCount":3,"giftType":1,"repeatEnd":true}}
+{"event":"like","data":{"uniqueId":"ayse","nickname":"Ayşe","likeCount":15}}
+{"event":"follow","data":{"uniqueId":"ayse","nickname":"Ayşe"}}
+
+ya da doğrudan sayfadan:
+CanliOyun.olay({tip:"hediye", kullanici:{id:"ayse", ad:"Ayşe"}, jeton:50})</pre>
+      </details>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+'use strict';
+/* ── oyunlar/halay/js/00-ayar.js ── */
+/* AYAR — Mendil Kimde? oyununun bütün yazıları, hediye kademeleri, açılış kalabalığı ve sahte yorumları.
+ * Derlemede HER ZAMAN İLK dosyadır; çekirdek OYUN'u buradan okur (docs/KANCALAR.md).
+ */
+const OYUN = {
+  id: 'mendil-kimde',
+  ad: 'Mendil Kimde?',
+  logo: ['Mendil', 'Kimde?'],
+  nasil: { yorum: 'Yorum: halaya gir', begeni: 'Beğeni: tempo', hediye: 'Hediye: mendil' },
+  yazi: {
+    sira: 'Halay sırası', gosterge: 'Coşku', bos: 'Meydan boş. İlk yazan mendili alır.',
+    birim: 'kişi', ses: 'Davul zurnayı başlat', sahne: 'Halay sahnesi', giris: 'halaya girer', bosalt: 'Meydanı boşalt'
+  },
+  kapasite: 36,
+  // Büyükten küçüğe. tip, oyunHediye'nin hangi hareketi başlatacağını seçer; etki paneldeki tabloda yazar.
+  kademe: [
+    { min: 1000, ad: 'Meydan senin', tip: 'solo', etki: 'Gönderen ortaya çıkar, tek başına oynar' },
+    { min: 200, ad: 'Davulcu coşsun', tip: 'davul', etki: 'Davulcu coşar, tempo fırlar' },
+    { min: 50, ad: 'Çök', tip: 'cok', etki: 'Herkes çöker, kalkar' },
+    { min: 10, ad: 'Omuz', tip: 'omuz', etki: 'Herkes omuz titretir' },
+    { min: 1, ad: 'Zıpla', tip: 'zipla', etki: 'Gönderen zıplar' }
+  ],
+  tohum: [['zeyno.47', 320], ['urfalı_bekir', 140], ['gülizar_teyze', 60], ['dj_mahmut', 25], ['elif_naz', 10], ['hasan.usta', 5], ['pınar_34', 0], ['köyün_delisi', 0], ['berfin_gül', 0]],
+  sahteAd: ['halaysever06', 'kıvırcık_ayşe', 'davulcu.memo', 'zeyno.47', 'urfalı_bekir', 'gülizar_teyze', 'mert.can.21', 'elif_naz', 'dj_mahmut', 'karadenizli.cemo', 'sibel_abla', 'ozan_dayı', 'mardinli_rojin', 'tuğçe.sk', 'hasan.usta', 'pınar_34', 'köyün_delisi', 'berfin_gül', 'yusuf.63', 'nazlı_can', 'apo_halay', 'şahin_k', 'melo.27', 'damat_tarafı', 'gelinin_kuzeni', 'fatoş_01', 'efe_tr', 'cano_23', 'zilan.d', 'hüso_baba', 'ayten_hanım', 'kemo_44', 'deniz.yıldızı', 'rıza_amca', 'sude_nur', 'baran.21', 'ipek_böceği', 'muhtar_emmi', 'selo_02', 'songül.k', 'laz_ziya', 'egeli_duru', 'bozkır_ali', 'nur.sena'],
+  sahteYorum: ['halay!', 'ben de geldim', 'çek çek çek', 'Diyarbakır’dan selamlar', 'mendil bende kalsın', 'davulcu coştur', 'halay başı kim ya', 'yer açın geliyorum', 'omuzlar omuzlar', 'bu hava çok iyi', 'Antep buradaa', 'kolum koptu ama bırakmam', 'sıraya girin', 'hoppa!', 'zurnacıya bir çay', 'anneme gösteriyorum', 'düğün var düğün', 'adımı gördüm', 'İzmir’den geldim', 'çök çök çök'],
+  renk: {},
+  kamera: {}
+};
+
+/* ── cekirdek/js/00-yardimci.js ── */
+/* YARDIMCILAR — her parçanın kullandığı küçük işlevler.
+ * clamp / lerp / yumusak / basamak: sayı yardımcıları · ozet + rastgeleUret: addan tekrarlanabilir rastgelelik
+ * aciFark: iki açı arasındaki en kısa fark · azHareket: kullanıcı "hareketi azalt" istemiş mi · $: id ile öğe bul
+ */
+const TAU = Math.PI * 2, HP = Math.PI / 2;
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const lerp = (a, b, t) => a + (b - a) * t;
+const yumusak = t => { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); };
+const basamak = (a, b, x) => yumusak((x - a) / (b - a));
+function ozet(s) { let h = 2166136261; for (const ch of String(s)) {
+  h ^= ch.codePointAt(0);
+  h = Math.imul(h, 16777619);
+} return h >>> 0; }
+function rastgeleUret(tohum) { return () => { tohum |= 0; tohum = tohum + 0x6D2B79F5 | 0; let t = Math.imul(tohum ^ tohum >>> 15, 1 | tohum); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const aciFark = (a, b) => { let d = (b - a) % TAU; if (d > Math.PI)
+  d -= TAU; if (d < -Math.PI)
+  d += TAU; return d; };
+const azHareket = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const $ = id => document.getElementById(id);
+
+/* ── cekirdek/js/10-muzik.js ── */
+/* MÜZİK — davul ve zurna burada sentezlenir; ses dosyası yoktur.
+ * HAVALAR: ezgiler (nota yazımı docs/MUZIK.md'de) · Muzik: zamanlayıcı + ses zinciri · muzik: tek örnek
+ * Önemli: oyunun bütün hareketi "vuruş" saatine (B) bağlıdır ve o saat buradan gelir: muzik.beatAt().
+ * Ses kapalıyken de saat işler (performance.now ile); ses açılınca AudioContext saatine geçilir (tabanDegistir).
+ */
+// Nota yazımı: "derece:süre". Derece dizinin kaçıncı sesi (0 = karar), süre adım sayısı.
+// ' = üstten çarpma, ~ = tril, - = sus.
+const HAVALAR = [
+  { id: 'harman', ad: 'Harman Yeri', bpm: 104, spb: 4, bar: 16, tonik: 415.3,
+    dizi: [0, 150, 300, 500, 700, 880, 1000],
+    davul: { ana: 'D..kT.k.D.D.T.k.', cesni: 'D..kT.kkD.DkT.T.', gecis: 'D.TkD.TkDkTkTTTT' },
+    bolum: {
+      A: "4:4 4:2 5':2 4:2 3:2 4:4 | 3:2 4:2 3:2 2:2 3:4 2:4 | 2:2 3:2 4':2 3:2 2:2 1:2 2:4 | 1:2 2:2 1:2 0:2 0~:8",
+      B: "4:2 5:2 6:2 7:2 7:4 6:2 7':2 | 8:4 7:2 6:2 7:2 6:2 5:4 | 6':2 5:2 4:2 5:2 4:2 3:2 4:4 | 3:2 2:2 1:2 2:2 0~:8",
+      D: "-:16 -:16"
+    }, form: 'AABBD' },
+  { id: 'toz', ad: 'Toz Duman', bpm: 132, spb: 4, bar: 8, tonik: 392,
+    dizi: [0, 120, 390, 500, 700, 800, 1000],
+    davul: { ana: 'D.kkT.k.', cesni: 'D.kTT.kk', gecis: 'DkTkTTTT' },
+    bolum: {
+      A: "4:2 4:1 5:1 4:2 3:2 | 2:2 3:2 4:4 | 4:2 4:1 5:1 4:2 3:2 | 2:2 1:2 0:4 | 0:1 1:1 2:1 3:1 4:2 4:2 | 5':2 4:2 3:2 2:2 | 3:1 2:1 1:2 2:1 1:1 0:2 | 0~:4 0:2 -:2",
+      B: "7:2 7:2 6:1 7:1 6:2 | 5:2 6:2 5:4 | 6':2 5:1 6:1 5:2 4:2 | 5:2 4:2 4:4 | 4:1 5:1 6:1 5:1 4:1 3:1 2:2 | 3:2 2:2 1:2 2:2 | 3:1 2:1 1:1 0:1 1:2 0:2 | 0~:6 -:2",
+      D: "-:8 -:8 -:8 -:8"
+    }, form: 'AABBD' },
+  { id: 'cifte', ad: 'Çifte Mendil', bpm: 84, spb: 3, bar: 6, tonik: 404,
+    dizi: [0, 140, 300, 500, 700, 800, 1000],
+    davul: { ana: 'D.kT.k', cesni: 'D.kTkk', gecis: 'DkkTTT' },
+    bolum: {
+      A: "4:2 4:1 5':2 4:1 | 3:2 2:1 3:3 | 4:2 3:1 2:2 1:1 | 2:3 2:3 | 3:2 3:1 4':2 3:1 | 2:2 1:1 2:3 | 3:1 2:1 1:1 2:1 1:1 0:1 | 0~:6",
+      B: "7:3 6:2 7':1 | 6:2 5:1 6:3 | 5:2 6:1 5:2 4:1 | 5:3 4:3 | 4:1 5:1 6:1 5:1 4:1 3:1 | 4':2 3:1 2:3 | 3:1 2:1 1:1 2:1 1:1 0:1 | 0~:6",
+      D: "-:6 -:6 -:6 -:6"
+    }, form: 'AABBD' }
+];
+for (const h of HAVALAR) {
+  const coz = yazi => {
+    const notalar = [];
+    let toplam = 0;
+    for (const p of yazi.split(/\s+/)) {
+      if (!p || p === '|')
+        continue;
+      const [sol, sure] = p.split(':');
+      const len = +sure;
+      const n = { len, sus: sol === '-', carpma: sol.includes("'"), tril: sol.includes('~'), deg: parseInt(sol, 10) || 0 };
+      notalar.push(n);
+      toplam += len;
+    }
+    return { notalar, toplam };
+  };
+  h.harita = [];
+  h.bolumBas = [];
+  for (const ad of h.form) {
+    const b = coz(h.bolum[ad]);
+    if (b.toplam % h.bar)
+      console.warn('Bölüm ölçüye oturmuyor:', h.id, ad, b.toplam);
+    h.bolumBas.push({ bas: h.harita.length, uz: b.toplam, ad });
+    let i = h.harita.length;
+    h.harita.length += b.toplam;
+    for (const n of b.notalar) {
+      h.harita[i] = n;
+      i += n.len;
+    }
+  }
+  h.formAdim = h.harita.length;
+  h.sent = d => { const o = Math.floor(d / 7), i = ((d % 7) + 7) % 7; return h.dizi[i] + 1200 * o; };
+}
+
+class Muzik {
+  constructor() {
+    this.hava = HAVALAR[0];
+    this.bekleyen = null;
+    this.adim = 0;
+    this.beat = 0;
+    this.sonraki = null;
+    this.iz = [];
+    this.olaylar = [];
+    this.carpan = 1;
+    this.sov = false;
+    this.cosku = 0;
+    this.ctx = null;
+    this.acik = false;
+    this.duzey = 0.6;
+    this.sirayla = true;
+    this.havaSure = 0;
+    this.enVurus = 0;
+    // hazır parçalar (isteğe bağlı): muzik/liste.js varsa dolar
+    this.parcalar = [];
+    this.muzikKok = 'muzik/';
+    this.kaynak = 'sentez';
+    this.hazirCal = false;
+    this.hazirSira = 0;
+    this.hz = null;
+    this.calar = null;
+  }
+  simdi() { return this.acik ? this.ctx.currentTime : performance.now() / 1000; }
+  beatAt(t) {
+    let v;
+    if (this.hazirCal)
+      v = this.hazirVurus();
+    else {
+      const iz = this.iz;
+      if (!iz.length)
+        return this.beat;
+      let e = iz[0];
+      for (let i = iz.length - 1; i >= 0; i--)
+        if (iz[i].t <= t) {
+          e = iz[i];
+          break;
+        }
+      v = e.beat + (t - e.t) / e.bd;
+    }
+    if (!(v >= this.enVurus))
+      return this.enVurus;
+    this.enVurus = v;
+    return v; // saat asla geri gitmez
+  }
+  planla(ufuk) {
+    if (this.hazirCal) {
+      this.hazirPlanla();
+      return;
+    }
+    const t = this.simdi();
+    if (this.sonraki === null || this.sonraki < t - 0.4)
+      this.sonraki = t + 0.05;
+    let guard = 0;
+    while (this.sonraki < t + ufuk && guard++ < 400)
+      this.adimCal();
+    while (this.iz.length > 2 && this.iz[1].t < t - 0.5)
+      this.iz.shift();
+  }
+  adimCal() {
+    let h = this.hava;
+    if (this.sirayla && !this.bekleyen && this.adim === 0 && this.havaSure > 100)
+      this.bekleyen = HAVALAR[(HAVALAR.indexOf(h) + 1) % HAVALAR.length];
+    if (this.bekleyen && this.adim % h.bar === 0) {
+      h = this.hava = this.bekleyen;
+      this.bekleyen = null;
+      this.adim = 0;
+      this.havaSure = 0;
+      if (this.ses)
+        for (const z of [this.ses.zurna, this.ses.dem]) {
+          z.o1.frequency.setValueAtTime(h.tonik, this.sonraki);
+          z.o2.frequency.setValueAtTime(h.tonik, this.sonraki);
+        }
+    }
+    const t = this.sonraki, dur = 60 / (h.bpm * this.carpan) / h.spb;
+    this.iz.push({ t, beat: this.beat, bd: dur * h.spb, adim: this.adim });
+    // davul
+    const s = this.adim % h.bar, olcu = Math.floor(this.adim / h.bar);
+    const bol = h.bolumBas.find(b => this.adim >= b.bas && this.adim < b.bas + b.uz);
+    const sonOlcu = bol && this.adim >= bol.bas + bol.uz - h.bar;
+    const solo = bol && bol.ad === 'D'; // zurna susar, davul tek başına çalar
+    let ch = (solo ? (olcu % 2 ? h.davul.gecis : h.davul.cesni) : sonOlcu ? h.davul.gecis : (olcu % 2 ? h.davul.cesni : h.davul.ana))[s];
+    if (ch === '.' && (solo || this.sov || (this.cosku > 0.6 && s % 2 === 0)))
+      ch = 'k';
+    if (ch === 'D') {
+      this.dum(t, s === 0 ? 1 : 0.8);
+      this.olaylar.push({ t, tip: 'dum' });
+    }
+    else if (ch === 'T') {
+      this.tek(t, 0.8);
+      this.olaylar.push({ t, tip: 'tek' });
+    }
+    else if (ch === 'k') {
+      this.tek(t, this.sov ? 0.45 : 0.3);
+      this.olaylar.push({ t, tip: 'tek' });
+    }
+    // zurna
+    const n = h.harita[this.adim];
+    if (n) {
+      this.nota(n, t, dur);
+      if (!n.sus)
+        this.olaylar.push({ t, tip: 'nota', deg: n.deg });
+    }
+    this.adim = (this.adim + 1) % h.formAdim;
+    this.beat += 1 / h.spb;
+    this.sonraki += dur;
+    this.havaSure += dur;
+  }
+  sesKur(ctx) {
+    this.ctx = ctx;
+    const ana = ctx.createGain();
+    ana.gain.value = 0.7;
+    const sik = ctx.createDynamicsCompressor();
+    sik.threshold.value = -14;
+    sik.ratio.value = 5;
+    sik.attack.value = 0.004;
+    sik.release.value = 0.16;
+    const son = ctx.createGain();
+    son.gain.value = this.duzey; /* düzey sıkıştırıcıdan sonra ayarlanır */
+    ana.connect(sik);
+    sik.connect(son);
+    son.connect(ctx.destination);
+    // açık hava yankısı: sönümlenen gürültüden üretilmiş kısa bir tepki
+    const yanki = ctx.createConvolver(), uz = Math.floor(ctx.sampleRate * 1.1), tb = ctx.createBuffer(2, uz, ctx.sampleRate), r = rastgeleUret(7);
+    for (let k = 0; k < 2; k++) {
+      const d = tb.getChannelData(k);
+      for (let i = 0; i < uz; i++)
+        d[i] = (r() * 2 - 1) * Math.pow(1 - i / uz, 3.2);
+    }
+    yanki.buffer = tb;
+    const yg = ctx.createGain();
+    yg.gain.value = 0.16;
+    yanki.connect(yg);
+    yg.connect(ana);
+    const davul = ctx.createGain();
+    davul.gain.value = 1.75;
+    davul.connect(ana);
+    davul.connect(yanki);
+    const zb = ctx.createGain();
+    zb.gain.value = 1;
+    zb.connect(ana);
+    zb.connect(yanki);
+    const gb = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate), gd = gb.getChannelData(0);
+    for (let i = 0; i < gd.length; i++)
+      gd[i] = r() * 2 - 1;
+    const zurnaKur = (seviye, parlak) => {
+      const perde = ctx.createConstantSource();
+      perde.offset.value = 0;
+      perde.start();
+      const o1 = ctx.createOscillator();
+      o1.type = 'sawtooth';
+      o1.frequency.value = this.hava.tonik;
+      const o2 = ctx.createOscillator();
+      o2.type = 'square';
+      o2.frequency.value = this.hava.tonik;
+      o2.detune.value = 6;
+      const g1 = ctx.createGain();
+      g1.gain.value = 0.6;
+      const g2 = ctx.createGain();
+      g2.gain.value = 0.22;
+      const lfo = ctx.createOscillator();
+      lfo.frequency.value = 5.7;
+      const vib = ctx.createGain();
+      vib.gain.value = 4;
+      lfo.connect(vib);
+      for (const o of [o1, o2]) {
+        perde.connect(o.detune);
+        vib.connect(o.detune);
+      }
+      const sek = ctx.createWaveShaper(), egri = new Float32Array(1024);
+      for (let i = 0; i < 1024; i++)
+        egri[i] = Math.tanh((i / 511.5 - 1) * 2.4);
+      sek.curve = egri;
+      const hp = ctx.createBiquadFilter();
+      hp.type = 'highpass';
+      hp.frequency.value = 540;
+      const f1 = ctx.createBiquadFilter();
+      f1.type = 'peaking';
+      f1.frequency.value = 1350;
+      f1.Q.value = 2.0;
+      f1.gain.value = 12;
+      const f2 = ctx.createBiquadFilter();
+      f2.type = 'peaking';
+      f2.frequency.value = 2750;
+      f2.Q.value = 2.4;
+      f2.gain.value = 11;
+      const lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.value = parlak;
+      const amp = ctx.createGain();
+      amp.gain.value = 0;
+      const cik = ctx.createGain();
+      cik.gain.value = seviye;
+      o1.connect(g1);
+      g1.connect(sek);
+      o2.connect(g2);
+      g2.connect(sek);
+      sek.connect(hp);
+      hp.connect(f1);
+      f1.connect(f2);
+      f2.connect(lp);
+      lp.connect(amp);
+      amp.connect(cik);
+      cik.connect(zb);
+      o1.start();
+      o2.start();
+      lfo.start();
+      return { perde: perde.offset, amp: amp.gain, vib: vib.gain, o1, o2, cik: cik.gain };
+    };
+    this.ses = { ana, son, davul, yanki: yg.gain, gurultu: gb, zurna: zurnaKur(0.23, 6800), dem: zurnaKur(0.055, 3000) };
+  }
+  dum(t, v) {
+    if (!this.acik)
+      return;
+    const c = this.ctx, s = this.ses;
+    const o = c.createOscillator(), g = c.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(150, t);
+    o.frequency.exponentialRampToValueAtTime(52, t + 0.13);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(v, t + 0.002);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.44);
+    o.connect(g);
+    g.connect(s.davul);
+    o.start(t);
+    o.stop(t + 0.46);
+    this.fis(t, 0.035, 'lowpass', 900, 0.5 * v);
+  }
+  tek(t, v) {
+    if (!this.acik)
+      return;
+    const c = this.ctx, s = this.ses;
+    this.fis(t, 0.055, 'bandpass', 3300, 0.55 * v);
+    const o = c.createOscillator(), g = c.createGain();
+    o.type = 'triangle';
+    o.frequency.setValueAtTime(640, t);
+    o.frequency.exponentialRampToValueAtTime(380, t + 0.04);
+    g.gain.setValueAtTime(0.3 * v, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.06);
+    o.connect(g);
+    g.connect(s.davul);
+    o.start(t);
+    o.stop(t + 0.07);
+  }
+  fis(t, sure, tur, frek, v) {
+    const c = this.ctx, s = this.ses, k = c.createBufferSource();
+    k.buffer = s.gurultu;
+    const f = c.createBiquadFilter();
+    f.type = tur;
+    f.frequency.value = frek;
+    f.Q.value = 0.9;
+    const g = c.createGain();
+    g.gain.setValueAtTime(v, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + sure);
+    k.connect(f);
+    f.connect(g);
+    g.connect(s.davul);
+    k.start(t, (t * 7.13) % 0.9, sure + 0.02);
+  }
+  nota(n, t, dur) {
+    if (!this.acik)
+      return;
+    const z = this.ses.zurna, h = this.hava, uz = n.len * dur;
+    this.ses.dem.amp.setTargetAtTime(n.sus && n.len >= h.bar ? 0 : 1, t, n.sus ? 0.06 : 0.25);
+    if (n.sus) {
+      z.amp.setTargetAtTime(0, t, 0.015);
+      return;
+    }
+    const c = h.sent(n.deg), ust = h.sent(n.deg + 1);
+    z.amp.setTargetAtTime(0.3, Math.max(0, t - 0.008), 0.004);
+    z.amp.setTargetAtTime(1, t + 0.004, 0.012);
+    if (n.carpma) {
+      z.perde.setValueAtTime(ust, t);
+      z.perde.setTargetAtTime(c, t + 0.034, 0.006);
+    }
+    else
+      z.perde.setTargetAtTime(c, t, 0.007);
+    if (n.tril) {
+      const ad = Math.min(0.085, dur * 0.5), kac = Math.floor(uz * 0.55 / ad);
+      for (let i = 1; i <= kac; i++)
+        z.perde.setTargetAtTime(i % 2 ? ust : c, t + i * ad, 0.008);
+    }
+    z.vib.setTargetAtTime(3, t, 0.02);
+    if (uz > 0.28)
+      z.vib.setTargetAtTime(20, t + 0.12, 0.09);
+  }
+  zil(guc) {
+    if (!this.acik)
+      return;
+    const c = this.ctx, t = c.currentTime + 0.01;
+    for (const [f, v] of [[1760, 0.12], [2637, 0.07], [3520, 0.04 * guc]]) {
+      const o = c.createOscillator(), g = c.createGain();
+      o.frequency.value = f;
+      g.gain.setValueAtTime(v, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.5 + 0.3 * guc);
+      o.connect(g);
+      g.connect(this.ses.ana);
+      o.start(t);
+      o.stop(t + 1);
+    }
+  }
+  tabanDegistir(ac) {
+    const eski = this.simdi(), b = this.beatAt(eski), ileri = this.iz.find(e => e.t > eski), sonBd = this.iz.length ? this.iz[this.iz.length - 1].bd : 0.5;
+    this.acik = ac;
+    const yeni = this.simdi();
+    let bd = sonBd;
+    if (ileri) {
+      this.adim = ileri.adim;
+      this.beat = ileri.beat;
+      this.sonraki = yeni + Math.max(0.04, ileri.t - eski);
+      if (ileri.beat > b + 1e-6)
+        bd = (this.sonraki - yeni) / (ileri.beat - b);
+    }
+    else
+      this.sonraki = yeni + 0.05;
+    this.iz = [{ t: yeni, beat: b, bd, adim: -1 }];
+    this.olaylar.length = 0; // köprü dilimi: yeni saatte ilk adıma tam vuruşunda varır
+  }
+  async sesAc(beklemeden) {
+    if (!this.ctx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC)
+        return false;
+      this.sesKur(new AC());
+    }
+    const p = this.ctx.resume();
+    if (beklemeden) {
+      await Promise.race([p, new Promise(r => setTimeout(r, 500))]);
+      if (this.ctx.state !== 'running')
+        return false;
+    }
+    else
+      await p;
+    if (!this.acik)
+      this.tabanDegistir(true);
+    this.ses.son.gain.setTargetAtTime(this.duzey, this.ctx.currentTime, 0.05);
+    if (this.kaynak === 'hazir' && !this.hazirCal)
+      this.hazirBaslat(this.hz ? this.hz.no : 0);
+    return true;
+  }
+  async sesKapat() {
+    if (!this.acik)
+      return;
+    this.sentezeDon();
+    this.ses.zurna.amp.setTargetAtTime(0, this.ctx.currentTime, 0.02);
+    this.ses.dem.amp.setTargetAtTime(0, this.ctx.currentTime, 0.02);
+    this.tabanDegistir(false);
+    await this.ctx.suspend();
+  }
+  duzeyAyarla(v) {
+    this.duzey = v;
+    if (this.calar)
+      this.calar.volume = clamp(v / 0.7, 0, 1);
+    if (this.acik)
+      this.ses.son.gain.setTargetAtTime(v, this.ctx.currentTime, 0.05);
+  }
+
+  /* ---- hazır parçalar ----
+   * muzik/ klasöründeki kayıtlar bir ses öğesiyle çalınır; vuruş saati o kaydın önceden ölçülmüş vuruşlarından
+   * gelir (araclar/muzik-hazirla.py). Ses kapalıyken ya da parça açılamazsa üretilen davul zurna sürer.
+   */
+  hazirKur(liste) {
+    this.parcalar = (Array.isArray(liste) ? liste : [])
+      .filter(p => p && typeof p.dosya === 'string' && /^[\w.-]+$/.test(p.dosya) && Array.isArray(p.vurus) && p.vurus.length > 8 && p.vurus.every(Number.isFinite))
+      .slice(0, 12)
+      .map(p => ({ ad: kisalt(temiz(p.ad || p.dosya), 28), dosya: p.dosya, bpm: clamp(+p.bpm || 100, 40, 240), kayma: (p.kayma | 0) & 3, vurus: p.vurus }));
+    return this.parcalar.length;
+  }
+  async kaynakSec(k) {
+    this.kaynak = k === 'hazir' && this.parcalar.length ? 'hazir' : 'sentez';
+    if (this.kaynak === 'sentez')
+      this.sentezeDon();
+    else if (this.acik && !this.hazirCal)
+      return this.hazirBaslat(this.hz ? this.hz.no : 0);
+    return true;
+  }
+  async hazirBaslat(no) {
+    const n = this.parcalar.length;
+    if (!n)
+      return false;
+    no = ((no % n) + n) % n;
+    const p = this.parcalar[no], sira = ++this.hazirSira;
+    if (!this.calar) {
+      const a = this.calar = new Audio();
+      a.preload = 'auto';
+      a.preservesPitch = true;
+      a.addEventListener('ended', () => { if (this.hazirCal)
+        this.hazirBaslat(this.hz.no + 1); });
+      a.addEventListener('error', () => { if (this.hazirCal)
+        this.sentezeDon(); });
+    }
+    const a = this.calar;
+    // Parça yüklenirken dans donmasın: saat, son tempoyla kendi kendine yürür.
+    if (this.hazirCal)
+      this.hz.bos = { b: this.enVurus, s: performance.now() / 1000, hiz: this.parcalar[this.hz.no].bpm / 60 * a.playbackRate };
+    a.src = this.muzikKok + p.dosya;
+    a.volume = clamp(this.duzey / 0.7, 0, 1);
+    a.playbackRate = clamp(this.carpan, 1, 1.25);
+    try {
+      await a.play();
+    }
+    catch (e) {
+      if (sira === this.hazirSira)
+        this.sentezeDon();
+      return false;
+    }
+    if (sira !== this.hazirSira)
+      return false;
+    if (this.kaynak !== 'hazir' || !this.acik) {
+      a.pause();
+      return false;
+    }
+    // Yeni parçanın ölçü başı, dansın dört vuruşluk döngüsünün başına denk getirilir.
+    const once = p.vurus[0] / (p.vurus[1] - p.vurus[0]);
+    this.hz = { no, i: 0, taban: Math.ceil((this.enVurus + p.kayma + once) / 4 - 1e-6) * 4, t: a.currentTime, s: performance.now() / 1000, yari: -1, bos: null };
+    if (!this.hazirCal) {
+      this.hazirCal = true;
+      const t = this.ctx.currentTime;
+      for (const z of [this.ses.zurna, this.ses.dem]) {
+        z.amp.cancelScheduledValues(t);
+        z.amp.setTargetAtTime(0, t, 0.02);
+      }
+    }
+    this.iz.length = 0;
+    this.olaylar.length = 0;
+    return true;
+  }
+  sentezeDon() {
+    this.hazirSira++;
+    if (this.calar)
+      this.calar.pause();
+    if (!this.hazirCal)
+      return;
+    this.hazirCal = false;
+    // Üretilen müzik bir sonraki ölçü başında girer; araya kadar saat aynı tempoda yürür.
+    const t = this.simdi(), b = this.enVurus, bd = 60 / (this.hava.bpm * this.carpan), nb = Math.ceil(b / 4 + 1e-6) * 4;
+    this.iz = [{ t, beat: b, bd, adim: -1 }];
+    this.adim = 0;
+    this.beat = nb;
+    this.sonraki = t + (nb - b) * bd;
+    this.havaSure = 0;
+    this.olaylar.length = 0;
+  }
+  hazirSaat() {
+    // Ses öğesinin saati kaba adımlarla ilerleyebilir; kendi saatimizi yürütüp ona yumuşakça yaklaştırırız.
+    const a = this.calar, hz = this.hz, simdi = performance.now() / 1000;
+    let t = hz.t + (a.paused ? 0 : (simdi - hz.s) * a.playbackRate);
+    const fark = a.currentTime - t;
+    t = Math.abs(fark) > 0.25 ? a.currentTime : t + fark * 0.06;
+    hz.t = t;
+    hz.s = simdi;
+    return t;
+  }
+  hazirVurus() {
+    const hz = this.hz;
+    if (hz.bos)
+      return hz.bos.b + (performance.now() / 1000 - hz.bos.s) * hz.bos.hiz;
+    const p = this.parcalar[hz.no], v = p.vurus, t = this.hazirSaat();
+    let i = hz.i;
+    while (i < v.length - 2 && v[i + 1] <= t)
+      i++;
+    while (i > 0 && v[i] > t)
+      i--;
+    hz.i = i;
+    return hz.taban + i - p.kayma + (t - v[i]) / (v[i + 1] - v[i]);
+  }
+  hazirPlanla() {
+    const a = this.calar, hiz = clamp(this.carpan, 1, 1.25);
+    if (Math.abs(a.playbackRate - hiz) > 0.004)
+      a.playbackRate = hiz;
+    // Çalgıcıların eli kolu vuruşla oynasın: her vuruşta düm, arasında tek, zurnacıya gezinen bir perde.
+    const yari = Math.floor(this.enVurus * 2), hz = this.hz;
+    if (hz.yari >= 0 && yari > hz.yari) {
+      const t = this.simdi();
+      this.olaylar.push({ t, tip: yari % 2 ? 'tek' : 'dum' }, { t, tip: 'nota', deg: [3, 4, 5, 4, 2, 3, 1, 4][yari % 8] });
+    }
+    hz.yari = yari;
+  }
+  calanAd() { return this.hazirCal ? this.parcalar[this.hz.no].ad : this.hava.ad; }
+  calanBpm() { return this.hazirCal ? this.parcalar[this.hz.no].bpm * this.calar.playbackRate : this.hava.bpm * this.carpan; }
+}
+const muzik = new Muzik();
+
+/* ── cekirdek/js/20-oyuncular.js ── */
+/* OYUNCULAR VE OLAYLAR — kim sahnede, kim lider, hangi olay neyi tetikler. Oyundan bağımsızdır.
+ * D: ortak oyun durumu (oyun kendi alanlarını ekler) · karakterYap / gorunumUret: izleyiciden karakter
+ * katil / cikar / siraGuncelle: sahnedeki sıra · olay(o): DIŞARIDAN GELEN HER ŞEYİN TEK GİRİŞ KAPISI
+ * (sahte izleyici, köprü ve testler hep bunu çağırır). Olay biçimi docs/OLAYLAR.md'de.
+ * Kullanıcı metni burada temizlenir; hiçbir yerde HTML olarak yazılmaz.
+ * Oyuna sorulanlar: oyunGiris(k) giriş yeri · oyunYerlesim() herkesin hedef yeri · oyunHediye(k, jeton, kademe)
+ * hediyenin sahnedeki etkisi · oyunLiderDegisti(eski, yeni) rol devri. Ayrıntı: docs/KANCALAR.md.
+ */
+// Eksik yazılar genel karşılıklarıyla doldurulur; oyun yalnız kendine özgü olanı yazar.
+OYUN.yazi = Object.assign({ sira: 'Sıra', gosterge: 'Coşku', bos: 'Sahne boş. İlk yorumu yazan girer.', birim: 'kişi', ses: 'Müziği başlat',
+  sahne: String(OYUN.ad || 'Oyun') + ' sahnesi', giris: 'sahneye girer', bosalt: 'Sahneyi boşalt' }, OYUN.yazi || {});
+OYUN.nasil = OYUN.nasil || {};
+const MAKS = Math.max(1, Math.round(OYUN.kapasite) || 36);
+// Kademeler büyükten küçüğe sıralanır; en küçüğü her hediyeyi karşılasın diye 1'e çekilir.
+const KADEME = (OYUN.kademe && OYUN.kademe.length ? OYUN.kademe : [{ min: 1, ad: 'Hediye', tip: 'hediye', etki: 'Gönderen sevinir' }])
+  .map(x => ({ ...x, min: Math.max(1, Math.round(x.min) || 1) })).sort((a, b) => b.min - a.min);
+KADEME[KADEME.length - 1].min = 1;
+const D = { oy: new Map(), sira: [], lider: null, cosku: 0.15, begeni: 0, sarsinti: 0 };
+let zaman = 0, B = 0; // oyun saati (sn) ve müzik vuruşu
+
+const TEN = ['#f2c9a0', '#e3ad7e', '#c98d5e', '#a86d45', '#f6d9bb'];
+const SAC = ['#1d1513', '#3a2416', '#5b3a1f', '#2a2a35', '#7b4a22'];
+const KUMAS = ['#e23d2f', '#22b8a7', '#f2b632', '#f6ecd9', '#3d5bd0', '#e86a9a', '#4fae6c', '#8b55c9', '#ef7d2d'];
+const KOYU = ['#20264f', '#3a2a2c', '#1d3b3a', '#2c2c38', '#4a2238'];
+// Görünüm kimlikten türetilir: aynı izleyici her girişinde aynı kıyafetle gelir.
+function gorunumUret(id) {
+  const r = rastgeleUret(ozet(id)), sec = a => a[Math.floor(r() * a.length)];
+  const kadin = r() < 0.5, ana = sec(KUMAS);
+  let ikinci = sec(KUMAS);
+  if (ikinci === ana)
+    ikinci = KUMAS[(KUMAS.indexOf(ana) + 3) % KUMAS.length];
+  return {
+    kadin, ten: sec(TEN), sac: sec(SAC), boy: 0.98 + r() * 0.13,
+    gomlek: kadin ? ana : (r() < 0.7 ? '#f6ecd9' : '#dfe6f5'), yelek: kadin ? ana : sec(KUMAS),
+    alt: kadin ? ana : sec(KOYU), onluk: ikinci, kusak: kadin ? ikinci : (ana === '#e23d2f' ? '#f2b632' : '#e23d2f'),
+    baslik: kadin ? sec(['yazma', 'yazma', 'orgu', 'cicek']) : sec(['kasket', 'kasket', 'yok', 'bere']),
+    baslikRenk: kadin ? ikinci : sec(KOYU), biyik: !kadin && r() < 0.55, ayakkabi: sec(['#2a1c16', '#191a2a', '#5a3620']), salin: r()
+  };
+}
+// Oyuncu kaydı. Alanların anlamı docs/KANCALAR.md'de; oyun kendi alanlarını bu nesneye ekleyebilir.
+function karakterYap(id, ad) {
+  return { id, ad, jeton: 0, son: zaman, katilim: zaman, g: gorunumUret(id), x: 0, z: 0, y0: 0, yon: Math.PI, yer: 0, sn: 0,
+    cikiyor: false, balon: null, zip0: -9, zip1: -9, kos: 0, j: {}, p: {}, f: [0, 0, -1], l: [1, 0, 0], mod: 'oyuncu', yeni: zaman, et: null };
+}
+const calgi = { dumP: 0, tekP: 0, perde: 3 };
+
+const temiz = s => String(s == null ? '' : s).replace(/[\u0000-\u001f\u007f​-‏‪-‮⁦-⁩]/g, ' ').replace(/\s+/g, ' ').trim();
+const ayar = { balon: true, yasak: [] };
+const yasakVar = m => { const k = m.toLocaleLowerCase('tr'); return ayar.yasak.some(y => k.includes(y)); };
+const balonMetni = m => yasakVar(m) ? '' : m.replace(/(https?:\/\/|www\.)\S+/gi, '…').replace(/\d[\d\s().+-]{6,}\d/g, '…');
+const kisalt = (s, n) => { const a = Array.from(s); return a.length > n ? a.slice(0, n - 1).join('') + '…' : s; };
+
+function katil(id, ad, zorla) {
+  let k = D.oy.get(id);
+  if (k && !k.cikiyor) {
+    if (ad)
+      k.ad = ad;
+    return k;
+  }
+  if (D.sira.length >= MAKS) {
+    // Yer doluysa en az jetonlu, en uzun süredir sessiz olan yerini bırakır. Lider ve yıldız (k.yildiz) korunur;
+    // yorumcu, hediye atmış birini yerinden edemez.
+    let kurban = null;
+    for (const a of D.sira) {
+      if (a === D.lider || a.yildiz)
+        continue;
+      if (!zorla && a.jeton > 0)
+        continue;
+      if (!kurban || a.jeton < kurban.jeton || (a.jeton === kurban.jeton && a.son < kurban.son))
+        kurban = a;
+    }
+    if (!kurban)
+      return null;
+    cikar(kurban);
+  }
+  k = karakterYap(id, ad || id);
+  D.oy.set(id, k);
+  siraGuncelle();
+  oyunGiris(k);
+  return k;
+}
+function cikar(k) { k.cikiyor = true; k.cikis = zaman; siraGuncelle(); }
+function siraGuncelle() {
+  D.sira = [...D.oy.values()].filter(k => !k.cikiyor).sort((a, b) => b.jeton - a.jeton || a.katilim - b.katilim);
+  D.sira.forEach((k, i) => k.sn = i);
+  D.lider = D.sira[0] || null;
+  oyunYerlesim();
+  D.siraKirli = true;
+}
+
+function olay(o) {
+  if (!o || !o.tip)
+    return;
+  const kim = o.kullanici || {}, id = temiz(kim.id || kim.ad).slice(0, 64);
+  if (!id)
+    return;
+  let ad = kisalt(temiz(kim.ad || kim.id), 18);
+  if (yasakVar(ad))
+    ad = 'misafir';
+  if (o.tip === 'yorum') {
+    const m = temiz(o.metin).slice(0, 200), b = ayar.balon ? balonMetni(m) : '';
+    const k = katil(id, ad, false);
+    if (k) {
+      k.son = zaman;
+      if (b)
+        k.balon = { m: kisalt(b, 30), t0: zaman };
+    }
+    gunluk('yorum', ad, m);
+  }
+  else if (o.tip === 'begeni') {
+    const n = clamp(Math.round(o.adet) || 1, 1, 500);
+    D.begeni += n;
+    D.cosku = Math.min(1, D.cosku + n * 0.006);
+    const k = D.oy.get(id);
+    if (k)
+      k.son = zaman;
+    kalpAt(n);
+    gunluk('beğeni', ad, '×' + n);
+  }
+  else if (o.tip === 'takip') {
+    const k = katil(id, ad, false);
+    if (k) {
+      k.son = zaman;
+      k.yeni = zaman;
+    }
+    bildir(ad, 'takip etti, hoş geldin');
+    gunluk('takip', ad, '');
+  }
+  else if (o.tip === 'paylasim') {
+    D.cosku = Math.min(1, D.cosku + 0.05);
+    gunluk('paylaşım', ad, '');
+  }
+  else if (o.tip === 'katilim') {
+    gunluk('geldi', ad, '');
+  }
+  else if (o.tip === 'hediye') {
+    const j = clamp(Math.round((+o.jeton || 1) * (+o.adet || 1)), 1, 1e7), onceki = D.lider;
+    const k = katil(id, ad, true);
+    if (!k)
+      return;
+    k.jeton += j;
+    k.son = zaman;
+    D.cosku = Math.min(1, D.cosku + Math.min(0.35, j / 300));
+    const kd = KADEME.find(x => j >= x.min) || KADEME[KADEME.length - 1];
+    // Hediye sevinci: bir sonraki yarım vuruştan başlayıp 4 vuruş sürer (oyun k.zip0–k.zip1 arasında zıplatır).
+    k.zip0 = Math.ceil(B * 2) / 2;
+    k.zip1 = k.zip0 + 4;
+    bildir(ad, j + ' jeton', kd.ad + '!');
+    muzik.zil(Math.min(1, j / 200));
+    gunluk('hediye', ad, j + ' jeton → ' + kd.ad, true);
+    oyunHediye(k, j, kd);
+    siraGuncelle();
+    if (onceki && D.lider !== onceki)
+      oyunLiderDegisti(onceki, D.lider);
+  }
+}
+
+/* ── cekirdek/js/25-yazilar.js ── */
+/* SAHNE ÜSTÜ YAZILAR — sıra kutusu, bildirimler, pankart, paneldeki olay günlüğü.
+ * bildir(ad, orta, vurgu): sağdaki bildirim satırı · pankart(satir1, satir2): ortadan geçen büyük duyuru
+ * gunluk(tur, ad, metin): paneldeki olay günlüğü. Boş sıranın yazısı OYUN.yazi.bos'tan gelir.
+ * Hepsi textContent ile yazılır. Sıra kutusu ve günlük olay anında değil karede bir kez güncellenir
+ * (yüzlerce olay aynı anda gelse de sayfa takılmasın diye).
+ */
+/* ---- sahne üstü yazılar ---- */
+let siraImza = '';
+function siraYaz() {
+  const ilk = D.sira.slice(0, 5), imza = ilk.map(k => k.id + ':' + k.jeton + ':' + k.ad).join('|');
+  if (imza === siraImza)
+    return;
+  siraImza = imza;
+  const ol = $('sira-liste');
+  ol.textContent = '';
+  if (!ilk.length) {
+    const li = document.createElement('li');
+    li.className = 'bos';
+    li.textContent = OYUN.yazi.bos;
+    ol.append(li);
+    return;
+  }
+  ilk.forEach((k, i) => {
+    const li = document.createElement('li');
+    if (i === 0)
+      li.className = 'bas';
+    const no = document.createElement('span');
+    no.className = 'no';
+    no.textContent = i + 1;
+    const ad = document.createElement('span');
+    ad.className = 'ad';
+    ad.textContent = k.ad;
+    const jt = document.createElement('span');
+    jt.className = 'jt';
+    jt.textContent = k.jeton;
+    li.append(no, ad, jt);
+    ol.append(li);
+  });
+}
+let bildirimSon = 0;
+function bildir(ad, orta, vurgu) {
+  const kutu = $('bildirim');
+  if (zaman - bildirimSon < 0.12 && kutu.lastChild)
+    kutu.lastChild.remove();
+  bildirimSon = zaman; // aynı anda yağan hediyeler tek satırda yenilenir
+  const d = document.createElement('div'), b = document.createElement('b');
+  d.append(ad + ' · ' + orta);
+  if (vurgu) {
+    b.textContent = ' ' + vurgu;
+    d.append(b);
+  }
+  kutu.append(d);
+  while (kutu.children.length > 3)
+    kutu.firstChild.remove();
+  setTimeout(() => { d.classList.add('git'); setTimeout(() => d.remove(), 320); }, 2800);
+}
+function pankart(b1, b2) {
+  const yer = $('pankart-yeri');
+  yer.textContent = '';
+  const p = document.createElement('div');
+  p.className = 'pankart';
+  const a = document.createElement('div');
+  a.className = 'b1';
+  a.textContent = b1;
+  const b = document.createElement('div');
+  b.className = 'b2';
+  b.textContent = b2;
+  p.append(a, b);
+  yer.append(p);
+  setTimeout(() => p.remove(), 3500);
+}
+const gunlukBekleyen = [];
+function gunluk(tur, ad, metin, hediye) { gunlukBekleyen.push([tur, ad, metin, hediye]); if (gunlukBekleyen.length > 40)
+  gunlukBekleyen.shift(); }
+function gunlukYaz() {
+  if (!gunlukBekleyen.length)
+    return;
+  const ul = $('gunluk');
+  for (const [tur, ad, metin, hediye] of gunlukBekleyen) {
+    const li = document.createElement('li'), t = document.createElement('span');
+    t.className = 'tur' + (hediye ? ' h' : '');
+    t.textContent = tur;
+    li.append(t, ad + (metin ? ': ' + kisalt(String(metin), 80) : ''));
+    ul.append(li);
+  }
+  gunlukBekleyen.length = 0;
+  while (ul.children.length > 40)
+    ul.firstChild.remove();
+  ul.scrollTop = ul.scrollHeight;
+}
+
+/* ── cekirdek/js/30-sahne.js ── */
+/* SAHNE — tuval, tema renkleri, kamera, perspektif, çizim listesi, ad etiketleri. Oyundan bağımsızdır.
+ * RENK: tema (OYUN.renk ezer) · kam + kamKur + pr(): 3B noktayı 720×1280 sanal tuvale düşürür
+ * ik(): iki kemikli ters kinematik (diz, dirsek) · liste + kap / top / ozel + listeCiz(): uzaktan yakına çizim
+ * kameraSigdir(noktalar, dt): verilen yer noktaları ALAN_UST–ALAN_ALT şeridine sığacak kadar uzaklaşır
+ * golge: ayak gölgesi · etiketCiz(ekler): ad etiketleri ve konuşma balonları · kenarKarart: köşeleri karartır
+ * Eksenler: x sağ, y yukarı, z kameradan uzağa. Karakterin yerel ekseni: x = kendi solu, z = baktığı yön.
+ */
+const tuval = $('tuval'), c = tuval.getContext('2d');
+const GW = 720, GH = 1280;
+// Tema renkleri. CSS'te aynı adlar --zemin, --zemin-2 … olarak kullanılır; panel açılışta bunları RENK'ten yazar.
+// Renkler #rrggbb biçiminde verilmeli (yarı saydam tonlar bunlardan türetilir).
+const RENK = Object.assign({
+  zemin: '#0e1230', zemin2: '#171d47', zemin3: '#232b63', cizgi: '#343d80',
+  vurgu: '#ffd166', sicak: '#e23d2f', serin: '#22b8a7', acik: '#f6ecd9', soluk: '#a9b0dc', murekkep: '#080a1c'
+}, OYUN.renk || {});
+const MUREKKEP = RENK.murekkep;
+function renkSaydam(hex, a) {
+  const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(String(hex));
+  if (!m)
+    return hex;
+  const h = m[1].length === 3 ? m[1].replace(/./g, x => x + x) : m[1], n = parseInt(h, 16);
+  return 'rgba(' + (n >> 16) + ',' + (n >> 8 & 255) + ',' + (n & 255) + ',' + a + ')';
+}
+// Dar açılı, yüksekten bakan kamera: öndeki ile arkadaki arasında boy farkı az kalır.
+// OYUN.kamera { egim, F, enYakin, ustPay, altPay } varsayılanları ezer.
+const kam = Object.assign({ yaw: 0, egim: 0.62, D: 14, tx: 0, ty: 0, tz: 0, F: 1400, cx: 360, cy: 760, ustPay: 1.5, altPay: 0.15 }, OYUN.kamera || {},
+  { C: [0, 0, 0], r: [1, 0, 0], u: [0, 1, 0], f: [0, 0, 1], son: { enX: 0, hd: 0 } });
+if (!(kam.enYakin > 0))
+  kam.enYakin = kam.F / 190;
+function kamKur() {
+  const cp = Math.cos(kam.egim), sp = Math.sin(kam.egim), sy = Math.sin(kam.yaw), cy = Math.cos(kam.yaw);
+  kam.f = [sy * cp, -sp, cy * cp];
+  const f = kam.f;
+  kam.C = [kam.tx - f[0] * kam.D, kam.ty - f[1] * kam.D, kam.tz - f[2] * kam.D];
+  const rl = Math.hypot(f[2], f[0]);
+  kam.r = [f[2] / rl, 0, -f[0] / rl];
+  const r = kam.r;
+  kam.u = [f[1] * r[2] - f[2] * r[1], f[2] * r[0] - f[0] * r[2], f[0] * r[1] - f[1] * r[0]];
+  // Başlar kameraya doğru kalkık çizilir: yukarıdan bakınca tepe değil yüz görünsün diye
+  // yüz hatları gerçek eğimin küçük bir payıyla (bf, bu) yerleştirilir.
+  const eb = kam.egim * 0.3, cb = Math.cos(eb), sb = Math.sin(eb), bf = kam.bf = [sy * cb, -sb, cy * cb];
+  kam.bu = [bf[1] * r[2] - bf[2] * r[1], bf[2] * r[0] - bf[0] * r[2], bf[0] * r[1] - bf[1] * r[0]];
+}
+// Dünyadaki [x, y, z] noktası → ekranda { x, y }, ölçek s (1 metre kaç piksel), derinlik d, görünür mü ok.
+function pr(v) {
+  const x = v[0] - kam.C[0], y = v[1] - kam.C[1], z = v[2] - kam.C[2];
+  const d = x * kam.f[0] + y * kam.f[1] + z * kam.f[2];
+  if (d < 0.35)
+    return { x: 0, y: 0, s: 0, d, ok: false };
+  const s = kam.F / d;
+  return { x: kam.cx + (x * kam.r[0] + z * kam.r[2]) * s, y: kam.cy - (x * kam.u[0] + y * kam.u[1] + z * kam.u[2]) * s, s, d, ok: true };
+}
+// a'dan b'ye uzanan iki kemik (l1, l2): ortadaki eklemi kutup yönüne doğru büker, sonucu out'a yazar.
+function ik(a, b, l1, l2, kutup, out) {
+  let dx = b[0] - a[0], dy = b[1] - a[1], dz = b[2] - a[2], gd = Math.hypot(dx, dy, dz) || 1e-4;
+  const nx = dx / gd, ny = dy / gd, nz = dz / gd, d = Math.min(gd, (l1 + l2) * 0.999);
+  const aa = (l1 * l1 - l2 * l2 + d * d) / (2 * d), h = Math.sqrt(Math.max(0, l1 * l1 - aa * aa));
+  const kn = kutup[0] * nx + kutup[1] * ny + kutup[2] * nz;
+  let px = kutup[0] - nx * kn, py = kutup[1] - ny * kn, pz = kutup[2] - nz * kn;
+  const pl = Math.hypot(px, py, pz) || 1;
+  out[0] = a[0] + nx * aa + px / pl * h;
+  out[1] = a[1] + ny * aa + py / pl * h;
+  out[2] = a[2] + nz * aa + pz / pl * h;
+  return out;
+}
+
+/* ---- çizim listesi (uzaktan yakına sıralanır) ---- */
+// Her karede çekirdek listeyi boşaltır, oyunCiz() doldurur, çekirdek derinliğe göre sıralayıp çizer.
+// d büyük = uzak. Aynı derinlikteki parçalar eklendikleri sırayla çizilir.
+const liste = [];
+// İki ucu farklı yarıçaplı kapsül (kol, bacak, gövde). pa / pb: pr() sonucu, ra / rb: metre cinsinden yarıçap.
+function kap(pa, ra, pb, rb, renk, d) {
+  if (!pa.ok || !pb.ok)
+    return;
+  liste.push({ d: d === undefined ? (pa.d + pb.d) / 2 : d, t: 0, x1: pa.x, y1: pa.y, r1: ra * pa.s, x2: pb.x, y2: pb.y, r2: rb * pb.s, c: renk, w: Math.max(1, (pa.s + pb.s) * 0.0065) });
+}
+// Mürekkep çizgili daire (el, top, uç). r metre; cizgi verilmezse ölçeğe göre seçilir.
+function top(p, r, renk, d, cizgi) {
+  if (!p.ok)
+    return;
+  liste.push({ d: d === undefined ? p.d : d, t: 2, x: p.x, y: p.y, r: r * p.s, c: renk, w: cizgi === undefined ? Math.max(1, p.s * 0.011) : cizgi });
+}
+// Serbest çizim: fn sırası gelince doğrudan c ile çizer.
+function ozel(d, fn) { liste.push({ d, t: 1, fn }); }
+function kapYol(x1, y1, r1, x2, y2, r2) {
+  const a = Math.atan2(y2 - y1, x2 - x1);
+  c.beginPath();
+  c.arc(x1, y1, r1, a + HP, a - HP);
+  c.arc(x2, y2, r2, a - HP, a + HP);
+  c.closePath();
+}
+function listeCiz() {
+  liste.sort((a, b) => b.d - a.d);
+  c.strokeStyle = MUREKKEP;
+  for (const o of liste) {
+    if (o.t === 0) {
+      kapYol(o.x1, o.y1, o.r1, o.x2, o.y2, o.r2);
+      c.fillStyle = o.c;
+      c.fill();
+      c.lineWidth = o.w;
+      c.strokeStyle = MUREKKEP;
+      c.stroke();
+    }
+    else if (o.t === 2) {
+      c.beginPath();
+      c.arc(o.x, o.y, o.r, 0, TAU);
+      c.fillStyle = o.c;
+      c.fill();
+      c.lineWidth = o.w;
+      c.strokeStyle = MUREKKEP;
+      c.stroke();
+    }
+    else
+      o.fn();
+  }
+}
+
+/* ---- kamera: oyuncular yayın alanına sığsın ---- */
+// Sahnenin oyuncular için ayrılan dikey şeridi (sanal 1280 satırda): üstü HUD, altı TikTok'un yorum alanı.
+const ALAN_UST = 505, ALAN_ALT = 1006;
+let kamCy = kam.cy;
+// noktalar: kadraja girmesi gereken yer noktaları [[x, z], …] (oyunKamera() döndürür). Kamera sağa sola
+// dönmez, ortaya bakar; bu yüzden yalnız |x| önemlidir. Sonuç yumuşakça yaklaşır; kam.son = { enX, hd }
+// (en geniş |x| ve derinliğin yarısı) oyunun zeminini kalabalığa göre büyütmesi için saklanır.
+function kameraSigdir(noktalar, dt) {
+  let mnZ = Infinity, mxZ = -Infinity;
+  for (const n of noktalar) {
+    if (n[1] < mnZ)
+      mnZ = n[1];
+    if (n[1] > mxZ)
+      mxZ = n[1];
+  }
+  if (!(mxZ >= mnZ))
+    mnZ = mxZ = 0;
+  const hd = (mxZ - mnZ) / 2, zOrta = (mnZ + mxZ) / 2, se = Math.sin(kam.egim), ce = Math.cos(kam.egim), kk = Math.min(1, dt * 1.6);
+  // Genişlik: kameraya yakın duran daha iri göründüğü için her nokta kendi derinliğiyle hesaba girer.
+  let hD = kam.enYakin, ust = 0, alt = 0, enX = 0;
+  for (const n of noktalar) {
+    const x = Math.abs(n[0]);
+    hD = Math.max(hD, (x + 0.55) * kam.F / 322 - (n[1] - zOrta) * ce);
+    enX = Math.max(enX, x);
+  }
+  for (let i = 0; i < 5; i++) {
+    // en arkadakinin adının üstü ve en öndekinin ayağı, hedef noktaya göre ekranda ne kadar yer tutuyor
+    ust = (hd * se + kam.ustPay * ce) * kam.F / (hD + hd * ce);
+    alt = (hd * se + kam.altPay) * kam.F / (hD - hd * ce);
+    if (ust + alt <= ALAN_ALT - ALAN_UST)
+      break;
+    hD *= (ust + alt) / (ALAN_ALT - ALAN_UST);
+  }
+  const hCy = ALAN_UST + ust + (ALAN_ALT - ALAN_UST - ust - alt) / 2;
+  kam.D += (hD - kam.D) * kk;
+  kam.tz += (zOrta - kam.tz) * kk;
+  kam.tx += (0 - kam.tx) * kk;
+  kamCy += (hCy - kamCy) * kk;
+  // hafif sağa sola salınım ve hediye sarsıntısı (D.sarsinti 0–1; oyun artırır, burada söner)
+  kam.yaw = azHareket ? 0 : 0.035 * Math.sin(zaman * 0.21);
+  D.sarsinti *= Math.exp(-dt * 5);
+  kam.cx = 360 + (azHareket ? 0 : Math.sin(zaman * 60) * D.sarsinti * 6);
+  kam.cy = kamCy + (azHareket ? 0 : Math.cos(zaman * 53) * D.sarsinti * 6);
+  kam.son.enX = enX;
+  kam.son.hd = hd;
+  kamKur();
+}
+
+/* ---- gölge, ad etiketleri, konuşma balonları, kenar karartması ---- */
+// Yerdeki gölge: (x, z) noktasında rx × rz metrelik elips.
+function golge(x, z, rx, rz) {
+  const g = pr([x, 0, z]);
+  if (!g.ok)
+    return;
+  c.fillStyle = 'rgba(40,24,30,.34)';
+  c.beginPath();
+  c.ellipse(g.x, g.y, rx * g.s, rz * g.s, 0, 0, TAU);
+  c.fill();
+}
+// k.et = { x, y, s, d }: etiketin oturacağı yer (başın tepesi), ölçek ve derinlik. insanEkle kendisi kurar;
+// insan çizmeyen oyun her karede kendisi yazar. Çekirdek her karede izleyicilerin k.et'ini boşaltır.
+// ekler: izleyici olmayan, etiketi olacak oyuncular (oyunEkAdlar()); k.ozel olanlar vurgu rengiyle yazılır.
+function etiketCiz(ekler) {
+  const adlar = ekler.filter(k => k && k.et);
+  for (const k of D.oy.values())
+    if (k.et && !k.cikiyor)
+      adlar.push(k);
+  c.textAlign = 'center';
+  c.textBaseline = 'middle';
+  c.lineJoin = 'round';
+  // Yer yetmeyince kimin adı kalır: lider, yıldız, özel oyuncular, son konuşanlar, ilk beş, öndekiler.
+  const onc = k => (k === D.lider ? 2000 : 0) + (k.yildiz ? 1500 : 0) + (k.ozel ? 900 : 0) + (zaman - k.son < 6 ? 600 - (zaman - k.son) * 20 : 0) + (!k.ozel && k.sn < 5 ? 200 - k.sn : 0) - k.et.d;
+  const kutular = [], sirali = adlar.slice().sort((a, b) => onc(b) - onc(a));
+  for (const k of sirali) {
+    const et = k.et, bas = k === D.lider, yeniMi = !k.ozel && zaman - k.yeni < 3;
+    const punto = clamp(Math.round(et.s * 0.17), 13, 18) + (bas ? 4 : 0), yk = punto + 9, tac = bas ? punto * 1.05 : 0;
+    c.font = (bas ? '700 ' : '500 ') + punto + 'px Rubik, system-ui, sans-serif';
+    if (k.adYazi !== k.ad + punto) {
+      k.adYazi = k.ad + punto;
+      k.adW = c.measureText(k.ad).width;
+    }
+    const w = k.adW + punto * 1.1 + tac, y0 = et.y - 5;
+    const x = clamp(et.x, w / 2 + 4, GW - w / 2 - 4);
+    let y = null;
+    for (const dy of [0, -(yk + 2), -(yk + 2) * 2]) {
+      const a = x - w / 2, u = y0 + dy - yk;
+      if (!kutular.some(q => a < q[0] + q[2] && a + w > q[0] && u < q[1] + q[3] && u + yk > q[1])) {
+        y = y0 + dy;
+        break;
+      }
+    }
+    k.etY = y0 - yk;
+    if (y === null) {
+      if (onc(k) < 500)
+        continue;
+      y = y0;
+    }
+    k.etY = y - yk;
+    kutular.push([x - w / 2, y - yk, w, yk]);
+    c.fillStyle = bas ? RENK.vurgu : renkSaydam(MUREKKEP, 0.78);
+    c.beginPath();
+    c.roundRect(x - w / 2, y - yk, w, yk, yk / 2);
+    c.fill();
+    if (bas) {
+      c.lineWidth = 2.5;
+      c.strokeStyle = MUREKKEP;
+      c.stroke();
+      // taç: liderin işareti
+      const tx = x - w / 2 + punto * 0.5, ty = y - yk / 2, b = punto * 0.42;
+      c.fillStyle = RENK.sicak;
+      c.beginPath();
+      c.moveTo(tx, ty + b * 0.7);
+      c.lineTo(tx - b * 0.15, ty - b * 0.6);
+      c.lineTo(tx + b * 0.45, ty);
+      c.lineTo(tx + b, ty - b * 0.85);
+      c.lineTo(tx + b * 1.55, ty);
+      c.lineTo(tx + b * 2.15, ty - b * 0.6);
+      c.lineTo(tx + b * 2, ty + b * 0.7);
+      c.closePath();
+      c.fill();
+    }
+    c.fillStyle = bas ? MUREKKEP : yeniMi ? '#5fe0d0' : k.ozel ? RENK.vurgu : RENK.acik;
+    c.fillText(k.ad, x + tac / 2, y - yk / 2 + 1);
+  }
+  for (const k of adlar) {
+    if (!k.balon)
+      continue;
+    const ya = zaman - k.balon.t0;
+    if (ya > 3.4) {
+      k.balon = null;
+      continue;
+    }
+    const et = k.et, al = Math.min(1, ya * 8, (3.4 - ya) * 4), by = (k.etY ?? et.y - 60) - 12;
+    c.font = '700 21px Rubik, system-ui, sans-serif';
+    const w = Math.min(330, c.measureText(k.balon.m).width + 28), x = clamp(et.x, w / 2 + 8, GW - w / 2 - 8);
+    c.globalAlpha = al;
+    c.fillStyle = RENK.vurgu;
+    c.strokeStyle = MUREKKEP;
+    c.lineWidth = 2.5;
+    c.beginPath();
+    c.roundRect(x - w / 2, by - 36, w, 36, 14);
+    c.fill();
+    c.stroke();
+    c.beginPath();
+    c.moveTo(et.x - 8, by - 2);
+    c.lineTo(et.x, by + 9);
+    c.lineTo(et.x + 8, by - 2);
+    c.stroke();
+    c.fill();
+    c.fillStyle = MUREKKEP;
+    c.fillText(k.balon.m, x, by - 17, w - 18);
+    c.globalAlpha = 1;
+  }
+  c.textBaseline = 'alphabetic';
+}
+let kenarBoya = null;
+function kenarKarart() {
+  if (!kenarBoya) {
+    kenarBoya = c.createRadialGradient(GW / 2, GH * 0.58, GH * 0.32, GW / 2, GH * 0.58, GH * 0.74);
+    kenarBoya.addColorStop(0, renkSaydam(MUREKKEP, 0));
+    kenarBoya.addColorStop(1, renkSaydam(MUREKKEP, 0.5));
+  }
+  c.fillStyle = kenarBoya;
+  c.fillRect(0, 0, GW, GH);
+}
+
+/* ── cekirdek/js/31-insan.js ── */
+/* İNSAN TAKIMI — iri başlı, kısa gövdeli "chibi" insan: eklemler, kollar, bekleme pozu, gövde ve baş çizimi.
+ * Oyun izleyicileri insan olarak çizecekse bunları kullanır; başka bir şey çizecekse hiç çağırmaz.
+ * iskeletKur(k, poz): pozdan eklemleri (k.j) kurar · kolKur(k): iki kolu ellere (j.haL / j.haR) uzatır
+ * pozBekle(k): vuruşla sallanan bekleme pozu · insanEkle(k): gövde + baş çizim listesine; k.et kurulur
+ * kafaCiz(k, ph): yalnız baş (yüz, saç, yazma, kasket; baş döndükçe yüz hatları kayar)
+ * Baş boyun yarısını tutar ki kalabalıkta da yüzler okunsun.
+ */
+// Gövde ölçüleri (karakterin boyuyla, k.g.boy, çarpılır; metre)
+const KALCA = 0.27, GOGUS = 0.2, KAFA_Y = 0.47, KAFA_R = 0.27, BACAK = 0.135, KOL = 0.16;
+
+// poz: { hipX, hipY, egim, yat, omL, omR, aS, aL }
+//   hipX: kalçanın yana kayması · hipY: kalça yüksekliği (KALCA ayakta durur; zıplayınca artar, çökünce azalır)
+//   egim: öne (+) / arkaya (−) eğilme · yat: yana yatma · omL / omR: omuzların kalkması
+//   aS / aL: sağ ve sol ayak [yana, ileri, yukarı] (karakterin yerel ekseninde, metre)
+// Karakterin yerinden (k.x, k.z, k.y0) ve yönünden (k.yon) eklemleri kurar. Bırakır: k._W(yana, yukarı, ileri)
+// yerel → dünya çevirici, k._hipX, k._hipY. Ellerin yerini (j.haL, j.haR) çağıran koyar, sonra kolKur(k).
+function iskeletKur(k, poz) {
+  const g = k.g, boy = g.boy, j = k.j;
+  const fx = Math.sin(k.yon), fz = Math.cos(k.yon), lx = -fz, lz = fx;
+  k.f[0] = fx;
+  k.f[2] = fz;
+  k.l[0] = lx;
+  k.l[2] = lz;
+  const W = (a, y, cc) => [k.x + (a * lx + cc * fx) * boy, k.y0 + y * boy, k.z + (a * lz + cc * fz) * boy];
+  const hipX = poz.hipX, hipY = poz.hipY, egim = poz.egim, yat = poz.yat, aS = poz.aS, aL = poz.aL;
+  const vurus = 0.5 + 0.5 * Math.cos(TAU * B); // vuruş anında 1
+  j.hip = W(hipX, hipY, 0);
+  j.gogus = W(hipX + yat * 3, hipY + GOGUS, egim);
+  j.kafa = W(hipX + yat * 5, hipY + KAFA_Y + 0.012 * vurus, egim * 1.4 + 0.01);
+  j.omL = W(hipX + yat * 3 + 0.15, hipY + GOGUS + 0.01 + poz.omL, egim);
+  j.omR = W(hipX + yat * 3 - 0.15, hipY + GOGUS + 0.01 + poz.omR, egim);
+  j.kbL = W(hipX + 0.075, hipY - 0.02, 0);
+  j.kbR = W(hipX - 0.075, hipY - 0.02, 0);
+  j.ayL = W(aL[0], aL[2] + 0.04, aL[1]);
+  j.ayR = W(aS[0], aS[2] + 0.04, aS[1]);
+  const ileri = [fx, 0.15, fz];
+  j.dzL = ik(j.kbL, j.ayL, BACAK * boy, BACAK * boy, ileri, j.dzL || [0, 0, 0]);
+  j.dzR = ik(j.kbR, j.ayR, BACAK * boy, BACAK * boy, ileri, j.dzR || [0, 0, 0]);
+  k._W = W;
+  k._hipY = hipY;
+  k._hipX = hipX;
+  return W;
+}
+// Omuzdan ele iki kol: dirsekler aşağı ve geriye bükülür.
+function kolKur(k) {
+  const j = k.j, boy = k.g.boy;
+  const kutupR = [-k.f[0] * 0.6 - k.l[0] * 0.5, -0.7, -k.f[2] * 0.6 - k.l[2] * 0.5], kutupL = [-k.f[0] * 0.6 + k.l[0] * 0.5, -0.7, -k.f[2] * 0.6 + k.l[2] * 0.5];
+  j.drR = ik(j.omR, j.haR, KOL * boy, KOL * boy, kutupR, j.drR || [0, 0, 0]);
+  j.drL = ik(j.omL, j.haL, KOL * boy, KOL * boy, kutupL, j.drL || [0, 0, 0]);
+}
+// Bekleme pozu: her vuruşta hafifçe çöker, iki vuruşta bir sırayla ayak kaldırır, dört vuruşta bir yana salınır.
+// Dönen nesne değiştirilebilir (ör. egim, zıplama için hipY ve ayak yüksekliği).
+function pozBekle(k) {
+  const t2 = ((B % 2) + 2) % 2, vurus = 0.5 + 0.5 * Math.cos(TAU * B);
+  return {
+    hipX: 0, hipY: KALCA - 0.03 * vurus, egim: 0, yat: Math.sin(TAU * B / 4) * 0.02, omL: 0, omR: 0,
+    aS: [-0.08, 0, t2 < 1 ? Math.sin(t2 * Math.PI) * 0.045 : 0], aL: [0.08, 0, t2 >= 1 ? Math.sin((t2 - 1) * Math.PI) * 0.045 : 0]
+  };
+}
+
+const SERIT = ['#f2b632', '#e23d2f', '#3d5bd0', '#f6ecd9', '#22b8a7'];
+// Eklemlerden gövde ve başı çizim listesine ekler. Ekrana düşmüş eklemler k.p'ye yazılır (oyun kendi
+// eklemlerini — ör. çalgı — k.j'ye koyduysa onlar da k.p'de bulunur). Çizildiyse true döner ve k.et kurulur.
+function insanEkle(k) {
+  const j = k.j, g = k.g, p = k.p, boy = g.boy;
+  k.et = null;
+  for (const n in j)
+    p[n] = pr(j[n]);
+  if (!p.hip.ok || !p.kafa.ok)
+    return false;
+  const bacak = g.kadin ? '#3a2a3c' : g.alt;
+  for (const y of ['L', 'R']) {
+    const kb = p['kb' + y], dz = p['dz' + y], ay = p['ay' + y];
+    kap(kb, 0.078 * boy, dz, 0.068 * boy, bacak);
+    kap(dz, 0.066 * boy, ay, 0.056 * boy, bacak);
+    const a3 = j['ay' + y], uc = pr([a3[0] + k.f[0] * 0.075 * boy, a3[1] - 0.01, a3[2] + k.f[2] * 0.075 * boy]);
+    kap(ay, 0.06 * boy, uc, 0.054 * boy, g.ayakkabi, (ay.d + uc.d) / 2 - 0.01);
+  }
+  const dzOrta = [(j.dzL[0] + j.dzR[0]) / 2, (j.dzL[1] + j.dzR[1]) / 2, (j.dzL[2] + j.dzR[2]) / 2];
+  const enYakin = Math.min(p.kbL.d, p.kbR.d, p.dzL.d, p.dzR.d);
+  if (g.kadin) {
+    const etek = pr([dzOrta[0], dzOrta[1] - 0.035 * boy, dzOrta[2]]);
+    kap(p.hip, 0.155 * boy, etek, 0.215 * boy, g.alt, enYakin - 0.03);
+    // önlük: öndeki şeritli kumaş
+    const o1 = pr([j.hip[0] + k.f[0] * 0.13 * boy, j.hip[1] + 0.01 * boy, j.hip[2] + k.f[2] * 0.13 * boy]), o2 = pr([dzOrta[0] + k.f[0] * 0.17 * boy, dzOrta[1] - 0.02 * boy, dzOrta[2] + k.f[2] * 0.17 * boy]);
+    const od = (o1.d + o2.d) / 2 - 0.12;
+    kap(o1, 0.075 * boy, o2, 0.115 * boy, g.onluk, od);
+    if (o1.ok && o2.ok)
+      ozel(od - 0.01, () => {
+        const dx = o2.x - o1.x, dy = o2.y - o1.y, uz = Math.hypot(dx, dy) || 1, nx = -dy / uz, ny = dx / uz, r1 = 0.075 * boy * o1.s, r2 = 0.115 * boy * o2.s;
+        c.lineWidth = r2 * 0.3;
+        let i = SERIT.indexOf(g.onluk) + 1;
+        for (const t of [-0.56, 0, 0.56]) {
+          c.strokeStyle = SERIT[i++ % SERIT.length];
+          c.beginPath();
+          c.moveTo(o1.x + nx * t * r1, o1.y + ny * t * r1);
+          c.lineTo(o2.x + nx * t * r2 + dx / uz * r2 * 0.55, o2.y + ny * t * r2 + dy / uz * r2 * 0.55);
+          c.stroke();
+        }
+      });
+  }
+  else {
+    const ag = pr([dzOrta[0], dzOrta[1] + 0.045 * boy, dzOrta[2]]);
+    kap(p.hip, 0.145 * boy, ag, 0.115 * boy, g.alt, enYakin - 0.02);
+  }
+  kap(p.hip, 0.148 * boy, p.gogus, 0.168 * boy, g.yelek, p.gogus.d - 0.01);
+  if (!g.kadin) {
+    const s1 = pr([j.gogus[0] + k.f[0] * 0.12 * boy, j.gogus[1] + 0.02 * boy, j.gogus[2] + k.f[2] * 0.12 * boy]), s2 = pr([j.hip[0] + k.f[0] * 0.105 * boy, j.hip[1] + 0.075 * boy, j.hip[2] + k.f[2] * 0.105 * boy]);
+    kap(s1, 0.07 * boy, s2, 0.055 * boy, g.gomlek, (s1.d + s2.d) / 2 - 0.02);
+  }
+  const b1 = pr([j.hip[0] + k.l[0] * 0.1 * boy, j.hip[1] + 0.055 * boy, j.hip[2] + k.l[2] * 0.1 * boy]), b2 = pr([j.hip[0] - k.l[0] * 0.1 * boy, j.hip[1] + 0.055 * boy, j.hip[2] - k.l[2] * 0.1 * boy]);
+  kap(b1, 0.07 * boy, b2, 0.07 * boy, g.kusak, Math.min(b1.d, b2.d) - 0.06);
+  for (const y of ['L', 'R']) {
+    const om = p['om' + y], dr = p['dr' + y], ha = p['ha' + y];
+    kap(om, 0.056 * boy, dr, 0.05 * boy, g.gomlek);
+    kap(dr, 0.05 * boy, ha, 0.046 * boy, g.gomlek);
+    if (ha.ok)
+      liste.push({ d: ha.d - 0.02, t: 2, x: ha.x, y: ha.y, r: 0.055 * boy * ha.s, c: g.ten, w: Math.max(1, ha.s * 0.011) });
+  }
+  const ph = p.kafa;
+  ozel(ph.d - 0.05, () => kafaCiz(k, ph));
+  const et = k._et || (k._et = { x: 0, y: 0, s: 0, d: 0 });
+  et.x = ph.x;
+  et.y = ph.y - KAFA_R * k.g.boy * ph.s;
+  et.s = ph.s;
+  et.d = ph.d;
+  k.et = et;
+  return true;
+}
+// Baş. Bayraklar: k.guler (hep güler), k.ciddi (hiç gülmez), k.ufle (yanaklar şişkin, ağız kapalı: üflemeli çalgı).
+// Bunlar yoksa hediye sevinci süresince (B < k.zip1) ve kalabalık coşkunken (D.cosku > 0.72) güler.
+function kafaCiz(k, ph) {
+  const g = k.g, R = KAFA_R * g.boy * ph.s, x0 = ph.x, y0 = ph.y, f = k.f, l = k.l;
+  const ku = kam.bu, kf = kam.bf;
+  const fr = f[0] * kam.r[0] + f[2] * kam.r[2], fu = f[0] * ku[0] + f[2] * ku[2], fd = f[0] * kf[0] + f[2] * kf[2];
+  const lr = l[0] * kam.r[0] + l[2] * kam.r[2], lu = l[0] * ku[0] + l[2] * ku[2], ld = l[0] * kf[0] + l[2] * kf[2];
+  const uu = ku[1], ud = kf[1];
+  const N = (a, b, cc) => ({ x: x0 + R * (a * lr + cc * fr), y: y0 - R * (a * lu + b * uu + cc * fu), d: a * ld + b * ud + cc * fd });
+  const cw = Math.max(1, ph.s * 0.012);
+  c.lineWidth = cw;
+  c.strokeStyle = MUREKKEP;
+  const ortu = g.baslik === 'yazma' ? g.baslikRenk : g.sac;
+  const arka = N(0, 0.1, -0.36), arkaR = R * (g.baslik === 'yazma' ? 1.02 : 0.95);
+  const daire = (x, y, r, renk, cizgi) => { c.beginPath(); c.arc(x, y, r, 0, TAU); c.fillStyle = renk; c.fill(); if (cizgi)
+    c.stroke(); };
+  if (g.baslik === 'orgu')
+    for (const s of [-1, 1]) {
+      const a = N(s * 0.8, -0.2, -0.3);
+      kapYol(a.x, a.y, R * 0.2, a.x + s * R * 0.08, a.y + R * 1.2, R * 0.13);
+      c.fillStyle = g.sac;
+      c.fill();
+      c.stroke();
+    }
+  if (arka.d > 0)
+    daire(arka.x, arka.y, arkaR, ortu, true);
+  daire(x0, y0, R, g.ten, true);
+  // tepeyi örten saç / yazma / şapka
+  c.save();
+  c.beginPath();
+  c.arc(x0, y0, R - cw * 0.4, 0, TAU);
+  c.clip();
+  if (g.baslik === 'yazma') {
+    const t = N(0, 0.98, 0.14);
+    daire(t.x, t.y, R * 0.86, g.baslikRenk);
+  }
+  else if (g.baslik === 'kasket' || g.baslik === 'bere') {
+    const t = N(0, 1.04, 0.02);
+    daire(t.x, t.y, R * 0.84, g.baslikRenk);
+  }
+  else {
+    const t = N(0, 1.0, 0.1);
+    daire(t.x, t.y, R * 0.78, g.sac);
+  }
+  c.restore();
+  if (fd < 0.3) {
+    // Yüz: iri göz, al yanak, açık gülüş. Gülen gözünü kısarak güler.
+    const kirp = (zaman + g.salin * 4.3) % 4.3 < 0.12;
+    const guler = !k.ciddi && (k.guler || B < k.zip1 || D.cosku > 0.72);
+    for (const s of [-1, 1]) {
+      const y = N(s * 0.6, -0.3, 0.68);
+      if (y.d < 0) {
+        c.globalAlpha = 0.5;
+        daire(y.x, y.y, R * (k.ufle ? 0.22 : 0.15), '#f0705f');
+        c.globalAlpha = 1;
+      }
+      const e = N(s * 0.36, -0.04, 0.88);
+      if (e.d < 0.05) {
+        if (guler || kirp) {
+          c.lineWidth = R * 0.07;
+          c.beginPath();
+          c.arc(e.x, e.y + R * 0.06, R * 0.11, Math.PI * 1.12, Math.PI * 1.88);
+          c.stroke();
+          c.lineWidth = cw;
+        }
+        else {
+          c.beginPath();
+          c.ellipse(e.x, e.y, R * 0.085, R * 0.12, 0, 0, TAU);
+          c.fillStyle = MUREKKEP;
+          c.fill();
+          daire(e.x + R * 0.03, e.y - R * 0.045, R * 0.032, '#f6ecd9');
+        }
+      }
+    }
+    const m = N(0, -0.42, 0.84);
+    if (m.d < 0 && !k.ufle) {
+      c.beginPath();
+      c.arc(m.x, m.y - R * 0.05, R * (guler ? 0.17 : 0.13), 0, Math.PI);
+      c.closePath();
+      c.fillStyle = '#7a1f2a';
+      c.fill();
+      if (g.biyik) {
+        const bi = N(0, -0.26, 0.9);
+        c.lineCap = 'round';
+        c.lineWidth = R * 0.12;
+        c.strokeStyle = g.sac;
+        c.beginPath();
+        c.moveTo(bi.x - R * 0.26, bi.y + R * 0.06);
+        c.quadraticCurveTo(bi.x, bi.y - R * 0.09, bi.x + R * 0.26, bi.y + R * 0.06);
+        c.stroke();
+        c.strokeStyle = MUREKKEP;
+      }
+      c.lineWidth = cw;
+    }
+  }
+  if (arka.d <= 0)
+    daire(arka.x, arka.y, arkaR, ortu, true);
+  if (g.baslik === 'kasket') {
+    const s = N(0, 0.46, 0.96);
+    if (s.d < 0.05) {
+      c.beginPath();
+      c.ellipse(s.x, s.y, R * 0.6, R * 0.16, 0, 0, TAU);
+      c.fillStyle = g.baslikRenk;
+      c.fill();
+      c.stroke();
+    }
+  }
+  if (g.baslik === 'bere') {
+    const t = N(0, 1.05, 0);
+    daire(t.x, t.y, R * 0.16, '#f2b632', true);
+  }
+  if (g.baslik === 'cicek') {
+    const t = N(0.62, 0.62, 0.36);
+    if (t.d < 0.3) {
+      daire(t.x, t.y, R * 0.22, '#e23d2f', true);
+      daire(t.x, t.y, R * 0.08, '#ffd166');
+    }
+  }
+  if (g.baslik === 'yazma') {
+    const t = N(0, 0.5, 0.88);
+    if (t.d < 0)
+      for (const s of [-0.5, 0, 0.5])
+        daire(t.x + s * R * 0.7, t.y - Math.abs(s) * R * -0.12, R * 0.05, '#ffd166');
+  }
+}
+
+/* ── cekirdek/js/32-parcacik.js ── */
+/* PARÇACIKLAR — konfeti ve beğeni kalpleri. Ekran koordinatında (720×1280) uçar, sahnenin üstüne çizilir.
+ * konfeti(adet, guc): ekranın üstünden saçılır · kalpAt(begeniSayisi): sağ alttan kalpler yükselir
+ * parcaCiz(dt): çekirdek her karede çağırır. Toplam parçacık sayısı sınırlıdır (olay selinde de şişmez).
+ */
+const parca = [];
+function konfeti(n, guc) { if (azHareket)
+  n = Math.min(n, 12); n = Math.min(n, 420 - parca.length); for (let i = 0; i < n; i++)
+  parca.push({ x: GW * (0.1 + Math.random() * 0.8), y: GH * 0.2 + Math.random() * 80, vx: (Math.random() - 0.5) * 420 * guc, vy: -200 - Math.random() * 520 * guc, d: Math.random() * TAU, vd: (Math.random() - 0.5) * 12, c: KUMAS[i % KUMAS.length], o: 2.2 + Math.random() * 1.2, tip: 0, b: 7 + Math.random() * 7 }); }
+function kalpAt(n) { const k = Math.min(10, Math.ceil(n / 3), 460 - parca.length); for (let i = 0; i < k; i++)
+  parca.push({ x: GW * 0.86 + (Math.random() - 0.5) * 60, y: GH * 0.76 + Math.random() * 40, vx: (Math.random() - 0.5) * 60, vy: -160 - Math.random() * 140, d: 0, vd: 0, c: RENK.sicak, o: 1.6 + Math.random() * 0.8, tip: 1, b: 12 + Math.random() * 10 }); }
+function parcaCiz(dt) {
+  for (let i = parca.length - 1; i >= 0; i--) {
+    const p = parca[i];
+    p.o -= dt;
+    if (p.o <= 0) {
+      parca.splice(i, 1);
+      continue;
+    }
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    p.d += p.vd * dt;
+    if (p.tip === 0) {
+      p.vy += 620 * dt;
+      p.vx *= 0.99;
+      c.save();
+      c.translate(p.x, p.y);
+      c.rotate(p.d);
+      c.globalAlpha = Math.min(1, p.o);
+      c.fillStyle = p.c;
+      c.fillRect(-p.b / 2, -p.b / 4, p.b, p.b / 2);
+      c.restore();
+    }
+    else {
+      p.x += Math.sin(zaman * 4 + i) * 0.6;
+      c.save();
+      c.translate(p.x, p.y);
+      c.globalAlpha = Math.min(1, p.o);
+      c.fillStyle = p.c;
+      const b = p.b;
+      c.beginPath();
+      c.moveTo(0, b * 0.35);
+      c.bezierCurveTo(-b, -b * 0.3, -b * 0.45, -b * 0.95, 0, -b * 0.4);
+      c.bezierCurveTo(b * 0.45, -b * 0.95, b, -b * 0.3, 0, b * 0.35);
+      c.fill();
+      c.restore();
+    }
+  }
+  c.globalAlpha = 1;
+}
+
+/* ── cekirdek/js/35-kare.js ── */
+/* KARE DÖNGÜSÜ — her karede: müzik saatini oku, oyunu ilerlet, kamerayı ayarla, her şeyi çiz.
+ * Sıra (docs/KANCALAR.md): müzik saati (B) → coşkunun sönmesi → boşta kalanı çıkarma → oyunGuncelle →
+ * çıkanları silme → kameraSigdir(oyunKamera()) → oyunZemin → oyunCiz → liste → oyunUst → etiketler →
+ * konfeti / kalpler → kenar karartması → sahne üstü yazılar.
+ */
+// İsteğe bağlı kancalar: oyun tanımlamadıysa yok sayılır (typeof, tanımsız adda da hata vermez).
+const KANCA_UST = typeof oyunUst === 'function' ? oyunUst : null;
+const KANCA_EK_ADLAR = typeof oyunEkAdlar === 'function' ? oyunEkAdlar : null;
+let sonKare = 0, kareSay = 0;
+function kare(simdiMs) {
+  const olcBas = performance.now(), dt = Math.min(0.05, (simdiMs - sonKare) / 1000 || 0.016);
+  sonKare = simdiMs;
+  zaman += dt;
+  kareSay++;
+  // müzik saati (oyun muzik.sov'u kendisi açar: doğruysa tempo biraz artar)
+  muzik.cosku = D.cosku;
+  const hedefCarpan = 1 + 0.3 * D.cosku + (muzik.sov ? 0.08 : 0);
+  muzik.carpan += (hedefCarpan - muzik.carpan) * Math.min(1, dt * 1.5);
+  muzik.planla(0.2);
+  const mt = muzik.simdi();
+  B = muzik.beatAt(mt);
+  const ol = muzik.olaylar;
+  while (ol.length && ol[0].t <= mt) {
+    const e = ol.shift();
+    if (e.tip === 'dum')
+      calgi.dumP = 1;
+    else if (e.tip === 'tek')
+      calgi.tekP = 1;
+    else
+      calgi.hedefPerde = e.deg;
+  }
+  calgi.dumP *= Math.exp(-dt * 8);
+  calgi.tekP *= Math.exp(-dt * 11);
+  calgi.perde += ((calgi.hedefPerde ?? 3) - calgi.perde) * Math.min(1, dt * 10);
+  // coşku kendiliğinden söner
+  D.cosku = Math.max(0, D.cosku - dt * 0.022);
+  // Uzun süre sessiz kalan sahneden çıkar (lider ve yıldız hariç). Hediye atanın süresi jetonla uzar.
+  if (kareSay % 45 === 0)
+    for (const k of D.sira) {
+      if (k === D.lider || k.yildiz)
+        continue;
+      if (zaman - k.son > (D.sira.length > 24 ? 75 : 240) + Math.min(600, k.jeton * 4)) {
+        cikar(k);
+        break;
+      }
+    }
+  oyunGuncelle(dt);
+  // Çıkan oyuncu 1,7 saniye sonra ya da oyun "gitti" (k.gitti) deyince silinir.
+  for (const k of D.oy.values())
+    if (k.cikiyor && (zaman - k.cikis > 1.7 || k.gitti))
+      D.oy.delete(k.id);
+  kameraSigdir(oyunKamera(), dt);
+  // çizim
+  c.setTransform(tuval.width / GW, 0, 0, tuval.height / GH, 0, 0);
+  c.lineJoin = 'round';
+  c.lineCap = 'round';
+  oyunZemin();
+  liste.length = 0;
+  for (const k of D.oy.values())
+    k.et = null;
+  oyunCiz();
+  listeCiz();
+  if (KANCA_UST)
+    KANCA_UST(dt);
+  etiketCiz(KANCA_EK_ADLAR ? KANCA_EK_ADLAR() || [] : []);
+  parcaCiz(dt);
+  kenarKarart();
+  // sahne üstü yazılar
+  if (D.siraKirli) {
+    D.siraKirli = false;
+    siraYaz();
+  }
+  if (kareSay % 6 === 0) {
+    gunlukYaz();
+    $('cosku-dolu').style.width = Math.round(D.cosku * 100) + '%';
+    $('cosku-bilgi').textContent = muzik.calanAd() + '\n' + Math.round(muzik.calanBpm()) + ' vuruş/dk · ' + D.sira.length + ' ' + OYUN.yazi.birim;
+    const calan = muzik.hazirCal ? muzik.hz.no : -1;
+    if (calan !== kare.parca) {
+      kare.parca = calan;
+      kare.kaynakYaz();
+    }
+    const secHava = (muzik.bekleyen || muzik.hava).id;
+    if (secHava !== kare.hava) {
+      kare.hava = secHava;
+      for (const x of $('hava-sec').children)
+        x.classList.toggle('secili', x.id === 'hava-' + secHava);
+    }
+  }
+  D.kareMs = D.kareMs ? D.kareMs * 0.95 + (performance.now() - olcBas) * 0.05 : performance.now() - olcBas;
+  requestAnimationFrame(kare);
+}
+
+/* ── cekirdek/js/40-sahte-izleyici.js ── */
+/* SAHTE İZLEYİCİ — yayın açık değilken denemek için uydurma adlar ve yorumlar üretir.
+ * Yorumlar OYUN.sahteYorum'dan, adlar OYUN.sahteAd'dan (yoksa aşağıdaki genel listeden) gelir.
+ * Hediyeler oyunun kademelerinden seçilir: en büyüğü seyrek, en küçüğü sık.
+ * Gerçek yayın kipinde (köprüden açılınca) kendiliğinden kapanır; sahnede sahte ad görünmez.
+ */
+const SAHTE_AD = OYUN.sahteAd && OYUN.sahteAd.length ? OYUN.sahteAd : ['kıvırcık_ayşe', 'zeyno.47', 'mert.can.21', 'elif_naz', 'dj_mahmut', 'karadenizli.cemo', 'sibel_abla', 'ozan_dayı', 'mardinli_rojin', 'tuğçe.sk', 'hasan.usta', 'pınar_34', 'berfin_gül', 'yusuf.63', 'nazlı_can', 'şahin_k', 'melo.27', 'fatoş_01', 'efe_tr', 'cano_23', 'zilan.d', 'hüso_baba', 'ayten_hanım', 'kemo_44', 'deniz.yıldızı', 'rıza_amca', 'sude_nur', 'baran.21', 'ipek_böceği', 'muhtar_emmi', 'selo_02', 'songül.k', 'laz_ziya', 'egeli_duru', 'bozkır_ali', 'nur.sena'];
+const SAHTE_YORUM = OYUN.sahteYorum && OYUN.sahteYorum.length ? OYUN.sahteYorum : ['selam!', 'ben de geldim', 'adımı gördüm'];
+// En büyük kademeden başlayarak her kademenin seçilme payı; kalan pay en küçük kademeye kalır.
+const SAHTE_HEDIYE_PAY = [0.007, 0.038, 0.105, 0.25];
+function sahteJeton() {
+  let q = Math.random(), esik = 1;
+  for (let i = 0; i < KADEME.length - 1; i++) {
+    esik -= SAHTE_HEDIYE_PAY[i] || 0;
+    if (q >= esik)
+      return KADEME[i].min;
+  }
+  return KADEME[KADEME.length - 1].min;
+}
+const sec = a => a[Math.floor(Math.random() * a.length)];
+function sahteKim() {
+  const ad = temiz($('sahte-ad').value);
+  if (ad)
+    return { id: 'ben:' + ad, ad };
+  const a = sec(SAHTE_AD);
+  return { id: 'sahte:' + a, ad: a };
+}
+const HIZLAR = [{ ad: 'Sakin', sn: 2.2 }, { ad: 'Normal', sn: 0.9 }, { ad: 'Çılgın', sn: 0.28 }];
+let oto = true, hiz = 0, otoSayac = 1;
+function otoAdim(dt) {
+  if (!oto)
+    return;
+  otoSayac -= dt;
+  if (otoSayac > 0)
+    return;
+  otoSayac = HIZLAR[hiz].sn * (0.4 + Math.random() * 1.2);
+  const a = sec(SAHTE_AD), kim = { id: 'sahte:' + a, ad: a }, r = Math.random();
+  if (r < 0.5)
+    olay({ tip: 'yorum', kullanici: kim, metin: sec(SAHTE_YORUM) });
+  else if (r < 0.8)
+    olay({ tip: 'begeni', kullanici: kim, adet: 3 + Math.floor(Math.random() * 14) });
+  else if (r < 0.94)
+    olay({ tip: 'hediye', kullanici: kim, jeton: sahteJeton() });
+  else
+    olay({ tip: 'takip', kullanici: kim });
+}
+setInterval(() => { otoAdim(0.1); muzik.planla(document.hidden ? 1.6 : 0.2); }, 100);
+
+/* ── cekirdek/js/50-yayin.js ── */
+/* GERÇEK YAYIN BAĞLANTISI — köprü programına WebSocket ile bağlanır, iletileri olay(o)'ya çevirir.
+ * KOPRU: sayfayı köprü açtıysa dolu gelir (kopru.js sayfaya window.OYUN_KOPRU yazar)
+ * Yayin.cevir: dış ileti → oyun olayı · Yayin.baglan / kes · kopunca 3 sn'de bir yeniden dener
+ * siraSakla / siraOku: jeton sıralamasını tarayıcıda 3 saat saklar · ayarOku / ayarYaz: balon ve süzgeç ayarı
+ * Bu dosya TikTok'a doğrudan bağlanmaz ve hiçbir kimlik bilgisi tutmaz.
+ */
+const KOPRU = typeof window.OYUN_KOPRU === 'string' ? window.OYUN_KOPRU : null; // sayfayı köprü programı açtıysa dolu gelir
+const Yayin = {
+  ws: null, alinan: 0, yeniden: null,
+  cevir(m) {
+    if (!m || typeof m !== 'object')
+      return null;
+    if (m.tip)
+      return m; // oyunun kendi biçimi
+    const e = String(m.event || m.type || '').toLowerCase(), d = m.data && typeof m.data === 'object' ? m.data : m, u = d.user && typeof d.user === 'object' ? d.user : d;
+    const kullanici = { id: u.uniqueId || u.userId || u.id || u.nickname, ad: u.nickname || u.uniqueId || u.displayName };
+    if (!kullanici.id)
+      return null;
+    if (e === 'chat' || e === 'comment')
+      return { tip: 'yorum', kullanici, metin: d.comment || d.message || d.text || '' };
+    if (e === 'like')
+      return { tip: 'begeni', kullanici, adet: d.likeCount || d.count || 1 };
+    if (e === 'follow')
+      return { tip: 'takip', kullanici };
+    if (e === 'share')
+      return { tip: 'paylasim', kullanici };
+    if (e === 'member' || e === 'join')
+      return { tip: 'katilim', kullanici };
+    if (e === 'social') {
+      const t = String(d.displayType || d.label || '');
+      return t.includes('follow') ? { tip: 'takip', kullanici } : t.includes('share') ? { tip: 'paylasim', kullanici } : null;
+    }
+    if (e === 'gift') {
+      const g = (d.giftDetails && typeof d.giftDetails === 'object' && d.giftDetails) || (d.gift && typeof d.gift === 'object' && d.gift) || d;
+      const tur = d.giftType ?? g.giftType ?? g.type, bitti = d.repeatEnd ?? d.repeat_end;
+      if (+tur === 1 && bitti !== undefined && !+bitti)
+        return null; // seri sürüyor, bitince sayılır
+      return { tip: 'hediye', kullanici, jeton: +(d.diamondCount ?? g.diamondCount ?? g.diamond_count ?? d.coins) || 1, adet: +(d.repeatCount ?? d.repeat_count ?? d.count) || 1 };
+    }
+    return null;
+  },
+  baglan(adres) {
+    const sur = this.surekli;
+    this.kes();
+    this.surekli = sur;
+    adres = String(adres || '').trim();
+    if (!/^wss?:\/\//i.test(adres)) {
+      bagDurum('hata', 'Adres ws:// ya da wss:// ile başlamalı.');
+      return;
+    }
+    let ws;
+    try {
+      ws = new WebSocket(adres);
+    }
+    catch (e) {
+      bagDurum('hata', 'Bu adres açılamadı.');
+      return;
+    }
+    this.ws = ws;
+    bagDurum('', 'Bağlanıyor…');
+    ws.onopen = () => { bagDurum('acik', 'Köprüye bağlandı. Sahte izleyiciyi kapattım.'); otoAyarla(false); };
+    ws.onmessage = ev => { let m; try {
+      m = JSON.parse(ev.data);
+    }
+    catch (e) {
+      return;
+    } for (const tek of Array.isArray(m) ? m : [m]) {
+      if (tek && tek.tip === 'kopru') {
+        bagDurum('acik', tek.ileti || '');
+        continue;
+      }
+      const o = this.cevir(tek);
+      if (o) {
+        this.alinan++;
+        olay(o);
+      }
+    } };
+    ws.onerror = () => { if (this.ws === ws && !this.surekli)
+      bagDurum('hata', 'Bağlanılamadı. Köprü programı çalışıyor mu? Bu sayfayı Claude içinde açtıysan dış bağlantı kapalıdır; indirdiğin dosyadan dene.'); };
+    ws.onclose = () => {
+      if (this.ws !== ws)
+        return;
+      this.ws = null;
+      $('bag-dugme').textContent = 'Bağlan';
+      if (this.surekli) {
+        bagDurum('hata', 'Köprüyle bağlantı koptu. 3 saniyede bir yeniden deniyorum.');
+        clearTimeout(this.yeniden);
+        this.yeniden = setTimeout(() => { if (this.surekli && !this.ws)
+          this.baglan(adres); }, 3000);
+      }
+      else if (!$('bag-rozet').classList.contains('hata'))
+        bagDurum('', 'Bağlantı kapandı.');
+    };
+    $('bag-dugme').textContent = 'Bağlantıyı kes';
+  },
+  kes() { this.surekli = false; clearTimeout(this.yeniden); if (this.ws) {
+    const w = this.ws;
+    this.ws = null;
+    try {
+      w.close();
+    }
+    catch (e) { }
+  } $('bag-dugme').textContent = 'Bağlan'; }
+};
+// Tarayıcı saklama anahtarları oyunun kimliğiyle başlar: iki oyun aynı tarayıcıda birbirinin sırasını görmez.
+const SAKLA = String(OYUN.id || 'canli-oyun') + '-sira', AYAR_SAKLA = String(OYUN.id || 'canli-oyun') + '-ayar';
+function siraSakla() { if (!KOPRU)
+  return; try {
+  localStorage.setItem(SAKLA, JSON.stringify({ t: Date.now(), oyuncular: D.sira.filter(k => k.jeton > 0).slice(0, 60).map(k => ({ id: k.id, ad: k.ad, jeton: k.jeton })) }));
+}
+catch (e) { } }
+function siraOku() { try {
+  const v = JSON.parse(localStorage.getItem(SAKLA) || 'null');
+  return v && Date.now() - v.t < 3 * 3600e3 && Array.isArray(v.oyuncular) ? v.oyuncular : null;
+}
+catch (e) {
+  return null;
+} }
+function ayarOku() { try {
+  const v = JSON.parse(localStorage.getItem(AYAR_SAKLA) || 'null');
+  if (v) {
+    ayar.balon = v.balon !== false;
+    ayar.yasak = Array.isArray(v.yasak) ? v.yasak.filter(x => typeof x === 'string' && x) : [];
+  }
+}
+catch (e) { } }
+function ayarYaz() { try {
+  localStorage.setItem(AYAR_SAKLA, JSON.stringify(ayar));
+}
+catch (e) { } }
+function bagDurum(sinif, ileti) { const r = $('bag-rozet'); r.className = 'rozet' + (sinif ? ' ' + sinif : ''); r.textContent = sinif === 'acik' ? 'Bağlı' : sinif === 'hata' ? 'Bağlanamadı' : 'Bağlı değil'; $('bag-ileti').textContent = ileti || ''; }
+
+/* ── cekirdek/js/60-panel.js ── */
+/* PANEL VE AÇILIŞ — sayfa yazıları, deneme panelinin düğmeleri, sahnenin boyutlandırılması, oyunun başlatılması.
+ * sayfaYaz: logo, nasıl oynanır, başlıklar, kademe tablosu ve tema renkleri OYUN'dan · boyutla: sahneyi 9:16 tutar
+ * yayinModu: yalnız sahne görünümü (#yayin) · baslat: tohum kalabalığı kurar, oyunBaslat(kayit) çağırır, döngüyü açar
+ * window.CanliOyun: dışarıya açık arayüz (olay, baglan, kes, cevir, durum, _test). Testler bunu kullanır.
+ * Açılış bütün parçalar çalıştıktan sonra (mikro görevde) yapılır: oyunun üst düzey const'ları kancalarda hazırdır.
+ */
+const KANCA_DURUM = typeof oyunDurum === 'function' ? oyunDurum : null;
+function otoAyarla(v) { oto = v; const b = $('oto'); b.textContent = 'Otomatik izleyici: ' + (v ? 'açık' : 'kapalı'); b.classList.toggle('secili', v); b.setAttribute('aria-pressed', v); }
+async function sesDegistir(ac) {
+  if (ac) {
+    const ok = await muzik.sesAc();
+    if (!ok)
+      return;
+  }
+  else
+    await muzik.sesKapat();
+  $('ses-dugme').textContent = muzik.acik ? 'Sesi kapat' : 'Sesi aç';
+  $('ses-dugme').classList.toggle('ana', !muzik.acik);
+  $('ses-cagri').hidden = muzik.acik;
+}
+function boyutla() {
+  const yayin = document.body.classList.contains('yayin'), dar = innerWidth <= 820, kok = document.documentElement, s = $('sahne');
+  const cs = getComputedStyle(kok), yukH = kok.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+  let w;
+  if (yayin)
+    w = Math.min(innerWidth, yukH * 9 / 16);
+  else if (dar)
+    w = Math.min(innerWidth - 32, yukH * 0.58 * 9 / 16);
+  else
+    w = Math.min((yukH - 32) * 9 / 16, innerWidth - 32 - 20 - 300);
+  w = Math.max(200, Math.floor(w));
+  s.style.width = w + 'px';
+  s.style.height = Math.round(w * 16 / 9) + 'px';
+  const pw = Math.min(yayin ? 1080 : 900, Math.round(w * Math.min(2, devicePixelRatio || 1)));
+  if (tuval.width !== pw) {
+    tuval.width = pw;
+    tuval.height = Math.round(pw * 16 / 9);
+  }
+}
+function yayinModu(v) { document.body.classList.toggle('yayin', v); try {
+  if ((location.hash === '#yayin') !== v)
+    history.replaceState(null, '', v ? '#yayin' : location.pathname + location.search);
+}
+catch (e) { } boyutla(); }
+
+// Sayfadaki oyuna özgü her yazı OYUN'dan gelir (hepsi textContent; HTML yazılmaz).
+function sayfaYaz() {
+  const kok = document.documentElement.style;
+  for (const [ad, css] of [['zemin', '--zemin'], ['zemin2', '--zemin-2'], ['zemin3', '--zemin-3'], ['cizgi', '--cizgi'], ['vurgu', '--vurgu'], ['sicak', '--sicak'], ['serin', '--serin'], ['acik', '--acik'], ['soluk', '--soluk'], ['murekkep', '--murekkep']])
+    kok.setProperty(css, RENK[ad]);
+  const y = OYUN.yazi, logo = $('logo'), lp = [].concat(OYUN.logo || OYUN.ad || '').map(String);
+  logo.textContent = '';
+  logo.append(lp[0] + (lp.length > 1 ? ' ' : ''));
+  if (lp.length > 1) {
+    const b = document.createElement('b');
+    b.textContent = lp.slice(1).join(' ');
+    logo.append(b);
+  }
+  for (const tur of ['yorum', 'begeni', 'hediye']) {
+    const s = $('nasil-' + tur), m = OYUN.nasil[tur];
+    if (m)
+      s.append(String(m));
+    else
+      s.hidden = true;
+  }
+  $('sira-baslik').textContent = y.sira;
+  $('gosterge-baslik').textContent = y.gosterge;
+  $('ses-cagri').textContent = y.ses;
+  tuval.setAttribute('aria-label', y.sahne);
+  $('s-yorum-not').textContent = y.giris;
+  $('s-takip-not').textContent = y.giris;
+  $('bosalt').textContent = y.bosalt;
+  // kademe tablosu: küçükten büyüğe
+  const tablo = $('kademe-tablo');
+  for (const kd of [...KADEME].reverse()) {
+    const tr = document.createElement('tr'), a = document.createElement('td'), b = document.createElement('td');
+    a.textContent = kd.min + '+ jeton';
+    b.textContent = kd.etki || kd.ad;
+    tr.append(a, b);
+    tablo.append(tr);
+  }
+}
+
+function baslat(kayit) {
+  sayfaYaz();
+  // panel düğmeleri
+  HAVALAR.forEach((h, i) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'dugme' + (i === 0 ? ' secili' : '');
+    b.textContent = h.ad;
+    b.id = 'hava-' + h.id;
+    b.onclick = () => { muzik.bekleyen = h; muzik.havaSure = 0; };
+    $('hava-sec').append(b);
+  });
+  for (const kd of [...KADEME].reverse()) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'dugme';
+    b.id = 'h-' + kd.min;
+    const g = document.createElement('b');
+    g.textContent = kd.min + ' jeton';
+    const s = document.createElement('small');
+    s.textContent = kd.ad;
+    b.append(g, s);
+    b.onclick = () => { ilkDokunus(); olay({ tip: 'hediye', kullanici: sahteKim(), jeton: kd.min }); };
+    $('hediyeler').append(b);
+  }
+  HIZLAR.forEach((h, i) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'dugme' + (i === hiz ? ' secili' : '');
+    b.textContent = h.ad;
+    b.id = 'hiz-' + i;
+    b.onclick = () => { hiz = i; for (const x of $('hiz-sec').children)
+      x.classList.toggle('secili', x === b); if (!oto)
+      otoAyarla(true); };
+    $('hiz-sec').append(b);
+  });
+  let dokunuldu = false;
+  const ilkDokunus = () => { if (!dokunuldu) {
+    dokunuldu = true;
+    if (!muzik.acik)
+      sesDegistir(true);
+  } };
+  $('s-yorum').onclick = () => { ilkDokunus(); olay({ tip: 'yorum', kullanici: sahteKim(), metin: sec(SAHTE_YORUM) }); };
+  $('s-begeni').onclick = () => { ilkDokunus(); olay({ tip: 'begeni', kullanici: sahteKim(), adet: 15 }); };
+  $('s-takip').onclick = () => { ilkDokunus(); olay({ tip: 'takip', kullanici: sahteKim() }); };
+  $('oto').onclick = () => otoAyarla(!oto);
+  // Boşalt: önce bütün oyuncular silinir, sonra oyun kendi durumunu sıfırlar (oyunBosalt), sonra sıra yeniden kurulur.
+  $('bosalt').onclick = () => { D.oy.clear(); D.cosku = 0; siraImza = '?'; oyunBosalt(); siraGuncelle(); otoAyarla(false); try {
+    localStorage.removeItem(SAKLA);
+  }
+  catch (e) { } };
+  const dugmeYaz = (id, on, ad) => { const b = $(id); b.textContent = ad + (on ? 'açık' : 'kapalı'); b.classList.toggle('secili', on); b.setAttribute('aria-pressed', on); };
+  $('sirayla').onclick = () => { muzik.sirayla = !muzik.sirayla; dugmeYaz('sirayla', muzik.sirayla, 'Havaları sırayla çal: '); };
+  ayarOku();
+  dugmeYaz('balon-dugme', ayar.balon, 'Yorum balonları: ');
+  $('yasak').value = ayar.yasak.join(', ');
+  $('balon-dugme').onclick = () => { ayar.balon = !ayar.balon; dugmeYaz('balon-dugme', ayar.balon, 'Yorum balonları: '); ayarYaz(); };
+  $('yasak').oninput = e => { ayar.yasak = e.target.value.split(',').map(x => x.trim().toLocaleLowerCase('tr')).filter(x => x.length > 1).slice(0, 200); ayarYaz(); };
+  $('ses-dugme').onclick = () => { dokunuldu = true; sesDegistir(!muzik.acik); };
+  $('ses-cagri').onclick = () => { dokunuldu = true; sesDegistir(true); };
+  $('ses-duzey').oninput = e => muzik.duzeyAyarla(e.target.value / 100 * 0.7);
+  // Hazır parçalar: oyunun yanındaki muzik/liste.js varsa yüklenir ve müzik yalnız o parçalardan çalar;
+  // üretilen havaların düğmeleri gizlenir. Klasör yoksa hiçbir şey değişmez, üretilen müzik çalar.
+  const kaynakYaz = () => {
+    for (const x of $('parca-sec').children)
+      x.classList.toggle('secili', muzik.hazirCal && x.id === 'parca-' + muzik.hz.no);
+  };
+  kare.kaynakYaz = kaynakYaz;
+  if (!window.OYUN_MUZIK_KAPALI) {
+    const ml = document.createElement('script');
+    ml.src = 'muzik/liste.js';
+    ml.onload = () => {
+      if (!muzik.hazirKur(window.OYUN_MUZIK))
+        return;
+      muzik.parcalar.forEach((p, i) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'dugme';
+        b.id = 'parca-' + i;
+        b.textContent = p.ad;
+        b.onclick = async () => { dokunuldu = true; if (!muzik.acik)
+          await sesDegistir(true); await muzik.hazirBaslat(i); kaynakYaz(); };
+        $('parca-sec').append(b);
+      });
+      $('hazir-kutu').hidden = false;
+      $('hava-sec').hidden = true;
+      $('sirayla').parentElement.hidden = true;
+      muzik.kaynakSec('hazir').then(kaynakYaz);
+    };
+    document.head.append(ml);
+  }
+  $('yayin-gor').onclick = () => yayinModu(true);
+  $('cik-yayin').onclick = () => yayinModu(false);
+  addEventListener('keydown', e => { if (e.key === 'Escape' && document.body.classList.contains('yayin'))
+    yayinModu(false); });
+  addEventListener('hashchange', () => yayinModu(location.hash === '#yayin'));
+  $('bag-dugme').onclick = () => { if (Yayin.ws) {
+    Yayin.kes();
+    bagDurum('', 'Bağlantı kesildi.');
+  }
+  else
+    Yayin.baglan($('bag-adres').value); };
+  addEventListener('resize', boyutla);
+  if (window.ResizeObserver)
+    new ResizeObserver(boyutla).observe(document.documentElement);
+  // Başlangıç kalabalığı: sayfa boş açılmasın. Gerçek yayında sahte ad olmaz; saklanan sıra geri gelir.
+  const eski = kayit && Array.isArray(kayit.oyuncular) ? kayit.oyuncular : KOPRU ? (siraOku() || []) : null;
+  const tohum = eski || (OYUN.tohum || []).map(([ad, jeton]) => ({ id: 'sahte:' + ad, ad, jeton }));
+  tohum.forEach((t, i) => { const k = karakterYap(String(t.id), String(t.ad)); k.jeton = +t.jeton || 0; k.katilim = i * 0.001; D.oy.set(k.id, k); });
+  siraImza = '?';
+  siraGuncelle();
+  oyunBaslat(kayit);
+  if (kayit && typeof kayit.cosku === 'number')
+    D.cosku = kayit.cosku;
+  if (kayit && kayit.hava) {
+    const h = HAVALAR.find(x => x.id === kayit.hava);
+    if (h) {
+      muzik.hava = h;
+      for (const x of $('hava-sec').children)
+        x.classList.toggle('secili', x.id === 'hava-' + h.id);
+    }
+  }
+  document.body.classList.toggle('yayin', location.hash === '#yayin');
+  boyutla();
+  kamKur();
+  if (KOPRU) {
+    otoAyarla(false);
+    $('bag-adres').value = KOPRU;
+    Yayin.surekli = true;
+    Yayin.baglan(KOPRU);
+    Yayin.surekli = true;
+    $('panel-not').textContent = 'Bu sayfayı köprü programı açtı. Yorum ve hediyeler gerçek yayından gelir. Aşağıdaki sahte izleyici düğmeleri yalnızca deneme içindir; yayın sırasında basma.';
+    setInterval(siraSakla, 5000);
+  }
+  if (KOPRU || location.hash === '#yayin')
+    muzik.sesAc(true).then(ok => { if (ok)
+      sesDegistir(true); });
+  requestAnimationFrame(t => { sonKare = t; kare(t); });
+}
+
+// Dışarıya açık küçük arayüz: köprü yazanlar ve denemeler için.
+window.CanliOyun = {
+  olay, baglan: a => Yayin.baglan(a), kes: () => Yayin.kes(), cevir: m => Yayin.cevir(m),
+  durum: () => {
+    const d = { oyun: OYUN.id, kisi: D.sira.length, lider: D.lider && D.lider.ad, cosku: D.cosku, begeni: D.begeni, vurus: B, sira: D.sira.map(k => [k.ad, k.jeton]), kareMs: D.kareMs, parca: parca.length, bagli: !!(Yayin.ws && Yayin.ws.readyState === 1), alinan: Yayin.alinan, hava: muzik.hava.id, ses: muzik.acik };
+    if (KANCA_DURUM)
+      KANCA_DURUM(d);
+    return d;
+  },
+  _test: { D, muzik, Muzik, HAVALAR, ayar, OYUN, KADEME, zamanEkle: sn => { zaman += sn; }, zaman: () => zaman },
+  async _sesTesti(sn, i) {
+    const oc = new OfflineAudioContext(2, 44100 * sn, 44100), m = new Muzik();
+    m.hava = HAVALAR[i || 0];
+    m.sesKur(oc);
+    m.acik = true;
+    m.sonraki = 0.05;
+    while (m.sonraki < sn)
+      m.adimCal();
+    const buf = await oc.startRendering(), d = buf.getChannelData(0);
+    let tepe = 0, kare2 = 0, gecis = 0;
+    const dilim = [];
+    for (let i2 = 0; i2 < d.length; i2++) {
+      const v = d[i2];
+      if (Math.abs(v) > tepe)
+        tepe = Math.abs(v);
+      kare2 += v * v;
+      if (i2 && (v > 0) !== (d[i2 - 1] > 0))
+        gecis++;
+      if (i2 % 44100 === 44099) {
+        let q = 0;
+        for (let w = i2 - 44099; w <= i2; w++)
+          q += d[w] * d[w];
+        dilim.push(+Math.sqrt(q / 44100).toFixed(3));
+      }
+    }
+    return { tepe: +tepe.toFixed(3), rms: +Math.sqrt(kare2 / d.length).toFixed(3), sifirGecis: Math.round(gecis / sn), dilim, adimlar: m.iz.length };
+  }
+};
+window.claude?.hot?.snapshot?.(() => ({ oyuncular: D.sira.map(k => ({ id: k.id, ad: k.ad, jeton: k.jeton })), cosku: D.cosku, hava: muzik.hava.id }));
+queueMicrotask(() => {
+  if (window.claude?.hot?.ready)
+    window.claude.hot.ready(baslat);
+  else
+    baslat(window.claude?.hot?.data ?? {});
+});
+
+/* ── oyunlar/halay/js/10-durum.js ── */
+/* HALAY DURUMU — yay biçiminde halay dizisi, çalgıcılar, hediye etkileri, mendilin el değiştirmesi.
+ * D'ye eklenenler: hareket (herkesin yaptığı omuz / çök), soloKuyruk + solo (ortaya çıkan), sovBit (davul şovu
+ * hangi vuruşa dek sürer), mendilUcus (el değiştiren mendil), R / Rhedef (yayın yarıçapı), aci (yayın açıklığı),
+ * meydanR (ışıklı meydanın yarıçapı), salinim (dizinin yavaş salınımı), soloYer, calZ / calAralik (çalgıcıların yeri).
+ * Kancalar: oyunYerlesim, oyunGiris, oyunHediye, oyunLiderDegisti, oyunBaslat, oyunBosalt, oyunDurum.
+ */
+const ARALIK = 0.54;
+Object.assign(D, { hareket: null, soloKuyruk: [], solo: null, sovBit: -1, mendilUcus: null, R: 2.2, Rhedef: 2.2, aci: 0, meydanR: 3.6, salinim: 0, soloYer: [0, 0], calZ: 0, calAralik: 0.7 });
+
+// Çalgıcılar izleyici değildir: D.oy'da durmazlar, etiketleri oyunEkAdlar'dan gelir (k.ozel).
+const davulcu = karakterYap('__davulcu', 'Davulcu');
+Object.assign(davulcu, { mod: 'davulcu', ozel: true, ciddi: true });
+Object.assign(davulcu.g, { kadin: false, ten: '#d9a070', sac: '#1d1513', boy: 1.2, gomlek: '#f6ecd9', yelek: '#20264f', alt: '#3a2a2c', kusak: '#e23d2f', baslik: 'kasket', baslikRenk: '#3a2a2c', biyik: true });
+const zurnaci = karakterYap('__zurnaci', 'Zurnacı');
+Object.assign(zurnaci, { mod: 'zurnaci', ozel: true, ciddi: true, ufle: true });
+Object.assign(zurnaci.g, { kadin: false, ten: '#f2c9a0', sac: '#3a2416', boy: 1.14, gomlek: '#f6ecd9', yelek: '#22b8a7', alt: '#20264f', kusak: '#f2b632', baslik: 'bere', baslikRenk: '#e23d2f', biyik: false });
+const CALGICILAR = [davulcu, zurnaci];
+
+// Herkes yayın üstünde ARALIK metre arayla durur; yay kalabalıkla büyür ve kapanmaya yaklaşır.
+function oyunYerlesim() {
+  const n = D.sira.length, L = Math.max(0, n - 1) * ARALIK;
+  D.Rhedef = Math.max(2.2, L / 5.2);
+  const R = D.Rhedef;
+  D.aci = L / R;
+  // Yay arkada ortalanır, açıklığı hep kameraya bakar: halkanın içi (çalgıcılar, solo) kapanmaz.
+  // Halay başı yayın sol ucundadır; kameraya döndüğü için serbest kalan sağ eli mendili sallar.
+  const bas = -D.aci / 2;
+  D.sira.forEach((k, i) => { k.hedefAci = bas + i * ARALIK / R; });
+}
+// Yeni gelen, yerinin hizasında halkanın dışından koşarak gelir.
+function oyunGiris(k) {
+  const a = k.hedefAci || 0, r = D.R + 4.5;
+  k.x = Math.sin(a) * r;
+  k.z = Math.cos(a) * r;
+}
+function oyunHediye(k, j, kd) {
+  const v = Math.ceil(B);
+  if (kd.tip === 'omuz' || kd.tip === 'cok')
+    D.hareket = { tip: kd.tip, bas: v, sure: 8 };
+  if (kd.tip === 'davul' || kd.tip === 'solo') {
+    D.sovBit = Math.max(D.sovBit, v + 16);
+    D.hareket = { tip: 'omuz', bas: v, sure: 8 };
+    konfeti(40, 0.5);
+  }
+  if (kd.tip === 'solo') {
+    if (!D.soloKuyruk.includes(k) && !k.solo && D.soloKuyruk.length < 4)
+      D.soloKuyruk.push(k);
+    konfeti(120, 1);
+    D.sarsinti = 1;
+  }
+  muzik.sov = B < D.sovBit;
+}
+// Mendil eski halay başının elinden yenisinin başına uçar.
+function oyunLiderDegisti(eski, yeni) {
+  const e = eski.j.haR || [eski.x, 1.4, eski.z];
+  D.mendilUcus = { x: e[0], y: e[1], z: e[2], t0: zaman, sure: 1.0, kime: yeni };
+  pankart('Mendil el değiştirdi', 'Yeni halay başı: ' + yeni.ad);
+  konfeti(90, 0.9);
+  D.sarsinti = 0.7;
+}
+function oyunBaslat() {
+  D.R = D.Rhedef;
+  for (const k of D.sira) {
+    k.x = Math.sin(k.hedefAci) * D.R;
+    k.z = Math.cos(k.hedefAci) * D.R;
+    k.yer = 1;
+    k.yon = Math.PI;
+    k.yeni = -9;
+  }
+  davulcu.x = -2.4;
+  davulcu.z = 1;
+  zurnaci.x = 2.4;
+  zurnaci.z = 1;
+  arkaHazirla();
+}
+function oyunBosalt() {
+  D.soloKuyruk.length = 0;
+  D.solo = null;
+  D.hareket = null;
+  D.mendilUcus = null;
+}
+function oyunDurum(d) {
+  d.halayBasi = d.lider;
+  d.solo = D.solo ? D.solo.k.ad : null;
+  d.soloKuyruk = D.soloKuyruk.length;
+}
+
+/* ── oyunlar/halay/js/20-hareket.js ── */
+/* HALAY HAREKETİ — 4 vuruşluk halay adımı, solo, el ele tutuşma, yerine koşma, çalgıcıların yeri ve duruşu.
+ * ayakSag / ayakSol: halay adımı · iskelet(k): o anki poz → iskeletKur · kollar(k, onceki, sonraki): komşularla
+ * el ele; halay başının boş eli mendil sallar · karakterHareket(k, dt): yerine koşma, çıkış, solo, yüzün yönü
+ * calgicilariYerlestir(dt) · Kancalar: oyunGuncelle(dt), oyunKamera().
+ */
+const ADIM = 0.6; // adım değerleri uzun bacaklı ölçüdedir; kısa bacağa bu oranla küçültülür
+
+// Halay adımı: 4 vuruşluk döngü. Sağa bas, sol ayağı çaprazla, sol tekme, sağ tekme.
+function ayakSag(u, g) {
+  if (u < 0.6) {
+    const t = u / 0.6;
+    return [lerp(-0.10, -0.30, t), 0, Math.sin(t * Math.PI) * 0.07];
+  }
+  if (u < 2)
+    return [-0.30, 0, 0];
+  if (u < 2.5) {
+    const t = (u - 2) / 0.5;
+    return [lerp(-0.30, -0.24, t), 0, Math.sin(t * Math.PI) * 0.04];
+  }
+  if (u < 3)
+    return [-0.24, 0, 0];
+  const t = u - 3, s = Math.sin(t * Math.PI);
+  return [lerp(-0.24, -0.10, t), s * 0.2 * g, s * 0.16 * g];
+}
+function ayakSol(u, g) {
+  if (u < 1)
+    return [0.10, 0, 0];
+  if (u < 1.6) {
+    const t = (u - 1) / 0.6;
+    return [lerp(0.10, -0.12, t), 0.04 * t, Math.sin(t * Math.PI) * 0.07];
+  }
+  if (u < 2)
+    return [-0.12, 0.04, 0];
+  if (u < 3) {
+    const t = u - 2, s = Math.sin(t * Math.PI);
+    return [lerp(-0.12, 0.02, t), 0.04 * (1 - t) + s * 0.3 * g, s * 0.22 * g];
+  }
+  if (u < 3.5)
+    return [0.02, 0, 0];
+  const t = (u - 3.5) / 0.5;
+  return [lerp(0.02, 0.10, t), 0, Math.sin(t * Math.PI) * 0.03];
+}
+
+// Halaydaki birinin pozu: koşu ile halay adımı arasında yerine oturma oranıyla (k.yer) geçer.
+// Ortak hareket (D.hareket: omuz / çök), solo ve hediye zıplaması bunun üstüne biner. Serbest el hedeflerini döndürür.
+function halayPoz(k) {
+  const g = k.g, b = B, cos = D.cosku, guc = 1 + cos * 0.6;
+  const vurus = 0.5 + 0.5 * Math.cos(TAU * b);
+  let egim = 0, zipla = 0, elR = null, elL = null;
+  const y = k.yer, u = ((b % 4) + 4) % 4;
+  // koşu
+  const ph = k.kos * 7, ky = 1 - y;
+  const ksS = [-0.11, Math.sin(ph) * 0.2, Math.max(0, Math.cos(ph)) * 0.16], ksL = [0.11, -Math.sin(ph) * 0.2, Math.max(0, -Math.cos(ph)) * 0.16];
+  let hS = ayakSag(u, guc), hL = ayakSol(u, guc);
+  let X = u < 2 ? -0.2 * yumusak(u / 2) : -0.2 * (1 - yumusak((u - 2) / 2));
+  let cok = 0, omuz = cos * 0.01 * Math.sin(TAU * b * 2);
+  const hr = D.hareket;
+  if (hr && b >= hr.bas && b < hr.bas + hr.sure) {
+    const hu = b - hr.bas;
+    if (hr.tip === 'cok') {
+      cok = 0.11 * Math.pow(Math.sin(Math.PI * hu / 2), 2);
+    }
+    else if (hr.tip === 'omuz') {
+      omuz = 0.045 * Math.sin(TAU * hu * 2);
+      egim -= 0.03;
+    }
+  }
+  if (k.solo) {
+    const su = b - (D.solo ? D.solo.bas : b), t2 = ((su % 2) + 2) % 2, sq = 0.05 + 0.04 * Math.sin(Math.PI * su);
+    hS = t2 < 1 ? [-0.14, Math.sin(t2 * Math.PI) * 0.32, Math.sin(t2 * Math.PI) * 0.3] : [-0.14, 0, 0];
+    hL = t2 >= 1 ? [0.14, Math.sin((t2 - 1) * Math.PI) * 0.32, Math.sin((t2 - 1) * Math.PI) * 0.3] : [0.14, 0, 0];
+    X = 0;
+    cok = Math.max(0, sq);
+    const yuk = 0.48 + 0.04 * Math.sin(TAU * su);
+    elR = [-0.3, yuk, 0.05];
+    elL = [0.3, yuk - 0.08 * Math.sin(TAU * su), 0.05];
+    omuz = 0.04 * Math.sin(TAU * su * 2);
+  }
+  if (b >= k.zip0 && b < k.zip1)
+    zipla = 0.3 * Math.abs(Math.sin(Math.PI * (b - k.zip0)));
+  const kc = 1 - cok * 5;
+  const aS = [lerp(ksS[0], hS[0], y) * ADIM, lerp(ksS[1], hS[1] * kc, y) * ADIM, lerp(ksS[2], hS[2] * kc, y) * ADIM + zipla * 0.8];
+  const aL = [lerp(ksL[0], hL[0], y) * ADIM, lerp(ksL[1], hL[1] * kc, y) * ADIM, lerp(ksL[2], hL[2] * kc, y) * ADIM + zipla * 0.8];
+  const hipX = X * y * ADIM;
+  const hipY = KALCA - (0.022 + cos * 0.02) * vurus * y - cok * y + zipla - ky * 0.02 * Math.abs(Math.sin(ph));
+  egim += ky * 0.05;
+  const yat = Math.sin(TAU * b / 2 + g.salin) * 0.016 * y;
+  if (elR) {
+    elR[1] += hipY;
+    elL[1] += hipY;
+  }
+  else {
+    elR = [-0.2 - ky * 0.04, hipY + 0.06, 0.04 + ky * Math.sin(ph) * 0.14];
+    elL = [0.2 + ky * 0.04, hipY + 0.06, 0.04 - ky * Math.sin(ph) * 0.14];
+  }
+  return { poz: { hipX, hipY, egim, yat, omL: omuz, omR: -omuz, aS, aL }, elR, elL };
+}
+function iskelet(k) {
+  const j = k.j, b = B;
+  if (k.mod === 'oyuncu') {
+    const h = halayPoz(k);
+    iskeletKur(k, h.poz);
+    k._elR = h.elR;
+    k._elL = h.elL;
+    return;
+  }
+  // çalgıcılar: bekleme pozu, çalgının üstüne eğilmiş
+  const poz = pozBekle(k);
+  poz.egim = k.mod === 'davulcu' ? -0.02 : -0.015 - calgi.perde * 0.004;
+  const W = iskeletKur(k, poz), hipX = poz.hipX, hipY = poz.hipY, yat = poz.yat;
+  if (k.mod === 'davulcu') {
+    j.davul = W(0.01, hipY + 0.09, 0.22);
+    j.davulL = W(0.17, hipY + 0.09, 0.22);
+    j.davulR = W(-0.15, hipY + 0.09, 0.22);
+    const kal = 1 - calgi.dumP, kal2 = 1 - calgi.tekP;
+    j.haR = W(-0.27 - kal * 0.07, hipY + 0.12 + kal * 0.2, 0.2);
+    j.haL = W(0.23, hipY + 0.3 + kal2 * 0.07, 0.24);
+    j.tokmak = W(-0.17 - kal * 0.04, hipY + 0.1 + kal * 0.08, 0.22);
+    j.cubuk = W(0.11, hipY + 0.2 + kal2 * 0.1, 0.32);
+  }
+  else {
+    const kalk = 0.02 + calgi.perde * 0.012 + 0.025 * Math.sin(TAU * b / 2);
+    j.agiz = W(hipX + yat * 5, hipY + KAFA_Y - 0.09, KAFA_R * 0.9);
+    j.zurnaUc = W(hipX + yat * 5, hipY + 0.26 + kalk * 2.2, 0.62);
+    j.haR = W(hipX - 0.03, hipY + 0.34 + kalk * 0.6, 0.33);
+    j.haL = W(hipX + 0.03, hipY + 0.3 + kalk * 1.3, 0.45);
+  }
+}
+function kollar(k, onceki, sonraki) {
+  const j = k.j, W = k._W, bagli = a => a && a.yer > 0.9 && !a.solo && !a.cikiyor;
+  if (k.mod === 'oyuncu') {
+    const ben = bagli(k);
+    // Herkes kameraya döndüğü için komşu, yayın neresinde durduğuna göre sağda ya da solda kalır.
+    let solda = null, sagda = null;
+    if (ben)
+      for (const a of [onceki, sonraki]) {
+        if (!bagli(a))
+          continue;
+        const yan = (a.x - k.x) * k.l[0] + (a.z - k.z) * k.l[2];
+        if (yan >= 0 ? !solda : !!sagda)
+          solda = solda || a;
+        else
+          sagda = a;
+      }
+    // İki komşu da aynı orta noktaya uzanır; eller orada buluşur.
+    const orta = a => [(j.hip[0] + a.j.hip[0]) / 2, (j.hip[1] + a.j.hip[1]) / 2 + 0.04, (j.hip[2] + a.j.hip[2]) / 2];
+    const eL = k._elL, eR = k._elR;
+    k.bagL = !!solda;
+    k.bagR = !!sagda;
+    j.haL = solda ? orta(solda) : W(k._hipX + eL[0], eL[1], eL[2]);
+    j.haR = sagda ? orta(sagda) : W(k._hipX + eR[0], eR[1], eR[2]);
+    k.mendilEl = null;
+    if (k === D.lider && ben && !D.mendilUcus) {
+      const el = !sagda ? 'R' : !solda ? 'L' : null;
+      if (el) {
+        const s = el === 'R' ? -1 : 1, th = TAU * B;
+        // El başın yanından yukarı uzanır; mendil yüzü kapatmasın.
+        j['ha' + el] = W(k._hipX + s * (0.37 + 0.05 * Math.cos(th)), k._hipY + 0.5 + 0.06 * Math.sin(th), 0.05);
+        k.mendilEl = el;
+      }
+    }
+  }
+  kolKur(k);
+}
+
+function karakterHareket(k, dt) {
+  let hx, hz, hedefYon;
+  if (k.cikiyor) {
+    const a = Math.atan2(k.x, k.z), r = D.R + 9;
+    hx = Math.sin(a) * r;
+    hz = Math.cos(a) * r;
+  }
+  else if (k.solo) {
+    hx = D.soloYer[0];
+    hz = D.soloYer[1];
+  }
+  else {
+    const a = k.hedefAci + D.salinim;
+    hx = Math.sin(a) * D.R;
+    hz = Math.cos(a) * D.R;
+  }
+  const dx = hx - k.x, dz = hz - k.z, uz = Math.hypot(dx, dz);
+  if (uz > 0.002) {
+    const adim = Math.min(uz, (2.8 + uz * 1.6) * dt);
+    k.x += dx / uz * adim;
+    k.z += dz / uz * adim;
+    if (uz > 0.15)
+      k.kos += adim;
+  }
+  const yerinde = uz < 0.16 && !k.cikiyor;
+  k.yer += ((yerinde ? 1 : 0) - k.yer) * Math.min(1, dt * 7);
+  if (k.solo && yerinde)
+    hedefYon = Math.atan2(-kam.f[0], -kam.f[2]) + (azHareket ? 0 : Math.floor((B - D.solo.bas) / 4) % 2 ? TAU * yumusak(((B - D.solo.bas) % 4) / 2) : 0);
+  else {
+    // Herkes kameraya döner ki yüzü görünsün. Koşan gittiği yöne, yerinde oynayan halkanın içine doğru hafifçe kırılır.
+    const cx = kam.C[0] - k.x, cz = kam.C[2] - k.z, cl = Math.hypot(cx, cz) || 1, il = Math.hypot(k.x, k.z) || 1;
+    if (uz > 0.3)
+      hedefYon = Math.atan2(cx / cl + 0.55 * dx / uz, cz / cl + 0.55 * dz / uz);
+    else
+      hedefYon = Math.atan2(cx / cl - 0.3 * k.x / il, cz / cl - 0.3 * k.z / il);
+  }
+  k.yon += aciFark(k.yon, hedefYon) * Math.min(1, dt * (k.solo ? 14 : 9));
+  // çıkan, halkadan yeterince uzaklaşınca silinsin (çekirdek k.gitti'ye bakar)
+  if (k.cikiyor)
+    k.gitti = Math.hypot(k.x, k.z) > D.R + 6;
+}
+// Çalgıcılar: bir avuç kişiyken dizinin iki yanında, kalabalıklaşınca yayın önünde, halka kapanınca tam ortada.
+// Hiçbir durumda oynayanların yüzünü kapatmazlar; solo yapan onların önüne çıkar.
+function calgicilariYerlestir(dt) {
+  const zon = D.R * Math.cos(D.aci / 2), xe = D.R * Math.sin(Math.min(D.aci, Math.PI) / 2);
+  const yan = 1 - basamak(0.9, 1.6, D.aci), kar = basamak(2.2, 3.4, D.aci);
+  const calZ = lerp(lerp(zon - 1.35, 0.15, kar), zon - 0.25, yan);
+  // Solo sırasında çalgıcılar iki yana açılır ki öne çıkan kişi onları kapatmasın.
+  const aralik = lerp(D.solo ? 1.1 : 0.7, xe + 0.95, yan);
+  D.calZ = calZ;
+  D.calAralik = aralik;
+  D.soloYer = [0, lerp(calZ - 1.15, zon - 1.3, yan)];
+  for (const [m, s] of [[davulcu, -1], [zurnaci, 1]]) {
+    const gez = muzik.sov && m === davulcu ? 0.5 : 0, hx = s * aralik + gez * Math.sin(B * TAU / 8) * 0.6, hz = calZ - gez * 0.5;
+    m.x += (hx - m.x) * Math.min(1, dt * 3);
+    m.z += (hz - m.z) * Math.min(1, dt * 3);
+    const bak = Math.atan2(kam.C[0] - m.x, kam.C[2] - m.z) + s * 0.22 + (gez ? Math.sin(B * TAU / 4) * 0.3 : 0);
+    m.yon += aciFark(m.yon, bak) * Math.min(1, dt * 6);
+  }
+}
+
+let sonDt = 0.016; // oyunZemin meydanı aynı hızla büyütsün diye
+function oyunGuncelle(dt) {
+  sonDt = dt;
+  D.R += (D.Rhedef - D.R) * Math.min(1, dt * 2.5);
+  D.salinim = azHareket ? 0 : 0.09 * Math.sin(B * TAU / 16);
+  if (D.hareket && B > D.hareket.bas + D.hareket.sure)
+    D.hareket = null;
+  // solo: sırası gelen 16 vuruş ortada tek başına oynar
+  if (D.solo && (B > D.solo.bas + 16 || D.solo.k.cikiyor)) {
+    const k = D.solo.k;
+    k.solo = k.yildiz = k.guler = false;
+    D.solo = null;
+  }
+  if (!D.solo && D.soloKuyruk.length) {
+    const k = D.soloKuyruk.shift();
+    if (!k.cikiyor) {
+      k.solo = k.yildiz = k.guler = true;
+      D.solo = { k, bas: Math.ceil(B) + 1 };
+    }
+  }
+  if (D.mendilUcus && zaman - D.mendilUcus.t0 > D.mendilUcus.sure)
+    D.mendilUcus = null;
+  calgicilariYerlestir(dt);
+  for (const k of D.oy.values())
+    karakterHareket(k, dt);
+  muzik.sov = B < D.sovBit;
+  // eklemler: önce herkesin iskeleti, sonra komşulara uzanan kollar
+  const hepsi = [...D.oy.values(), davulcu, zurnaci];
+  for (const k of hepsi)
+    iskelet(k);
+  for (const k of hepsi) {
+    const i = k.cikiyor ? -1 : k.sn, halayda = k.mod === 'oyuncu';
+    kollar(k, halayda && i > 0 ? D.sira[i - 1] : null, halayda && i >= 0 ? D.sira[i + 1] : null);
+  }
+}
+// Kadraja girmesi gerekenler: çalgıcılar, herkesin hedef yeri ve solo yeri.
+function oyunKamera() {
+  const calZ = D.calZ, n = [[D.calAralik + 0.3, calZ], [0, calZ - 0.2], [0, calZ + 0.2]];
+  for (const k of D.sira)
+    n.push([Math.sin(k.hedefAci) * D.Rhedef, Math.cos(k.hedefAci) * D.Rhedef]);
+  if (D.solo)
+    n.push(D.soloYer);
+  return n;
+}
+
+/* ── oyunlar/halay/js/30-dekor.js ── */
+/* DEKOR — gece göğü, köy, meydan zemini, kilim baklavaları, ampul dizileri, gölgeler, halay başı halkası, solo ışığı.
+ * arkaHazirla: gökyüzü bir kez çizilir · zeminCiz (meydan + ampulCiz) · Kanca: oyunZemin().
+ */
+// Kamera yüksekten baktığı için gerçek ufuk görüntünün dışında kalır. Gökyüzü ve köy, sahnenin üstünde
+// sabit bir fon perdesi gibi durur; UFUK o perdenin bittiği satırdır.
+const UFUK = 432;
+let arkaKatman = null;
+function arkaHazirla() {
+  const t = document.createElement('canvas');
+  t.width = 1100;
+  t.height = 600;
+  const a = t.getContext('2d'), r = rastgeleUret(41), H = UFUK + 2;
+  const gr = a.createLinearGradient(0, 0, 0, H);
+  gr.addColorStop(0, '#0a0d2a');
+  gr.addColorStop(0.55, '#1a2260');
+  gr.addColorStop(0.9, '#3a3a86');
+  gr.addColorStop(1, '#6b4f8f');
+  a.fillStyle = gr;
+  a.fillRect(0, 0, 1100, H + 160);
+  for (let i = 0; i < 120; i++) {
+    a.globalAlpha = 0.3 + r() * 0.7;
+    a.fillStyle = '#f6ecd9';
+    a.beginPath();
+    a.arc(r() * 1100, r() * H * 0.85, 0.6 + r() * 1.4, 0, TAU);
+    a.fill();
+  }
+  a.globalAlpha = 0.12;
+  a.fillStyle = '#ffd166';
+  a.beginPath();
+  a.arc(800, 92, 70, 0, TAU);
+  a.fill();
+  a.globalAlpha = 1;
+  a.fillStyle = '#f6ecd9';
+  a.beginPath();
+  a.arc(800, 92, 34, 0, TAU);
+  a.fill();
+  a.fillStyle = 'rgba(169,176,220,.35)';
+  for (const [x, y, q] of [[790, 84, 8], [812, 100, 6], [798, 106, 4]]) {
+    a.beginPath();
+    a.arc(x, y, q, 0, TAU);
+    a.fill();
+  }
+  const tepe = (renk, yuk, f1, f2, kay) => { a.fillStyle = renk; a.beginPath(); a.moveTo(0, H + 160); for (let x = 0; x <= 1100; x += 10)
+    a.lineTo(x, H - yuk * (0.55 + 0.3 * Math.sin(x * f1 + kay) + 0.15 * Math.sin(x * f2 + kay * 2))); a.lineTo(1100, H + 160); a.closePath(); a.fill(); };
+  tepe('#232a6b', 74, 0.0071, 0.019, 1.2);
+  tepe('#181e52', 44, 0.011, 0.027, 4.1);
+  // köy: evler, kavaklar, ışıklı pencereler
+  for (let x = 20; x < 1090;) {
+    const kavak = r() < 0.3;
+    if (kavak) {
+      const h = 46 + r() * 30;
+      a.fillStyle = '#10153d';
+      a.beginPath();
+      a.ellipse(x + 8, H - h / 2 - 2, 8, h / 2, 0, 0, TAU);
+      a.fill();
+      x += 22;
+      continue;
+    }
+    const w = 34 + r() * 30, h = 20 + r() * 20;
+    a.fillStyle = '#10153d';
+    a.fillRect(x, H - h, w, h + 4);
+    a.beginPath();
+    a.moveTo(x - 4, H - h);
+    a.lineTo(x + w / 2, H - h - 12 - r() * 8);
+    a.lineTo(x + w + 4, H - h);
+    a.closePath();
+    a.fill();
+    a.fillStyle = r() < 0.75 ? '#ffd166' : '#22b8a7';
+    for (let px = x + 7; px < x + w - 9; px += 13)
+      if (r() < 0.7)
+        a.fillRect(px, H - h + 7, 6, 8);
+    x += w + 6 + r() * 26;
+  }
+  arkaKatman = t;
+}
+const KILIM = ['#e23d2f', '#22b8a7', '#f2b632'];
+let zeminBoya = null;
+function zeminCiz() {
+  c.drawImage(arkaKatman, -190 - kam.yaw * 520, 0);
+  if (!zeminBoya) {
+    zeminBoya = c.createLinearGradient(0, UFUK, 0, GH);
+    zeminBoya.addColorStop(0, '#242b66');
+    zeminBoya.addColorStop(0.3, '#171d4b');
+    zeminBoya.addColorStop(1, '#0c1030');
+  }
+  c.fillStyle = zeminBoya;
+  c.fillRect(0, UFUK, GW, GH - UFUK);
+  // meydan: ampullerin aydınlattığı sıcak toprak. Kenarı geceye karışır, ortası en aydınlık yerdir.
+  const mz = kam.tz, yc = D.meydanR + 0.8;
+  const o = pr([0, 0, mz]), sag = pr([yc, 0, mz]), on = pr([0, 0, mz - yc]), ar = pr([0, 0, mz + yc]);
+  if (o.ok && sag.ok && on.ok && ar.ok) {
+    const rx = sag.x - o.x, my = (on.y + ar.y) / 2, ky = (on.y - ar.y) / 2 / rx;
+    c.save();
+    c.translate(o.x, my);
+    c.scale(1, ky);
+    const isik = c.createRadialGradient(0, 0, rx * 0.08, 0, 0, rx);
+    isik.addColorStop(0, '#f0cf93');
+    isik.addColorStop(0.42, '#c9a166');
+    isik.addColorStop(0.72, 'rgba(132,104,96,.86)');
+    isik.addColorStop(1, 'rgba(58,52,98,0)');
+    c.fillStyle = isik;
+    c.beginPath();
+    c.arc(0, 0, rx, 0, TAU);
+    c.fill();
+    c.restore();
+  }
+  // kilim baklavaları: meydanın çevresini sarar
+  const rr = D.meydanR - 0.2, adet = Math.max(18, Math.round(rr * TAU / 0.62));
+  for (let i = 0; i < adet; i++) {
+    const a = i / adet * TAU, da = 0.2 / rr, dr = 0.26;
+    const k = [pr([Math.sin(a - da) * rr, 0, mz + Math.cos(a - da) * rr]), pr([Math.sin(a) * (rr + dr), 0, mz + Math.cos(a) * (rr + dr)]), pr([Math.sin(a + da) * rr, 0, mz + Math.cos(a + da) * rr]), pr([Math.sin(a) * (rr - dr), 0, mz + Math.cos(a) * (rr - dr)])];
+    if (k.some(p => !p.ok))
+      continue;
+    c.beginPath();
+    c.moveTo(k[0].x, k[0].y);
+    for (let q = 1; q < 4; q++)
+      c.lineTo(k[q].x, k[q].y);
+    c.closePath();
+    c.globalAlpha = 0.8;
+    c.fillStyle = KILIM[i % 3];
+    c.fill();
+  }
+  c.globalAlpha = 1;
+  ampulCiz();
+}
+// Ampul dizileri fon perdesinin önünde, meydanın arkasında asılıdır; vuruşla yanıp söner.
+const AMPUL = ['#ffd166', '#e23d2f', '#ffd166', '#22b8a7', '#f6ecd9'];
+const IPLER = [[-24, 404, 744, 452, 13], [-24, 474, 744, 414, 12]];
+function ampulCiz() {
+  let say = 0;
+  for (const [x1, y1, x2, y2, sark] of IPLER) {
+    const n = 22, nokta = t => [lerp(x1, x2, t), lerp(y1, y2, t) + sark * 4 * t * (1 - t)];
+    c.strokeStyle = 'rgba(8,10,28,.85)';
+    c.lineWidth = 2;
+    c.beginPath();
+    for (let i = 0; i <= n; i++) {
+      const [x, y] = nokta(i / n);
+      i ? c.lineTo(x, y) : c.moveTo(x, y);
+    }
+    c.stroke();
+    for (let i = 1; i < n; i++) {
+      const [x, y] = nokta(i / n), renk = AMPUL[say % AMPUL.length], par = 0.72 + 0.28 * Math.sin(B * Math.PI + say * 1.7), r = 6.5;
+      say++;
+      c.globalAlpha = 0.17 * par;
+      c.fillStyle = renk;
+      c.beginPath();
+      c.arc(x, y + r, r * 3.3, 0, TAU);
+      c.fill();
+      c.globalAlpha = 0.6 + 0.4 * par;
+      c.beginPath();
+      c.arc(x, y + r, r, 0, TAU);
+      c.fill();
+    }
+  }
+  c.globalAlpha = 1;
+}
+
+function oyunZemin() {
+  // Meydanın ışığı ve kilim çevresi oynayanları ortalar: üç kişi de otuz altı kişi de ışığın içinde durur.
+  D.meydanR += (Math.max(kam.son.enX, kam.son.hd) + 1.7 - D.meydanR) * Math.min(1, sonDt * 1.6);
+  zeminCiz();
+  for (const k of D.oy.values())
+    golge(k.x, k.z, 0.25 * k.g.boy, 0.13 * k.g.boy);
+  for (const k of CALGICILAR)
+    golge(k.x, k.z, 0.25 * k.g.boy, 0.13 * k.g.boy);
+  // halay başının ayağının altında vuruşla atan altın halka
+  if (D.lider) {
+    const g = pr([D.lider.x, 0, D.lider.z]);
+    if (g.ok) {
+      const n = 1 + 0.08 * Math.sin(B * TAU);
+      c.strokeStyle = '#ffd166';
+      c.lineWidth = Math.max(2, g.s * 0.03);
+      c.beginPath();
+      c.ellipse(g.x, g.y, 0.37 * g.s * n, 0.2 * g.s * n, 0, 0, TAU);
+      c.stroke();
+    }
+  }
+  // solo yapanın üstüne düşen ışık
+  if (D.solo && D.solo.k.yer > 0.5) {
+    const g = pr([D.solo.k.x, 0, D.solo.k.z]);
+    if (g.ok) {
+      const gr = c.createLinearGradient(0, 0, 0, g.y);
+      gr.addColorStop(0, 'rgba(255,209,102,0)');
+      gr.addColorStop(1, 'rgba(255,209,102,.13)');
+      c.fillStyle = gr;
+      c.beginPath();
+      c.moveTo(g.x - 30, 0);
+      c.lineTo(g.x + 30, 0);
+      c.lineTo(g.x + 0.7 * g.s, g.y);
+      c.lineTo(g.x - 0.7 * g.s, g.y);
+      c.closePath();
+      c.fill();
+      c.fillStyle = 'rgba(255,209,102,.25)';
+      c.beginPath();
+      c.ellipse(g.x, g.y, 0.7 * g.s, 0.38 * g.s, 0, 0, TAU);
+      c.fill();
+    }
+  }
+}
+
+/* ── oyunlar/halay/js/40-cizim.js ── */
+/* HALAY ÇİZİMİ — oyuncular, davul, zurna, mendil; el değiştiren mendilin uçuşu; çalgıcıların ad etiketi.
+ * davulCiz · mendilCiz · Kancalar: oyunCiz(), oyunUst(dt), oyunEkAdlar().
+ */
+function oyunCiz() {
+  for (const k of D.oy.values())
+    if (insanEkle(k))
+      ekCiz(k);
+  for (const k of CALGICILAR)
+    if (insanEkle(k))
+      ekCiz(k);
+}
+// İnsanın üstüne gelenler: çalgılar ve halay başının mendili. insanEkle k.p'yi doldurduktan sonra çağrılır.
+function ekCiz(k) {
+  const p = k.p;
+  if (k.mod === 'davulcu') {
+    const d0 = p.davul;
+    ozel(d0.d - 0.2, () => davulCiz(k));
+    kap(p.haR, 0.02, p.tokmak, 0.02, '#8a5a2c', p.haR.d - 0.25);
+    top(p.tokmak, 0.045, '#f6ecd9', p.tokmak.d - 0.26, 1.5);
+    kap(p.haL, 0.012, p.cubuk, 0.008, '#caa46a', p.haL.d - 0.25);
+  }
+  else if (k.mod === 'zurnaci') {
+    // Zurna başın önünde durur; baştan sonra çizilsin diye derinliği öne çekilir.
+    kap(p.agiz, 0.02, p.zurnaUc, 0.06, '#7a4a22', p.kafa.d - 0.4);
+    top(p.zurnaUc, 0.064, '#caa46a', p.kafa.d - 0.42, 1.5);
+  }
+  if (k.mendilEl && k.yer > 0.9) {
+    const el = p['ha' + k.mendilEl];
+    // Mendil elin dış yanına, yukarı doğru sallanır (ekranda el başın solundaysa sola, sağındaysa sağa).
+    if (el.ok)
+      ozel(el.d - 0.1, () => mendilCiz(el.x, el.y, el.s * 0.8, (el.x < p.kafa.x ? -2.3 : -0.84) + 0.45 * Math.sin(TAU * B), 1));
+  }
+}
+// uçan mendil: eski halay başının elinden yenisinin başına
+function oyunUst() {
+  const mu = D.mendilUcus;
+  if (!mu)
+    return;
+  const t = (zaman - mu.t0) / mu.sure, h = mu.kime.j.kafa || [0, 1.5, 0], p = pr([lerp(mu.x, h[0], t), lerp(mu.y, h[1] + 0.3, t) + Math.sin(t * Math.PI) * 1.8, lerp(mu.z, h[2], t)]);
+  if (p.ok)
+    mendilCiz(p.x, p.y, p.s * 1.2, t * 14, 1);
+}
+function oyunEkAdlar() { return CALGICILAR; }
+
+function davulCiz(k) {
+  const p = k.p, a = p.davulL, b = p.davulR;
+  if (!a.ok || !b.ok)
+    return;
+  const yakinA = a.d < b.d, uz = yakinA ? b : a, yk = yakinA ? a : b, cap = 0.21 * k.g.boy, r1 = cap * uz.s, r2 = cap * yk.s;
+  const ac = Math.atan2(yk.y - uz.y, yk.x - uz.x), ek = Math.abs(k.l[0] * kam.f[0] + k.l[2] * kam.f[2]), dar = 0.18 + 0.82 * ek;
+  const nx = -Math.sin(ac), ny = Math.cos(ac);
+  c.lineWidth = Math.max(1, yk.s * 0.012);
+  c.strokeStyle = MUREKKEP;
+  c.beginPath();
+  c.ellipse(uz.x, uz.y, r1 * dar, r1, ac, 0, TAU);
+  c.fillStyle = '#e9dcc0';
+  c.fill();
+  c.stroke();
+  c.beginPath();
+  c.moveTo(uz.x + nx * r1, uz.y + ny * r1);
+  c.lineTo(yk.x + nx * r2, yk.y + ny * r2);
+  c.lineTo(yk.x - nx * r2, yk.y - ny * r2);
+  c.lineTo(uz.x - nx * r1, uz.y - ny * r1);
+  c.closePath();
+  c.fillStyle = '#b5482f';
+  c.fill();
+  c.stroke();
+  c.strokeStyle = '#ffd166';
+  c.lineWidth = Math.max(1, yk.s * 0.014);
+  for (let i = -2; i <= 2; i++) {
+    const t = i / 2.6;
+    c.beginPath();
+    c.moveTo(uz.x + nx * r1 * t, uz.y + ny * r1 * t);
+    c.lineTo(yk.x + nx * r2 * (t + 0.19), yk.y + ny * r2 * (t + 0.19));
+    c.stroke();
+  }
+  c.strokeStyle = MUREKKEP;
+  c.lineWidth = Math.max(1, yk.s * 0.012);
+  const vur = 1 + (yakinA ? calgi.tekP : calgi.dumP) * 0.05;
+  c.beginPath();
+  c.ellipse(yk.x, yk.y, r2 * dar * vur, r2 * vur, ac, 0, TAU);
+  c.fillStyle = '#f6ecd9';
+  c.fill();
+  c.stroke();
+  c.beginPath();
+  c.ellipse(yk.x, yk.y, r2 * dar * 0.55, r2 * 0.55, ac, 0, TAU);
+  c.strokeStyle = 'rgba(8,10,28,.25)';
+  c.stroke();
+  c.strokeStyle = MUREKKEP;
+}
+function mendilCiz(x, y, s, aci, parlak) {
+  const b = 0.3 * s, dal = Math.sin(zaman * 14) * 0.25;
+  c.save();
+  c.translate(x, y);
+  c.rotate(aci);
+  if (parlak) {
+    c.globalAlpha = 0.25;
+    c.beginPath();
+    c.arc(b * 0.5, 0, b * 0.9, 0, TAU);
+    c.fillStyle = '#ffd166';
+    c.fill();
+    c.globalAlpha = 1;
+  }
+  c.beginPath();
+  c.moveTo(0, 0);
+  c.quadraticCurveTo(b * 0.5, -b * (0.5 + dal), b, -b * 0.28);
+  c.lineTo(b * 0.78, b * 0.12);
+  c.lineTo(b * 1.02, b * 0.42);
+  c.quadraticCurveTo(b * 0.45, b * (0.3 - dal), 0, 0);
+  c.closePath();
+  c.fillStyle = '#e23d2f';
+  c.fill();
+  c.lineWidth = Math.max(1.5, s * 0.016);
+  c.strokeStyle = '#ffd166';
+  c.stroke();
+  c.restore();
+}
+})();
+</script>
+</body>
+</html>

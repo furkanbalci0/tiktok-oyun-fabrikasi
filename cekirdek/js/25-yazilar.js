@@ -1,4 +1,6 @@
 /* SAHNE ÜSTÜ YAZILAR — sıra kutusu, bildirimler, pankart, paneldeki olay günlüğü.
+ * bildir(ad, orta, vurgu): sağdaki bildirim satırı · pankart(satir1, satir2): ortadan geçen büyük duyuru
+ * gunluk(tur, ad, metin): paneldeki olay günlüğü. Boş sıranın yazısı OYUN.yazi.bos'tan gelir.
  * Hepsi textContent ile yazılır. Sıra kutusu ve günlük olay anında değil karede bir kez güncellenir
  * (yüzlerce olay aynı anda gelse de sayfa takılmasın diye).
  */
@@ -14,7 +16,7 @@ function siraYaz() {
   if (!ilk.length) {
     const li = document.createElement('li');
     li.className = 'bos';
-    li.textContent = 'Meydan boş. İlk yazan mendili alır.';
+    li.textContent = OYUN.yazi.bos;
     ol.append(li);
     return;
   }

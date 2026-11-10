@@ -1,27 +1,55 @@
 #!/usr/bin/env node
-/* Derleme: src/ altındaki parçaları tek dosyalık oyuna (mendil-kimde.html) birleştirir.
+/* Derleme: çekirdek ile bir oyunun parçalarını tek dosyalık sayfaya (oyunlar/<ad>/oyun.html) birleştirir.
  *
- *   node araclar/derle.js              mendil-kimde.html dosyasını yeniden üretir
- *   node araclar/derle.js --denetle    üretmez; depodaki dosya güncel değilse 1 koduyla çıkar
- *   node araclar/derle.js --parca YOL  <html>/<head>/<body> etiketleri olmadan, başka bir sayfaya
- *                                      gömülebilecek parça üretir
+ *   node araclar/derle.js <ad>                 oyunlar/<ad>/oyun.html dosyasını yeniden üretir
+ *   node araclar/derle.js --hepsi              oyunlar/ altındaki her oyunu üretir (ad verilmezse de böyle)
+ *   node araclar/derle.js --denetle [ad]       üretmez; depodaki oyun.html güncel değilse 1 koduyla çıkar
+ *                                              (ad verilmezse her oyun denetlenir)
+ *   node araclar/derle.js <ad> --parca YOL     <html>/<head>/<body> etiketleri olmadan, başka bir sayfaya
+ *                                              gömülebilecek parça üretir
  *
- * Bağımlılığı yoktur. JS parçaları dosya adına göre sıralanıp tek bir kapalı işlevin içine
- * art arda eklenir; bu yüzden parçalar birbirinin değişkenlerini doğrudan görür ve SIRA ÖNEMLİDİR.
+ * Birleştirme sırası (docs/KANCALAR.md): oyunlar/<ad>/js/00-ayar.js → cekirdek/js/*.js → oyunlar/<ad>/js/ altındaki
+ * diğer dosyalar (ada göre). Hepsi tek bir kapalı işlevin içine art arda eklenir; parçalar birbirinin adlarını
+ * doğrudan görür. Bağımlılığı yoktur.
  */
 'use strict';
 const fs = require('fs'), path = require('path');
-const kok = path.join(__dirname, '..'), oku = y => fs.readFileSync(path.join(kok, y), 'utf8').replace(/\r\n/g, '\n').replace(/\n+$/, '');
-
-const BASLIK = '<title>Mendil Kimde?</title>';
+const KOK = path.join(__dirname, '..');
+const oku = y => fs.readFileSync(path.join(KOK, y), 'utf8').replace(/\r\n/g, '\n').replace(/\n+$/, '');
+const KANCALAR = ['oyunBaslat', 'oyunBosalt', 'oyunGiris', 'oyunYerlesim', 'oyunHediye', 'oyunLiderDegisti', 'oyunGuncelle', 'oyunKamera', 'oyunZemin', 'oyunCiz'];
 const YAZI_TIPI = '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Rubik:wght@400;500;700&display=swap">';
-const stil = oku('src/stil.css'), sayfa = oku('src/sayfa.html');
-const js = fs.readdirSync(path.join(kok, 'src/js')).filter(d => d.endsWith('.js')).sort()
-  .map(d => '/* ── src/js/' + d + ' ── */\n' + oku('src/js/' + d)).join('\n\n');
-const betik = '<script>\n(() => {\n\'use strict\';\n' + js + '\n})();\n</script>';
+const kacir = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-const tam = `<!DOCTYPE html>
-<!-- BU DOSYA ÜRETİLİR. Elle düzenleme: src/ altını değiştir, sonra "npm run derle" çalıştır. -->
+function oyunlar() {
+  const kl = path.join(KOK, 'oyunlar');
+  return fs.existsSync(kl) ? fs.readdirSync(kl).filter(a => fs.existsSync(path.join(kl, a, 'js', '00-ayar.js'))).sort() : [];
+}
+function hata(ileti) { console.error(ileti); process.exit(1); }
+
+// Bir oyunun tam sayfasını ve gömülebilir parçasını üretir.
+function uret(ad) {
+  if (!/^[\w-]+$/.test(ad))
+    hata('Oyun adı yalnız harf, rakam, - ve _ içerebilir: ' + ad);
+  const ok = 'oyunlar/' + ad, jsKlasor = ok + '/js';
+  if (!fs.existsSync(path.join(KOK, jsKlasor, '00-ayar.js')))
+    hata(ok + '/js/00-ayar.js bulunamadı. Yeni oyun için: node araclar/yeni-oyun.js <ad>');
+  let bilgi = {};
+  try { bilgi = JSON.parse(oku(ok + '/oyun.json')); }
+  catch (e) { hata(ok + '/oyun.json okunamadı: ' + e.message); }
+  const parca = d => '/* ── ' + d + ' ── */\n' + oku(d);
+  const cekirdek = fs.readdirSync(path.join(KOK, 'cekirdek/js')).filter(d => d.endsWith('.js')).sort().map(d => 'cekirdek/js/' + d);
+  const kendi = fs.readdirSync(path.join(KOK, jsKlasor)).filter(d => d.endsWith('.js') && d !== '00-ayar.js').sort().map(d => jsKlasor + '/' + d);
+  const sira = [jsKlasor + '/00-ayar.js', ...cekirdek, ...kendi];
+  const oyunJs = [jsKlasor + '/00-ayar.js', ...kendi].map(oku).join('\n');
+  const eksik = KANCALAR.filter(k => !new RegExp('\\bfunction\\s+' + k + '\\s*\\(').test(oyunJs));
+  if (eksik.length)
+    hata(ad + ': şu kancalar işlev bildirimi olarak tanımlanmamış: ' + eksik.join(', ') + ' (docs/KANCALAR.md)');
+  const js = sira.map(parca).join('\n\n');
+  const betik = '<script>\n(() => {\n\'use strict\';\n' + js + '\n})();\n</script>';
+  const BASLIK = '<title>' + kacir(bilgi.ad || ad) + '</title>';
+  const stil = oku('cekirdek/stil.css'), sayfa = oku('cekirdek/sayfa.html');
+  const tam = `<!DOCTYPE html>
+<!-- BU DOSYA ÜRETİLİR. Elle düzenleme: cekirdek/ ya da oyunlar/${ad}/js/ altını değiştir, sonra "node araclar/derle.js ${ad}" çalıştır. -->
 <html lang="tr">
 <head>
 <meta charset="utf-8">
@@ -40,7 +68,7 @@ ${betik}
 </body>
 </html>
 `;
-const parca = `${BASLIK}
+  const gomulu = `${BASLIK}
 <meta name="claude:viewport-fit-sides" content="cover">
 ${YAZI_TIPI}
 <style>
@@ -51,11 +79,38 @@ ${sayfa}
 
 ${betik}
 `;
+  return { tam, gomulu, hedef: path.join(KOK, ok, 'oyun.html'), goreli: ok + '/oyun.html' };
+}
 
-const args = process.argv.slice(2), hedef = path.join(kok, 'mendil-kimde.html');
-if (args[0] === '--parca') { fs.writeFileSync(path.resolve(args[1]), parca); console.log('parça yazıldı:', args[1]); }
-else if (args[0] === '--denetle') {
-  const eski = fs.existsSync(hedef) ? fs.readFileSync(hedef, 'utf8').replace(/\r\n/g, '\n') : '';
-  if (eski !== tam) { console.error('mendil-kimde.html güncel değil. "npm run derle" çalıştırıp sonucu da işle (commit).'); process.exit(1); }
-  console.log('mendil-kimde.html güncel.');
-} else { fs.writeFileSync(hedef, tam); console.log('mendil-kimde.html yazıldı (' + tam.length + ' karakter).'); }
+const args = process.argv.slice(2), bayrak = a => args.includes(a), adlar = args.filter((a, i) => !a.startsWith('--') && args[i - 1] !== '--parca');
+if (bayrak('--denetle')) {
+  const liste = adlar.length ? adlar : oyunlar();
+  let eski = 0;
+  for (const ad of liste) {
+    const u = uret(ad), var_ = fs.existsSync(u.hedef) ? fs.readFileSync(u.hedef, 'utf8').replace(/\r\n/g, '\n') : '';
+    if (var_ !== u.tam) {
+      console.error(u.goreli + ' güncel değil. "node araclar/derle.js ' + ad + '" çalıştırıp sonucu da işle (commit).');
+      eski++;
+    }
+    else
+      console.log(u.goreli + ' güncel.');
+  }
+  process.exit(eski ? 1 : 0);
+}
+if (bayrak('--parca')) {
+  const yol = args[args.indexOf('--parca') + 1];
+  if (!yol || adlar.length !== 1)
+    hata('Kullanım: node araclar/derle.js <ad> --parca yol.html');
+  fs.writeFileSync(path.resolve(yol), uret(adlar[0]).gomulu);
+  console.log('parça yazıldı:', yol);
+}
+else {
+  const liste = bayrak('--hepsi') || !adlar.length ? oyunlar() : adlar;
+  if (!liste.length)
+    hata('Derlenecek oyun yok: oyunlar/<ad>/js/00-ayar.js bulunamadı.');
+  for (const ad of liste) {
+    const u = uret(ad);
+    fs.writeFileSync(u.hedef, u.tam);
+    console.log(u.goreli + ' yazıldı (' + u.tam.length + ' karakter).');
+  }
+}

@@ -1,10 +1,10 @@
 /* GERÇEK YAYIN BAĞLANTISI — köprü programına WebSocket ile bağlanır, iletileri olay(o)'ya çevirir.
- * KOPRU: sayfayı köprü açtıysa dolu gelir (kopru.js sayfaya window.MENDIL_KOPRU yazar)
+ * KOPRU: sayfayı köprü açtıysa dolu gelir (kopru.js sayfaya window.OYUN_KOPRU yazar)
  * Yayin.cevir: dış ileti → oyun olayı · Yayin.baglan / kes · kopunca 3 sn'de bir yeniden dener
  * siraSakla / siraOku: jeton sıralamasını tarayıcıda 3 saat saklar · ayarOku / ayarYaz: balon ve süzgeç ayarı
  * Bu dosya TikTok'a doğrudan bağlanmaz ve hiçbir kimlik bilgisi tutmaz.
  */
-const KOPRU = typeof window.MENDIL_KOPRU === 'string' ? window.MENDIL_KOPRU : null; // sayfayı köprü programı açtıysa dolu gelir
+const KOPRU = typeof window.OYUN_KOPRU === 'string' ? window.OYUN_KOPRU : null; // sayfayı köprü programı açtıysa dolu gelir
 const Yayin = {
   ws: null, alinan: 0, yeniden: null,
   cevir(m) {
@@ -102,7 +102,8 @@ const Yayin = {
     catch (e) { }
   } $('bag-dugme').textContent = 'Bağlan'; }
 };
-const SAKLA = 'mendil-kimde-sira';
+// Tarayıcı saklama anahtarları oyunun kimliğiyle başlar: iki oyun aynı tarayıcıda birbirinin sırasını görmez.
+const SAKLA = String(OYUN.id || 'canli-oyun') + '-sira', AYAR_SAKLA = String(OYUN.id || 'canli-oyun') + '-ayar';
 function siraSakla() { if (!KOPRU)
   return; try {
   localStorage.setItem(SAKLA, JSON.stringify({ t: Date.now(), oyuncular: D.sira.filter(k => k.jeton > 0).slice(0, 60).map(k => ({ id: k.id, ad: k.ad, jeton: k.jeton })) }));
@@ -116,14 +117,15 @@ catch (e) {
   return null;
 } }
 function ayarOku() { try {
-  const v = JSON.parse(localStorage.getItem('mendil-kimde-ayar') || 'null');
+  const v = JSON.parse(localStorage.getItem(AYAR_SAKLA) || 'null');
   if (v) {
     ayar.balon = v.balon !== false;
-    ayar.yasak = Array.isArray(v.yasak) ? v.yasak.filter(x => typeof x === 'string' && x) : [];  }
+    ayar.yasak = Array.isArray(v.yasak) ? v.yasak.filter(x => typeof x === 'string' && x) : [];
+  }
 }
 catch (e) { } }
 function ayarYaz() { try {
-  localStorage.setItem('mendil-kimde-ayar', JSON.stringify(ayar));
+  localStorage.setItem(AYAR_SAKLA, JSON.stringify(ayar));
 }
 catch (e) { } }
 function bagDurum(sinif, ileti) { const r = $('bag-rozet'); r.className = 'rozet' + (sinif ? ' ' + sinif : ''); r.textContent = sinif === 'acik' ? 'Bağlı' : sinif === 'hata' ? 'Bağlanamadı' : 'Bağlı değil'; $('bag-ileti').textContent = ileti || ''; }

@@ -1,23 +1,28 @@
-/* KURALLAR VE OYUN DURUMU — kim halayda, kim halay başı, hangi olay neyi tetikler.
- * D: bütün oyun durumu · karakterYap / gorunumUret: izleyiciden karakter · katil / cikar / siraGuncelle: halay sırası
- * olay(o): DIŞARIDAN GELEN HER ŞEYİN TEK GİRİŞ KAPISI (sahte izleyici, köprü ve testler hep bunu çağırır).
- * Olay biçimi docs/OLAYLAR.md'de. Kullanıcı metni burada temizlenir; hiçbir yerde HTML olarak yazılmaz.
+/* OYUNCULAR VE OLAYLAR — kim sahnede, kim lider, hangi olay neyi tetikler. Oyundan bağımsızdır.
+ * D: ortak oyun durumu (oyun kendi alanlarını ekler) · karakterYap / gorunumUret: izleyiciden karakter
+ * katil / cikar / siraGuncelle: sahnedeki sıra · olay(o): DIŞARIDAN GELEN HER ŞEYİN TEK GİRİŞ KAPISI
+ * (sahte izleyici, köprü ve testler hep bunu çağırır). Olay biçimi docs/OLAYLAR.md'de.
+ * Kullanıcı metni burada temizlenir; hiçbir yerde HTML olarak yazılmaz.
+ * Oyuna sorulanlar: oyunGiris(k) giriş yeri · oyunYerlesim() herkesin hedef yeri · oyunHediye(k, jeton, kademe)
+ * hediyenin sahnedeki etkisi · oyunLiderDegisti(eski, yeni) rol devri. Ayrıntı: docs/KANCALAR.md.
  */
-const MAKS = 36, ARALIK = 0.54;
-const KADEME = [
-  { min: 1000, ad: 'Meydan senin', tip: 'solo' },
-  { min: 200, ad: 'Davulcu coşsun', tip: 'davul' },
-  { min: 50, ad: 'Çök', tip: 'cok' },
-  { min: 10, ad: 'Omuz', tip: 'omuz' },
-  { min: 1, ad: 'Zıpla', tip: 'zipla' }
-];
-const D = { oy: new Map(), sira: [], lider: null, cosku: 0.15, begeni: 0, hareket: null, soloKuyruk: [], solo: null, sovBit: -1, mendilUcus: null, R: 2.2, aci: 0, sarsinti: 0, meydanR: 3.6 };
+// Eksik yazılar genel karşılıklarıyla doldurulur; oyun yalnız kendine özgü olanı yazar.
+OYUN.yazi = Object.assign({ sira: 'Sıra', gosterge: 'Coşku', bos: 'Sahne boş. İlk yorumu yazan girer.', birim: 'kişi', ses: 'Müziği başlat',
+  sahne: String(OYUN.ad || 'Oyun') + ' sahnesi', giris: 'sahneye girer', bosalt: 'Sahneyi boşalt' }, OYUN.yazi || {});
+OYUN.nasil = OYUN.nasil || {};
+const MAKS = Math.max(1, Math.round(OYUN.kapasite) || 36);
+// Kademeler büyükten küçüğe sıralanır; en küçüğü her hediyeyi karşılasın diye 1'e çekilir.
+const KADEME = (OYUN.kademe && OYUN.kademe.length ? OYUN.kademe : [{ min: 1, ad: 'Hediye', tip: 'hediye', etki: 'Gönderen sevinir' }])
+  .map(x => ({ ...x, min: Math.max(1, Math.round(x.min) || 1) })).sort((a, b) => b.min - a.min);
+KADEME[KADEME.length - 1].min = 1;
+const D = { oy: new Map(), sira: [], lider: null, cosku: 0.15, begeni: 0, sarsinti: 0 };
 let zaman = 0, B = 0; // oyun saati (sn) ve müzik vuruşu
 
 const TEN = ['#f2c9a0', '#e3ad7e', '#c98d5e', '#a86d45', '#f6d9bb'];
 const SAC = ['#1d1513', '#3a2416', '#5b3a1f', '#2a2a35', '#7b4a22'];
 const KUMAS = ['#e23d2f', '#22b8a7', '#f2b632', '#f6ecd9', '#3d5bd0', '#e86a9a', '#4fae6c', '#8b55c9', '#ef7d2d'];
 const KOYU = ['#20264f', '#3a2a2c', '#1d3b3a', '#2c2c38', '#4a2238'];
+// Görünüm kimlikten türetilir: aynı izleyici her girişinde aynı kıyafetle gelir.
 function gorunumUret(id) {
   const r = rastgeleUret(ozet(id)), sec = a => a[Math.floor(r() * a.length)];
   const kadin = r() < 0.5, ana = sec(KUMAS);
@@ -32,19 +37,14 @@ function gorunumUret(id) {
     baslikRenk: kadin ? ikinci : sec(KOYU), biyik: !kadin && r() < 0.55, ayakkabi: sec(['#2a1c16', '#191a2a', '#5a3620']), salin: r()
   };
 }
+// Oyuncu kaydı. Alanların anlamı docs/KANCALAR.md'de; oyun kendi alanlarını bu nesneye ekleyebilir.
 function karakterYap(id, ad) {
-  return { id, ad, jeton: 0, son: zaman, katilim: zaman, g: gorunumUret(id), x: 0, z: 0, y0: 0, yon: Math.PI, yer: 0, hx: 0, hz: 0, sn: 0,
-    cikiyor: false, solo: false, balon: null, zip0: -9, zip1: -9, kos: 0, j: {}, p: {}, f: [0, 0, -1], l: [1, 0, 0], mod: 'halay', yeni: zaman };
+  return { id, ad, jeton: 0, son: zaman, katilim: zaman, g: gorunumUret(id), x: 0, z: 0, y0: 0, yon: Math.PI, yer: 0, sn: 0,
+    cikiyor: false, balon: null, zip0: -9, zip1: -9, kos: 0, j: {}, p: {}, f: [0, 0, -1], l: [1, 0, 0], mod: 'oyuncu', yeni: zaman, et: null };
 }
-const davulcu = karakterYap('__davulcu', 'Davulcu');
-davulcu.mod = 'davulcu';
-Object.assign(davulcu.g, { kadin: false, ten: '#d9a070', sac: '#1d1513', boy: 1.2, gomlek: '#f6ecd9', yelek: '#20264f', alt: '#3a2a2c', kusak: '#e23d2f', baslik: 'kasket', baslikRenk: '#3a2a2c', biyik: true });
-const zurnaci = karakterYap('__zurnaci', 'Zurnacı');
-zurnaci.mod = 'zurnaci';
-Object.assign(zurnaci.g, { kadin: false, ten: '#f2c9a0', sac: '#3a2416', boy: 1.14, gomlek: '#f6ecd9', yelek: '#22b8a7', alt: '#20264f', kusak: '#f2b632', baslik: 'bere', baslikRenk: '#e23d2f', biyik: false });
 const calgi = { dumP: 0, tekP: 0, perde: 3 };
 
-const temiz = s => String(s == null ? '' : s).replace(/[\u0000-\u001f\u007f\u200b-\u200f\u202a-\u202e\u2066-\u2069]/g, ' ').replace(/\s+/g, ' ').trim();
+const temiz = s => String(s == null ? '' : s).replace(/[\u0000-\u001f\u007f​-‏‪-‮⁦-⁩]/g, ' ').replace(/\s+/g, ' ').trim();
 const ayar = { balon: true, yasak: [] };
 const yasakVar = m => { const k = m.toLocaleLowerCase('tr'); return ayar.yasak.some(y => k.includes(y)); };
 const balonMetni = m => yasakVar(m) ? '' : m.replace(/(https?:\/\/|www\.)\S+/gi, '…').replace(/\d[\d\s().+-]{6,}\d/g, '…');
@@ -58,9 +58,11 @@ function katil(id, ad, zorla) {
     return k;
   }
   if (D.sira.length >= MAKS) {
+    // Yer doluysa en az jetonlu, en uzun süredir sessiz olan yerini bırakır. Lider ve yıldız (k.yildiz) korunur;
+    // yorumcu, hediye atmış birini yerinden edemez.
     let kurban = null;
     for (const a of D.sira) {
-      if (a === D.lider || a.solo)
+      if (a === D.lider || a.yildiz)
         continue;
       if (!zorla && a.jeton > 0)
         continue;
@@ -74,9 +76,7 @@ function katil(id, ad, zorla) {
   k = karakterYap(id, ad || id);
   D.oy.set(id, k);
   siraGuncelle();
-  const a = k.hedefAci || 0, r = D.R + 4.5;
-  k.x = Math.sin(a) * r;
-  k.z = Math.cos(a) * r;
+  oyunGiris(k);
   return k;
 }
 function cikar(k) { k.cikiyor = true; k.cikis = zaman; siraGuncelle(); }
@@ -84,18 +84,8 @@ function siraGuncelle() {
   D.sira = [...D.oy.values()].filter(k => !k.cikiyor).sort((a, b) => b.jeton - a.jeton || a.katilim - b.katilim);
   D.sira.forEach((k, i) => k.sn = i);
   D.lider = D.sira[0] || null;
-  yerlesimHesapla();
+  oyunYerlesim();
   D.siraKirli = true;
-}
-function yerlesimHesapla() {
-  const n = D.sira.length, L = Math.max(0, n - 1) * ARALIK;
-  D.Rhedef = Math.max(2.2, L / 5.2);
-  const R = D.Rhedef;
-  D.aci = L / R;
-  // Yay arkada ortalanır, açıklığı hep kameraya bakar: halkanın içi (çalgıcılar, solo) kapanmaz.
-  // Halay başı yayın sol ucundadır; kameraya döndüğü için serbest kalan sağ eli mendili sallar.
-  const bas = -D.aci / 2;
-  D.sira.forEach((k, i) => { k.hedefAci = bas + i * ARALIK / R; });
 }
 
 function olay(o) {
@@ -151,34 +141,16 @@ function olay(o) {
     k.jeton += j;
     k.son = zaman;
     D.cosku = Math.min(1, D.cosku + Math.min(0.35, j / 300));
-    const kd = KADEME.find(x => j >= x.min), v = Math.ceil(B);
+    const kd = KADEME.find(x => j >= x.min) || KADEME[KADEME.length - 1];
+    // Hediye sevinci: bir sonraki yarım vuruştan başlayıp 4 vuruş sürer (oyun k.zip0–k.zip1 arasında zıplatır).
     k.zip0 = Math.ceil(B * 2) / 2;
     k.zip1 = k.zip0 + 4;
-    if (kd.tip === 'omuz' || kd.tip === 'cok')
-      D.hareket = { tip: kd.tip, bas: v, sure: 8 };
-    if (kd.tip === 'davul' || kd.tip === 'solo') {
-      D.sovBit = Math.max(D.sovBit, v + 16);
-      D.hareket = { tip: 'omuz', bas: v, sure: 8 };
-      konfeti(40, 0.5);
-    }
-    if (kd.tip === 'solo') {
-      if (!D.soloKuyruk.includes(k) && !k.solo && D.soloKuyruk.length < 4)
-        D.soloKuyruk.push(k);
-      konfeti(120, 1);
-      D.sarsinti = 1;
-    }
     bildir(ad, j + ' jeton', kd.ad + '!');
     muzik.zil(Math.min(1, j / 200));
     gunluk('hediye', ad, j + ' jeton → ' + kd.ad, true);
+    oyunHediye(k, j, kd);
     siraGuncelle();
     if (onceki && D.lider !== onceki)
-      liderDegisti(onceki, D.lider);
+      oyunLiderDegisti(onceki, D.lider);
   }
-}
-function liderDegisti(eski, yeni) {
-  const e = eski.j.haR || [eski.x, 1.4, eski.z];
-  D.mendilUcus = { x: e[0], y: e[1], z: e[2], t0: zaman, sure: 1.0, kime: yeni };
-  pankart('Mendil el değiştirdi', 'Yeni halay başı: ' + yeni.ad);
-  konfeti(90, 0.9);
-  D.sarsinti = 0.7;
 }
