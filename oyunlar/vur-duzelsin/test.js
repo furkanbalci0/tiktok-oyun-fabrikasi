@@ -161,7 +161,7 @@ const { sonuc, kontrol } = kontrolcu();
   };
   for (const [w, h] of [[540, 960], [1080, 1920]]) {
     const r = await kadrajOlc(w, h);
-    kontrol(w + '×' + h + ', ' + r.kisi + ' kişi: televizyon kadrajın yarısından geniş, ekranını baş örtmüyor', r.kisi === 24 && r.tvGen >= 360 && r.orten.length === 0, { tvGenislik: r.tvGen + '/720', orten: r.orten });
+    kontrol(w + '×' + h + ', ' + r.kisi + ' kişi: televizyon kadrajın yarısından geniş, ekranını baş örtmüyor', r.kisi === 21 && r.tvGen >= 360 && r.orten.length === 0, { tvGenislik: r.tvGen + '/720', orten: r.orten });
     kontrol(w + '×' + h + ': televizyon, anten ve lider sıralama kutusunun / göstergenin altında kalmıyor', !r.tvKutu && !r.antenKutu && !r.liderKutu, r);
     kontrol(w + '×' + h + ': kimse kadrajdan taşmıyor, kimsenin başı ya da adı kutuların altında değil, adlar yorum alanına inmiyor', r.tasan.length === 0 && r.kutuAltinda.length === 0 && r.altaInen.length === 0, { tasan: r.tasan, kutuAltinda: r.kutuAltinda, altaInen: r.altaInen });
   }

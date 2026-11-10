@@ -46,11 +46,13 @@ const KULE = (() => {
 // sıralama kutusunun altına girmesin diye alçak tutulur. Sıra önceliğe göredir: öndekiler daha çok jetonludur.
 // tur: 'comel' minderde çömelir · 'ayak' ayakta · 'sedir' sedirde oturur
 const SEDIR = { x0: 1.2, x1: 2.12, z0: 1.48, z1: 1.92, h: 0.42 };
+// Minderler tek sıradır ve aralıklıdır. Televizyonun altı ile yorum alanı arasındaki şerit bir baş + bir ad
+// yüksekliğindedir: iki sıra çömelen, iri başlarıyla tek bir yumağa dönüşüyor, adlar yüzlerin üstüne biniyordu.
+// Sıra ortadan dışa dolar; kalanlar yanlarda ve arkada ayakta durur ya da sedire oturur.
 const YERLER = [
-  [0.1, -0.38, 'comel'], [-0.36, -0.38, 'comel'], [0.56, -0.38, 'comel'],
-  [-1.12, -0.72, 'ayak'], [1.36, -0.42, 'ayak'],
-  [-0.14, -0.74, 'comel'], [0.34, -0.74, 'comel'], [-0.6, -0.74, 'comel'], [0.8, -0.74, 'comel'],
-  [-1.62, -0.42, 'ayak'], [1.66, 0.02, 'ayak'],
+  [0.31, -0.6, 'comel'], [-0.26, -0.6, 'comel'], [0.88, -0.6, 'comel'], [-0.83, -0.6, 'comel'],
+  [1.45, -0.6, 'comel'], [-1.4, -0.6, 'comel'],
+  [1.66, 0.02, 'ayak'],
   [1.72, 0.55, 'ayak'], [-1.78, 0.3, 'ayak'],
   [1.44, 1.68, 'sedir'], [1.88, 1.68, 'sedir'],
   [-1.5, 1.36, 'ayak'], [1.82, 1.08, 'ayak'], [-1.78, 1.0, 'ayak'],

@@ -14,8 +14,9 @@ const OYUN = {
     sira: 'Anten sırası', gosterge: 'Tezahürat', bos: 'Oda boş. İlk yazan anteni tutar.',
     birim: 'kişi', ses: 'Müziği başlat', sahne: 'Vur Düzelsin oturma odası', giris: 'TV başına gelir', bosalt: 'Odayı boşalt'
   },
-  // Oturma odası: televizyon kadrajın yarısını tutsun diye kalabalık 24 kişiyle sınırlı (36 kişide TV küçülüyordu).
-  kapasite: 24,
+  // Oturma odası: televizyon kadrajın yarısını tutsun diye kalabalık 21 kişiyle sınırlı (36 kişide TV küçülüyordu;
+  // önde tek sıra minder var, ikinci sıra yüzleri ve adları üst üste bindiriyordu).
+  kapasite: 21,
   // Büyükten küçüğe. tip, oyunHediye'nin hangi vuruşu başlatacağını seçer; etki paneldeki tabloda yazar.
   kademe: [
     { min: 1000, ad: 'Usta işi', tip: 'usta', etki: 'Gönderen sahneyi alır: tokat, yumruk, tekme, uçan tekme; görüntü bir anda net, gol olur' },
