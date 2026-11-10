@@ -617,7 +617,7 @@ window.CanliOyun = {
     return d;
   },
   _test: {
-    D, muzik, Muzik, HAVALAR, ayar, OYUN, KADEME, zamanEkle: sn => { zaman += sn; }, zaman: () => zaman,
+    D, muzik, Muzik, HAVALAR, TAKIMLAR, TAKIM, havalarKur, ayar, OYUN, KADEME, zamanEkle: sn => { zaman += sn; }, zaman: () => zaman,
     // Vuruş saatini dondurur / ilerletir / bırakır (yalnız test ve kare almak için: dondurulmuş B geri de alınabilir,
     // oyunda kullanılmaz). Kare döngüsü sürer; yalnız B sabit kalır, hareketin aynı evresi tekrar tekrar alınabilir.
     vurusDondur: b => { vurusKilit = b === undefined ? B : +b; B = vurusKilit; return vurusKilit; },

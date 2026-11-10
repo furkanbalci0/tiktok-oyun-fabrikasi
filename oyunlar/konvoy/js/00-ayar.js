@@ -29,5 +29,36 @@ const OYUN = {
   renk: { zemin: '#1a1233', zemin2: '#2a1b4a', zemin3: '#3d2862', cizgi: '#55407e', vurgu: '#ffd166', sicak: '#ef5a3c', serin: '#2fc4b2', soluk: '#c4b3dc' },
   // Alçak ve geniş açılı kamera: konvoy ufka doğru küçülerek uzar, gün batımı kadraja girer. Araba + tavandan
   // çıkan kişi insan boyundan uzun: arkadakinin adının üstüne daha çok pay.
-  kamera: { egim: 0.5, F: 700, enYakin: 3.5, ustPay: 2.2, altPay: 0.25 }
+  kamera: { egim: 0.5, F: 700, enYakin: 3.5, ustPay: 2.2, altPay: 0.25 },
+  // Müzik: düğün oyun havası (darbuka, def zili, klarnet, alttan bas). İki özgün hava, sırayla döner.
+  // Yazım docs/MUZIK.md. Tempo konvoyun akışını da belirler: yol vuruşla akar, kornalar vuruşla ölçülür.
+  muzik: {
+    takim: 'dugun',
+    havalar: [
+      { id: 'kurdele', ad: 'Kurdele', bpm: 104, spb: 4, bar: 16, tonik: 329.6,
+        dizi: [0, 110, 390, 500, 700, 810, 1000],                       // hicaz
+        davul: { ana: 'D.D.k.T.D.k.T.r.', cesni: 'D.D.kkT.D.kkT.kr', gecis: 'D.krT.krD.krTrTr' },
+        ust: { ana: '..z...z...z...z.', cesni: '..z...z...z.z.z.', gecis: '..z.z.z.z.z.zzzz' },
+        bas: { ana: '1.1.....5.......', cesni: '1.1.....5...8...', gecis: '1.1.....5.5.8.8.' },
+        bolum: {
+          A: "4:2 5':2 4:2 3:2 4:4 4:1 5:1 6:2 | 5:2 4:2 5:2 4:2 3:2 2:2 3:4 | 3:1 2:1 1:2 2:2 3:2 4:2 5:2 4:1 3:1 2:2 | 2:2 1:2 0:4 0~:8",
+          B: "7:4 7:2 6:2 7:2 8':2 7:4 | 6:2 5:2 6:2 5:2 4:4 -:4 | 4:1 5:1 6:1 5:1 4:2 3:2 4:1 3:1 2:1 3:1 2:2 1:2 | 2:2 1:2 0:4 0~:8",
+          D: '-:16 -:16'
+        },
+        eslik: { A: '0:16 0:16 1:16 0:16', B: '3:16 0:16 3:8 1:8 0:16' },
+        form: 'AABBD' },
+      { id: 'selektor', ad: 'Selektör', bpm: 118, spb: 4, bar: 8, tonik: 349.2,
+        dizi: [0, 200, 300, 500, 700, 800, 1100],                       // nihavend
+        davul: { ana: 'D.kDT.kr', cesni: 'D.kDTkTk', gecis: 'DkTrTrTr' },
+        ust: { ana: 'z.z.z.z.', cesni: 'z.zzz.z.', gecis: 'z.z.zzzz' },
+        bas: { ana: '1..15...', cesni: '1..18...', gecis: '1.5.8.5.' },
+        bolum: {
+          A: "0:2 2:2 4:2 5:2 | 4:4 2:2 3:2 | 4:2 3:2 2:2 1:2 | 2:4 -:2 2:1 3:1 | 4:2 4:1 5:1 4:2 3:2 | 2:2 3:1 2:1 1:2 0:2 | 1:2 -1:2 0:4 | 0~:8",
+          B: "7:2 7:2 6:2 5:2 | 6:4 5:2 4:2 | 5:2 4:2 3:2 4:2 | 5:4 -:4 | 4':2 3:2 2:2 3:2 | 2:1 1:1 0:1 1:1 2:2 -1:2 | 0:4 2:2 1:2 | 0~:8",
+          D: '-:8 -:8 -:8 -:8'
+        },
+        eslik: { A: '0:16 4:16 0:8 3:8 4:8 0:8', B: '0:16 4:16 3:16 4:8 0:8' },
+        form: 'AABBD' }
+    ]
+  }
 };

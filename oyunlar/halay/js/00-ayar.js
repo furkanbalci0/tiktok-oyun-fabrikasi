@@ -23,5 +23,7 @@ const OYUN = {
   sahteAd: ['halaysever06', 'kıvırcık_ayşe', 'davulcu.memo', 'zeyno.47', 'urfalı_bekir', 'gülizar_teyze', 'mert.can.21', 'elif_naz', 'dj_mahmut', 'karadenizli.cemo', 'sibel_abla', 'ozan_dayı', 'mardinli_rojin', 'tuğçe.sk', 'hasan.usta', 'pınar_34', 'köyün_delisi', 'berfin_gül', 'yusuf.63', 'nazlı_can', 'apo_halay', 'şahin_k', 'melo.27', 'damat_tarafı', 'gelinin_kuzeni', 'fatoş_01', 'efe_tr', 'cano_23', 'zilan.d', 'hüso_baba', 'ayten_hanım', 'kemo_44', 'deniz.yıldızı', 'rıza_amca', 'sude_nur', 'baran.21', 'ipek_böceği', 'muhtar_emmi', 'selo_02', 'songül.k', 'laz_ziya', 'egeli_duru', 'bozkır_ali', 'nur.sena'],
   sahteYorum: ['halay!', 'ben de geldim', 'çek çek çek', 'Diyarbakır’dan selamlar', 'mendil bende kalsın', 'davulcu coştur', 'halay başı kim ya', 'yer açın geliyorum', 'omuzlar omuzlar', 'bu hava çok iyi', 'Antep buradaa', 'kolum koptu ama bırakmam', 'sıraya girin', 'hoppa!', 'zurnacıya bir çay', 'anneme gösteriyorum', 'düğün var düğün', 'adımı gördüm', 'İzmir’den geldim', 'çök çök çök'],
   renk: {},
-  kamera: {}
+  kamera: {},
+  // Müzik: halayın davul zurnası ve üç havası (çekirdekteki davul-zurna takımının kendi havaları; docs/MUZIK.md).
+  muzik: { takim: 'davul-zurna', havalar: ['harman', 'toz', 'cifte'] }
 };

@@ -32,5 +32,38 @@ const OYUN = {
   // Mürekkep ve açık ton çekirdeğinkiyle aynı kalır (stil dosyasındaki yarı saydam tonlar onlardan türetildi).
   renk: { zemin: '#2a1712', zemin2: '#43251a', zemin3: '#6a3b25', cizgi: '#8c5636', vurgu: '#ffc947', sicak: '#e4572e', serin: '#56c7c0', soluk: '#d8b896' },
   // Televizyon yıldız: kamera ona yakın durur. Antenin ucu ve anteni tutanın başı için üstte pay.
-  kamera: { egim: 0.62, F: 1400, ustPay: 2.1, altPay: 0.06 }
+  kamera: { egim: 0.62, F: 1400, ustPay: 2.1, altPay: 0.06 },
+  // Müzik: maç gecesi, seksenler televizyon spor jeneriği (davul makinesi, synth bas, bakır nefesli, akor
+  // vuruşları). İki özgün hava, sırayla döner. Yazım docs/MUZIK.md. Tempo vuruşların ve yürüyüşün hızını da belirler.
+  muzik: {
+    takim: 'mac',
+    havalar: [
+      { id: 'naklen', ad: 'Naklen Yayın', bpm: 112, spb: 4, bar: 16, tonik: 349.2,
+        dizi: [0, 200, 400, 500, 700, 900, 1100],                       // majör
+        davul: { ana: 'D...T...D.D.T...', cesni: 'D...T..DD.D.T..g', gecis: 'D...T...m.m.mmTT' },
+        ust: { ana: 'h.h.h.h.h.h.h.ho', cesni: 'h.h.h.hoh.h.h.h.', gecis: 'h.h.h.h.o...o...' },
+        bas: { ana: '1.8.1.8.1.8.1.8.', cesni: '1.8.1.8.1.8.5.8.', gecis: '1.8.1.8.5.5.8.8.' },
+        akor: { ana: 'X.....x.......x.', cesni: 'X.....x...x.....', gecis: 'X.....x.X...X...' },
+        bolum: {
+          A: '0:2 2:2 4:4 7:3 6:1 5:4 | 4:2 5:2 4:2 2:2 4:6 -:2 | 5:2 6:2 7:2 5:2 4:3 2:1 4:4 | 1:2 2:2 3:2 1:2 0:6 -:2',
+          B: '7:3 7:1 7:2 8:2 9:4 7:4 | 8:2 7:2 6:2 5:2 6:4 4:4 | 5:3 5:1 6:2 7:2 8:2 7:2 5:4 | 6:2 4:2 5:2 1:2 0:4 -:4',
+          D: '-:16 -:16'
+        },
+        eslik: { A: '0:16 5:16 3:16 4:8 0:8', B: '0:16 4:16 1:16 4:8 0:8' },
+        form: 'AABBD' },
+      { id: 'tribun', ad: 'Tribün', bpm: 120, spb: 4, bar: 16, tonik: 293.66,
+        dizi: [0, 200, 300, 500, 700, 900, 1000],                       // dorian
+        davul: { ana: 'D...c...D..Dc...', cesni: 'D...c...D.Dmc.c.', gecis: 'D.m.c.m.mmmmc.cc' },
+        ust: { ana: 'h...h...h...h...', gecis: 'h.h.h.h.h.h.h.h.' },
+        bas: { ana: '1...1...1..51...', cesni: '1...1...1..58...', gecis: '1.1.5.5.8.8.5.5.' },
+        akor: { ana: 'X...........x...', cesni: 'X.......x...x...', gecis: 'X...x...X...X...' },
+        bolum: {
+          A: '0:3 0:1 2:2 3:2 4:4 3:2 2:2 | 4:3 4:1 5:2 4:2 3:4 -:4 | 2:3 2:1 3:2 4:2 5:2 4:2 3:2 2:2 | 1:2 2:2 0:6 -:6',
+          B: '7:4 6:2 5:2 6:4 4:4 | 5:4 4:2 3:2 4:6 -:2 | 3:2 4:2 5:2 6:2 7:3 6:1 5:4 | 4:2 2:2 1:2 -1:2 0:6 -:2',
+          D: '-:16 -:16'
+        },
+        eslik: { A: '0:16 3:16 2:16 4:8 0:8', B: '0:16 6:16 3:16 4:8 0:8' },
+        form: 'AABBD' }
+    ]
+  }
 };
