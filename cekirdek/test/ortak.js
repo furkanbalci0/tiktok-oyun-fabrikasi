@@ -1,21 +1,34 @@
 // Testlerin ortak parçaları: tarayıcıyı açar, yolları ve sonuç raporunu sağlar.
+// Hangi oyun: komut satırının ilk bağımsız değişkeni (node cekirdek/test/cekirdek.test.js <ad>), verilmezse halay.
 'use strict';
 const path = require('path'), fs = require('fs'), { pathToFileURL } = require('url');
 let playwright;
 try { playwright = require('playwright'); }
 catch (e) { console.error('Testler için playwright gerekli:\n  npm install\n  npx playwright install chromium'); process.exit(2); }
 
-const KOK = path.join(__dirname, '..');
-const OYUN = path.join(KOK, 'mendil-kimde.html');
-const OYUN_URL = pathToFileURL(OYUN).href;
-const CIKTI = path.join(__dirname, 'cikti'); // ekran görüntüleri ve ses dosyası buraya yazılır (depoya girmez)
+const KOK = path.join(__dirname, '..', '..');
+const OYUN_AD = process.argv[2] && !process.argv[2].startsWith('--') ? process.argv[2] : 'halay';
+if (!/^[\w-]+$/.test(OYUN_AD)) { console.error('Geçersiz oyun adı: ' + OYUN_AD); process.exit(2); }
+const OYUN_HTML = path.join(KOK, 'oyunlar', OYUN_AD, 'oyun.html');
+const OYUN = OYUN_HTML; // eski ad
+const OYUN_URL = pathToFileURL(OYUN_HTML).href;
+const CIKTI = path.join(KOK, 'test', 'cikti', OYUN_AD); // ekran görüntüleri ve ses dosyası buraya yazılır (depoya girmez)
 fs.mkdirSync(CIKTI, { recursive: true });
+if (!fs.existsSync(OYUN_HTML)) { console.error(path.relative(KOK, OYUN_HTML) + ' yok. Önce derle: node araclar/derle.js ' + OYUN_AD); process.exit(2); }
 
 // CHROME_PATH verilirse o tarayıcı, verilmezse playwright'ın indirdiği Chromium kullanılır.
 const tarayici = (ek = []) => playwright.chromium.launch({
   executablePath: process.env.CHROME_PATH || undefined,
   args: ['--no-sandbox', '--autoplay-policy=no-user-gesture-required', ...ek]
 });
+// Her sayfada bu bilgisayardaki muzik/ klasörü yok sayılır: testler hep üretilen müzikle çalışır.
+const muzikKapat = p => p.addInitScript(() => { window.OYUN_MUZIK_KAPALI = true; });
+async function tarayiciAc(ek = []) {
+  const b = await tarayici(ek), ac = b.newPage.bind(b), bag = b.newContext.bind(b);
+  b.newPage = async (...a) => { const p = await ac(...a); await muzikKapat(p); return p; };
+  b.newContext = async (...a) => { const x = await bag(...a), sa = x.newPage.bind(x); x.newPage = async () => { const p = await sa(); await muzikKapat(p); return p; }; return x; };
+  return b;
+}
 
 function raporla(sonuc) {
   const kalan = sonuc.filter(s => s[0] === 'KALDI').length;
@@ -29,4 +42,4 @@ function kontrolcu() {
     ayrinti === undefined ? '' : typeof ayrinti === 'string' ? ayrinti : JSON.stringify(ayrinti, (x, v) => typeof v === 'bigint' ? v + 'n' : v)]);
   return { sonuc, kontrol };
 }
-module.exports = { KOK, OYUN, OYUN_URL, CIKTI, tarayici, raporla, kontrolcu };
+module.exports = { KOK, OYUN_AD, OYUN_HTML, OYUN, OYUN_URL, CIKTI, tarayici: tarayiciAc, raporla, kontrolcu };

@@ -11,6 +11,7 @@ OYUN.yazi = Object.assign({ sira: 'Sıra', gosterge: 'Coşku', bos: 'Sahne boş.
   sahne: String(OYUN.ad || 'Oyun') + ' sahnesi', giris: 'sahneye girer', bosalt: 'Sahneyi boşalt' }, OYUN.yazi || {});
 OYUN.nasil = OYUN.nasil || {};
 const MAKS = Math.max(1, Math.round(OYUN.kapasite) || 36);
+OYUN.kapasite = MAKS;
 // Kademeler büyükten küçüğe sıralanır; en küçüğü her hediyeyi karşılasın diye 1'e çekilir.
 const KADEME = (OYUN.kademe && OYUN.kademe.length ? OYUN.kademe : [{ min: 1, ad: 'Hediye', tip: 'hediye', etki: 'Gönderen sevinir' }])
   .map(x => ({ ...x, min: Math.max(1, Math.round(x.min) || 1) })).sort((a, b) => b.min - a.min);
