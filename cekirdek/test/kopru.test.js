@@ -6,7 +6,9 @@ const { spawn } = require('child_process'); const fs = require('fs'), os = requi
 const { KOK, CIKTI, tarayici, raporla, kontrolcu } = require('./ortak');
 const { sonuc, kontrol } = kontrolcu();
 const S = CIKTI, GECICI = fs.mkdtempSync(path.join(os.tmpdir(), 'canli-kopru-')); // depo dışı: gerçek node_modules görünmesin
-const OYUN_AD = process.argv[2] || 'halay', OYUN_HTML = path.join(KOK, 'oyunlar', OYUN_AD, 'oyun.html'); // köprü hangi oyunla sınanacak
+const OYUN_AD = process.argv[2] && !process.argv[2].startsWith('--') ? process.argv[2] : 'halay', OYUN_HTML = path.join(KOK, 'oyunlar', OYUN_AD, 'oyun.html'); // köprü hangi oyunla sınanacak
+// Kapılar: --port N ya da KOPRU_TEST_PORT=N (öntanım 8791); N, N+1 ve N+2…N+5 kullanılır. Açık bir köprü 8791'i tutuyorsa başka kapı ver.
+const pi = process.argv.indexOf('--port'), P = parseInt(pi > 0 ? process.argv[pi + 1] : process.env.KOPRU_TEST_PORT, 10) || 8791;
 const bekle = ms => new Promise(r => setTimeout(r, ms));
 const al = url => new Promise((res, rej) => http.get(url, r => { let d = ''; r.on('data', c => d += c); r.on('end', () => res({ kod: r.statusCode, govde: d })); }).on('error', rej));
 function baslat(klasor, args) { const c = spawn(process.execPath, ['kopru.js', ...args], { cwd: klasor }); c.cikti = ''; c.stdout.on('data', d => c.cikti += d); c.stderr.on('data', d => c.cikti += d); return c; }
@@ -34,22 +36,24 @@ function baslat(klasor, args) { const c = spawn(process.execPath, ['kopru.js', .
   const sayfaAc = async (ctx, url) => { const p = await ctx.newPage(); await p.addInitScript(() => { window.OYUN_MUZIK_KAPALI = true; }); p.on('pageerror', e => hatalar.push(e.message)); p.on('console', m => { if (m.type() === 'error' && !/ERR_TUNNEL|Failed to load resource|WebSocket connection/.test(m.text())) hatalar.push(m.text()); }); await p.goto(url); return p; };
 
   // ---- 2. deneme kipi uçtan uca
-  let k = baslat(KOK, ['--deneme', '--oyun', OYUN_AD, '--port', '8791']); await bekle(900);
+  let k = baslat(KOK, ['--deneme', '--oyun', OYUN_AD, '--port', String(P)]); await bekle(900);
   const ctx = await b.newContext({ viewport: { width: 1280, height: 800 } });
-  let p = await sayfaAc(ctx, 'http://127.0.0.1:8791/'); await bekle(7000);
+  const dr0 = await al('http://127.0.0.1:' + P + '/durum').then(r => ({ kod: r.kod }), e => ({ hata: e.code }));
+  let p = await sayfaAc(ctx, 'http://127.0.0.1:' + P + '/'); await bekle(7000);
   let d = await p.evaluate(() => ({ ...CanliOyun.durum(), rozet: document.getElementById('bag-rozet').textContent, ileti: document.getElementById('bag-ileti').textContent, oto: document.getElementById('oto').textContent, not: document.getElementById('panel-not').textContent, adres: document.getElementById('bag-adres').value, serit: document.getElementById('d-bag').textContent, sekme: document.getElementById('bolum-yayin').hidden === false, uyari: document.getElementById('deneme-uyari').hidden === false }));
-  kontrol('Köprüden açılan sayfa kendiliğinden bağlanır', d.bagli && d.rozet === 'Bağlı' && d.adres === 'ws://127.0.0.1:8791/olay', { rozet: d.rozet, adres: d.adres, ileti: d.ileti });
+  kontrol('Köprü testi seçilen kapıda çalışır (' + P + ', KOPRU_TEST_PORT ya da --port)', dr0.kod === 200, dr0);
+  kontrol('Köprüden açılan sayfa kendiliğinden bağlanır', d.bagli && d.rozet === 'Bağlı' && d.adres === 'ws://127.0.0.1:' + P + '/olay', { rozet: d.rozet, adres: d.adres, ileti: d.ileti });
   kontrol('Köprü kipinde masa: durum şeridi Canlı yazar, Yayın sekmesi açık, Deneme sekmesinde uyarı var', d.serit === 'Canlı' && d.sekme && d.uyari, { serit: d.serit, sekme: d.sekme, uyari: d.uyari });
   kontrol('Köprüden gelen olaylar oyuna işlenir', d.alinan > 8 && d.kisi >= 3, { alinan: d.alinan, kisi: d.kisi });
   kontrol('Gerçek yayın kipinde sahte izleyici kapalı ve sahte ad yok', /kapalı/.test(d.oto) && d.sira.every(x => x[0].startsWith('D. ')), { oto: d.oto, adlar: d.sira.map(x => x[0]) });
   kontrol('Süren seri sayılmadı: jetonlar 15\'in katı', d.sira.every(x => x[1] % 15 === 0) && d.sira.some(x => x[1] >= 15), d.sira.map(x => x[1]));
-  const dr = JSON.parse((await al('http://127.0.0.1:8791/durum')).govde);
+  const dr = JSON.parse((await al('http://127.0.0.1:' + P + '/durum')).govde);
   kontrol('Köprü durum adresi çalışır', dr.bagliSayfa === 1 && dr.sayac.yorum > 0 && dr.sayac.hediye > 0, dr);
-  kontrol('Köprü bilinmeyen adrese 404 döner', (await al('http://127.0.0.1:8791/../../etc/passwd')).kod === 404 && (await al('http://127.0.0.1:8791/kopru.js')).kod === 404);
+  kontrol('Köprü bilinmeyen adrese 404 döner', (await al('http://127.0.0.1:' + P + '/../../etc/passwd')).kod === 404 && (await al('http://127.0.0.1:' + P + '/kopru.js')).kod === 404);
   // isteğe bağlı müzik klasörü: yalnız düz adlı .js ve ses dosyaları, yalnız muzik/ içinden
   const muzikKlasor = path.join(KOK, 'oyunlar', OYUN_AD, 'muzik'), klasorVardi = fs.existsSync(muzikKlasor), denemeDosya = path.join(muzikKlasor, '_kopru-test.js');
   fs.mkdirSync(muzikKlasor, { recursive: true }); fs.writeFileSync(denemeDosya, '0123456789');
-  const ham = (yol, baslik) => new Promise((res, rej) => http.get({ host: '127.0.0.1', port: 8791, path: yol, headers: baslik || {} }, r => { let g = ''; r.on('data', c => g += c); r.on('end', () => res({ kod: r.statusCode, govde: g, aralik: r.headers['content-range'] })); }).on('error', rej));
+  const ham = (yol, baslik) => new Promise((res, rej) => http.get({ host: '127.0.0.1', port: P, path: yol, headers: baslik || {} }, r => { let g = ''; r.on('data', c => g += c); r.on('end', () => res({ kod: r.statusCode, govde: g, aralik: r.headers['content-range'] })); }).on('error', rej));
   const mz = { tam: await ham('/muzik/_kopru-test.js'), parca: await ham('/muzik/_kopru-test.js', { range: 'bytes=2-5' }), son: await ham('/muzik/_kopru-test.js', { range: 'bytes=-3' }), tasan: await ham('/muzik/_kopru-test.js', { range: 'bytes=50-60' }),
     disari: [await ham('/muzik/../kopru.js'), await ham('/muzik/..%2Fkopru.js'), await ham('/muzik/%2e%2e/kopru.js'), await ham('/muzik/..\\kopru.js'), await ham('/muzik/alt/_kopru-test.js'), await ham('/muzik/_kopru-test.html'), await ham('/muzik/yok.mp3'), await ham('/muzik/')] };
   fs.unlinkSync(denemeDosya); if (!klasorVardi) fs.rmdirSync(muzikKlasor);
@@ -61,31 +65,31 @@ function baslat(klasor, args) { const c = spawn(process.execPath, ['kopru.js', .
   await bekle(300); d = await p.evaluate(() => ({ bagli: CanliOyun.durum().bagli, rozet: document.getElementById('bag-rozet').textContent, ileti: document.getElementById('bag-ileti').textContent, kisi: CanliOyun.durum().kisi, serit: document.getElementById('d-bag').textContent }));
   kontrol('Köprü kapanınca oyun durmaz, durumu bildirir (şeritte de)', !d.bagli && /koptu/.test(d.ileti) && d.kisi >= 3 && /Koptu|Bağlanıyor/.test(d.serit), d);
   const onceAlinan = await p.evaluate(() => CanliOyun.durum().alinan);
-  k = baslat(KOK, ['--deneme', '--oyun', OYUN_AD, '--port', '8791']); await bekle(7000);
+  k = baslat(KOK, ['--deneme', '--oyun', OYUN_AD, '--port', String(P)]); await bekle(7000);
   d = await p.evaluate(() => ({ bagli: CanliOyun.durum().bagli, alinan: CanliOyun.durum().alinan, rozet: document.getElementById('bag-rozet').textContent }));
   kontrol('Köprü yeniden açılınca oyun kendiliğinden yeniden bağlanır', d.bagli && d.alinan > onceAlinan + 3, { once: onceAlinan, sonra: d.alinan, rozet: d.rozet });
   // ---- 4. sayfa yenilenince sıralama geri gelir
   await bekle(5500); const sakli = await p.evaluate(() => CanliOyun.durum().sira.filter(x => x[1] > 0));
-  k.kill('SIGKILL'); await bekle(400); k = baslat(KOK, ['--deneme', '--oyun', OYUN_AD, '--port', '8791']); await bekle(600);
+  k.kill('SIGKILL'); await bekle(400); k = baslat(KOK, ['--deneme', '--oyun', OYUN_AD, '--port', String(P)]); await bekle(600);
   await p.reload(); await bekle(350);
   const geri = await p.evaluate(() => CanliOyun.durum().sira.filter(x => x[1] > 0));
   kontrol('Sayfa yenilenince jeton sıralaması geri yüklenir', geri.length >= sakli.length - 1 && geri.length > 0 && geri[0][1] >= sakli[0][1] - 30, { once: sakli.slice(0, 3), sonra: geri.slice(0, 3) });
   await p.close();
   // yalnız sahne görünümü köprüden
-  const y = await sayfaAc(await b.newContext({ viewport: { width: 540, height: 960 } }), 'http://127.0.0.1:8791/#yayin'); await bekle(4000);
+  const y = await sayfaAc(await b.newContext({ viewport: { width: 540, height: 960 } }), 'http://127.0.0.1:' + P + '/#yayin'); await bekle(4000);
   const yd = await y.evaluate(() => ({ panel: getComputedStyle(document.getElementById('panel')).display, bagli: CanliOyun.durum().bagli, ses: CanliOyun.durum().ses, sesDugme: document.getElementById('ses-cagri').hidden }));
   kontrol('Köprüden #yayin: yalnız sahne, bağlı, ses kendiliğinden başlar (tarayıcı izin verirse)', yd.panel === 'none' && yd.bagli && yd.ses && yd.sesDugme, yd);
   await y.screenshot({ path: S + '/k-yayin.png' }); await y.close();
   // aynı kapı ikinci kez
-  const k2 = baslat(KOK, ['--deneme', '--oyun', OYUN_AD, '--port', '8791']); await bekle(900);
+  const k2 = baslat(KOK, ['--deneme', '--oyun', OYUN_AD, '--port', String(P)]); await bekle(900);
   kontrol('Kapı doluysa anlaşılır ileti verip kapanır', /kapı dolu/.test(k2.cikti) && k2.exitCode === 1, k2.cikti.trim().slice(0, 90));
   k.kill('SIGKILL');
 
   // ---- 5. kütüphane yokken
   const bos = path.join(GECICI, 'kutuphanesiz'); fs.mkdirSync(bos); fs.copyFileSync(path.join(KOK, 'kopru.js'), path.join(bos, 'kopru.js')); fs.copyFileSync(OYUN_HTML, path.join(bos, 'oyun.html')); // yayıncı paketi düzeni: oyun.html köprünün yanında
-  const k3 = baslat(bos, ['deneme_kullanici', '--port', '8792']); await bekle(1200);
-  const dr3 = JSON.parse((await al('http://127.0.0.1:8792/durum')).govde);
-  kontrol('Kütüphane kurulu değilken ne yapılacağını söyler, oyun yine açılır', /npm install/.test(k3.cikti) && /npm install/.test(dr3.durum) && (await al('http://127.0.0.1:8792/')).kod === 200, dr3.durum);
+  const k3 = baslat(bos, ['deneme_kullanici', '--port', String(P + 1)]); await bekle(1200);
+  const dr3 = JSON.parse((await al('http://127.0.0.1:' + (P + 1) + '/durum')).govde);
+  kontrol('Kütüphane kurulu değilken ne yapılacağını söyler, oyun yine açılır', /npm install/.test(k3.cikti) && /npm install/.test(dr3.durum) && (await al('http://127.0.0.1:' + (P + 1) + '/')).kod === 200, dr3.durum);
   k3.kill('SIGKILL');
   const k4 = baslat(bos, []); await bekle(500);
   kontrol('Kullanıcı adı verilmezse kullanım bilgisini yazar', /Kullanım/.test(k4.cikti) && k4.exitCode === 1);
@@ -96,7 +100,7 @@ function baslat(klasor, args) { const c = spawn(process.execPath, ['kopru.js', .
     yeni: `const E=require('events');const WebcastEvent={CHAT:'chatX',GIFT:'giftX',LIKE:'likeX',FOLLOW:'followX',SHARE:'shareX',MEMBER:'memberX',STREAM_END:'endX'};const ControlEvent={DISCONNECTED:'discX',ERROR:'errX'};class TikTokLiveConnection extends E{constructor(u){super();}async connect(){setTimeout(()=>{const user={uniqueId:'yeni_memo',nickname:'Yeni Memo',userId:6813181309701718022n};this.emit('chatX',{user,comment:'yeni sürümden selam'});this.emit('giftX',{user,giftDetails:{giftType:1,diamondCount:10},repeatCount:2,repeatEnd:0});this.emit('giftX',{user,giftDetails:{giftType:1,diamondCount:10},repeatCount:6,repeatEnd:1});this.emit('likeX',{user,likeCount:9});this.emit('followX',{user:{uniqueId:'yeni_sude',nickname:'Yeni Sude'}});this.emit('chat',{user,comment:'yanlış adlı olay, gelmemeli'});},6000);return {roomId:'456'};}disconnect(){}}module.exports={TikTokLiveConnection,WebcastEvent,ControlEvent};`,
     kapali: `const E=require('events');class WebcastPushConnection extends E{connect(){return Promise.reject(new Error('LIVE has ended'));}disconnect(){}}module.exports={WebcastPushConnection};`
   };
-  let kapi = 8793;
+  let kapi = P + 2;
   for (const [ad, kod] of Object.entries(sahte)) {
     const kl = path.join(GECICI, 'sahte-' + ad); fs.mkdirSync(path.join(kl, 'node_modules/tiktok-live-connector'), { recursive: true });
     fs.writeFileSync(path.join(kl, 'node_modules/tiktok-live-connector/index.js'), kod); fs.copyFileSync(path.join(KOK, 'kopru.js'), path.join(kl, 'kopru.js')); fs.copyFileSync(OYUN_HTML, path.join(kl, 'oyun.html'));
