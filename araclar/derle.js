@@ -25,6 +25,25 @@ function oyunlar() {
   return fs.existsSync(kl) ? fs.readdirSync(kl).filter(a => fs.existsSync(path.join(kl, a, 'js', '00-ayar.js'))).sort() : [];
 }
 function hata(ileti) { console.error(ileti); process.exit(1); }
+// Çekirdekteki çalgı takımlarının adları (cekirdek/js/10-muzik.js: TAKIMLAR['ad'] = … ya da TAKIMLAR.ad = …).
+function takimlar() {
+  const adlar = [];
+  for (const r of oku('cekirdek/js/10-muzik.js').matchAll(/^TAKIMLAR(?:\[['"]([\w-]+)['"]\]|\.([\w$]+))\s*=/gm))
+    adlar.push(r[1] || r[2]);
+  return adlar;
+}
+// 00-ayar.js'teki OYUN.muzik bildirimine bakar, uyarıları döndürür (kodu çalıştırmaz, metne bakar).
+function muzikUyari(ad, ayar) {
+  const liste = takimlar(), yol = 'oyunlar/' + ad + '/js/00-ayar.js';
+  if (!/^\s*muzik\s*:/m.test(ayar))
+    return ['OYUN.muzik yok: oyun öntanımlı davul zurnayı (halayın müziğini) çalar. Her oyunun kendi müziği olur: ' + yol + ' içine muzik: { takim, havalar } yaz. Takımlar: ' + liste.join(', ') + ' (docs/MUZIK.md).'];
+  const t = /\btakim\s*:\s*['"]([^'"]*)['"]/.exec(ayar);
+  if (!t || !liste.includes(t[1]))
+    return ['OYUN.muzik.takim ' + (t ? '"' + t[1] + '" bilinmiyor' : 'yazılmamış') + '. Takımlar: ' + liste.join(', ') + '; ya da çekirdeğe yenisini ekle (docs/MUZIK.md "Yeni takım"). Sayfa açılınca konsola hata düşer, testler kalır.'];
+  if (!/\bhavalar\s*:/.test(ayar) || /\bhavalar\s*:\s*\[\s*\]/.test(ayar))
+    return ['OYUN.muzik.havalar boş: takımın hazır havaları çalar. Oyununa en az iki özgün hava yaz (docs/MUZIK.md "Ezgi yazımı").'];
+  return [];
+}
 
 // Bir oyunun tam sayfasını ve gömülebilir parçasını üretir.
 function uret(ad) {
@@ -61,6 +80,10 @@ function uret(ad) {
     hata(ad + ': şu adlar çekirdekte de tanımlı, sayfa açılmaz (SyntaxError): ' + olumcul.map(x => x[0]).join(', ') + '. Oyundaki adı değiştir.');
   if (cakisan.length && !sessiz)
     console.warn('UYARI ' + ad + ': şu işlevler çekirdektekini eziyor (çekirdek de oyununkini çağırır): ' + cakisan.map(x => x[0]).join(', ') + '. Bilerek değilse oyundaki adı değiştir.');
+  // Müzik: her oyunun kendi müziği olur (docs/MUZIK.md). Bildirim yoksa ya da takım seçilmemişse uyarılır;
+  // derleme sürer (bildirmeyen eski oyunlar öntanımlı davul zurnayla çalışmaya devam eder). Denetimde de yazılır.
+  for (const u of muzikUyari(ad, oku(jsKlasor + '/00-ayar.js')))
+    console.warn('UYARI ' + ad + ': ' + u);
   const js = sira.map(parca).join('\n\n');
   const betik = '<script>\n(() => {\n\'use strict\';\n' + js + '\n})();\n</script>';
   const BASLIK = '<title>' + kacir(bilgi.ad || ad) + '</title>';

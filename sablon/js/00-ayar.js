@@ -37,5 +37,14 @@ const OYUN = {
   // Yeni oyunlar için önerilen ayarlar (docs/KANCALAR.md): adlar sıralama kutusuna ve yorum alanına girmez,
   // ekran dışındakinin adı kenarda yığılmaz; pankart sıralama kutusunun altından geçer.
   etiket: { ustSinir: true, altSinir: true, disari: 'gizle' },
-  sahneYazi: { pankart: 'alt' }
+  sahneYazi: { pankart: 'alt' },
+  // MÜZİK: her oyunun kendi müziği olur; halayın davul zurnası başka oyunda çalmaz (docs/MUZIK.md).
+  // takim: oyunun dünyasına uyan çalgı takımı. Hazır takımlar: 'davul-zurna' (halay, köy meydanı), 'dugun' (darbuka,
+  //   def zili, klarnet: düğün, konvoy), 'mac' (davul makinesi, synth bas, bakır nefesli: seksenler TV spor jeneriği).
+  //   Hiçbiri uymuyorsa cekirdek/js/10-muzik.js'e yeni takım ekle (docs/MUZIK.md "Yeni takım").
+  // havalar: en az iki ÖZGÜN hava; var olan şarkı, türkü, marş, tezahürat ya da reklam müziği yazma.
+  //   Yazım docs/MUZIK.md "Ezgi yazımı"; örnek oyunlar/konvoy/js/00-ayar.js ve oyunlar/vur-duzelsin/js/00-ayar.js.
+  //   Tempo (bpm) oyunun hareket hızıdır: bütün hareket vuruş saatine (B) bağlı.
+  // Seçmeden bırakırsan ('SEC') derleme uyarır, sayfa konsola hata yazar, çekirdek testi kalır.
+  muzik: { takim: 'SEC', havalar: [] }
 };

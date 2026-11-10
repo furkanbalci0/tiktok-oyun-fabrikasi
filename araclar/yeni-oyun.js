@@ -59,6 +59,8 @@ execFileSync(process.execPath, [path.join(__dirname, 'derle.js'), ad], { stdio: 
 
 console.log('\noyunlar/' + ad + ' hazır. Sırada:');
 console.log('  1. oyunlar/' + ad + '/js/00-ayar.js   kurallar, yazılar, hediye kademeleri');
+console.log('     ve MÜZİK: OYUN.muzik içinde takımı seç, en az iki özgün hava yaz (docs/MUZIK.md).');
+console.log('     Her oyunun kendi müziği olur; seçmeden bırakırsan derleme uyarır, testler kalır.');
 console.log('  2. oyunlar/' + ad + '/js/10-oyun.js   ŞABLONUN KOPYASI, SENİN DOSYAN: üstüne yaz ya da silip baştan yaz');
 console.log('     (kancalar docs/KANCALAR.md; sahne ve çizim için yeni dosyalar aç)');
 console.log('  3. node araclar/derle.js ' + ad + ' && node araclar/kare-cek.js ' + ad + '   kareye bak');

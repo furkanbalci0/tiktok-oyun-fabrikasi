@@ -30,6 +30,16 @@ kontrol('derle: çekirdekteki adla const tanımlanınca adını söyleyip durur'
 fs.unlinkSync(ek);
 calis('araclar/derle.js', 'deneme-oyun');
 
+// müzik: şablondan kurulan oyun takımını seçmeye zorlanır; bildirimi olmayan, takımı bilinmeyen ya da havası boş
+// oyunda derleme uyarır (derleme sürer). Her oyunun kendi müziği olur (docs/MUZIK.md).
+const ayarYol = path.join(GECICI, 'oyunlar/deneme-oyun/js/00-ayar.js'), ayarIlk = fs.readFileSync(ayarYol, 'utf8');
+kontrol('yeni-oyun: şablon müziği seçtirir (takim "SEC"), derleme takımın seçilmediğini ve takımları söyler', /muzik:\s*\{\s*takim:\s*'SEC'/.test(ayarIlk) && /UYARI deneme-oyun: OYUN\.muzik\.takim "SEC" bilinmiyor.*davul-zurna, dugun, mac/.test(y.stderr) && /MÜZİK/.test(y.stdout), (y.stderr.match(/UYARI deneme-oyun: OYUN\.muzik[^\n]*/) || ['uyarı yok'])[0].slice(0, 160));
+const muzikDene = metin => { fs.writeFileSync(ayarYol, metin); return calis('araclar/derle.js', 'deneme-oyun'); };
+const mYok = muzikDene(ayarIlk.replace(/\n\s*muzik:\s*\{[^\n]*\}/, '')), mBos = muzikDene(ayarIlk.replace("takim: 'SEC'", "takim: 'dugun'")), mTam = muzikDene(fs.readFileSync(path.join(KOK, 'oyunlar/konvoy/js/00-ayar.js'), 'utf8'));
+kontrol('derle: OYUN.muzik bildirmeyen oyun için uyarır (öntanım davul zurna), derleme sürer', mYok.status === 0 && /UYARI deneme-oyun: OYUN\.muzik yok/.test(mYok.stderr), mYok.stderr.trim().slice(0, 160));
+kontrol('derle: takım seçilip hava yazılmayınca uyarır; kendi havaları olan oyunda müzik uyarısı yok', mBos.status === 0 && /havalar boş/.test(mBos.stderr) && mTam.status === 0 && !/OYUN\.muzik/.test(mTam.stderr), [mBos.stderr.trim().slice(0, 100), mTam.stderr.trim().slice(0, 100)]);
+muzikDene(ayarIlk);
+
 // kare-cek: şablondan kurulan oyunda ölçüm dosyaları, hareket şeridi; önerilen ayarlarla ad sıralama kutusuna girmez
 const k = calis('araclar/kare-cek.js', 'deneme-oyun');
 const ck = path.join(GECICI, 'test/cikti/deneme-oyun'), json = e => { try { return JSON.parse(fs.readFileSync(path.join(ck, 'kare-' + e + '.json'), 'utf8')); } catch (err) { return null; } };
