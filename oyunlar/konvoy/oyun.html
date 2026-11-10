@@ -24,7 +24,7 @@ body{margin:0}[hidden]{display:none!important}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 html,body{height:100%}
-body{background:var(--zemin);color:var(--acik);font-family:var(--govde);font-size:14px;line-height:1.45}
+body{background:var(--sayfa-zemin,var(--zemin));color:var(--acik);font-family:var(--govde);font-size:14px;line-height:1.45}
 button,input,select{font:inherit;color:inherit}
 button{cursor:pointer}
 :focus-visible{outline:2px solid var(--vurgu);outline-offset:2px}
@@ -69,6 +69,8 @@ button{cursor:pointer}
 .bildirim div.git{animation:cik .3s ease-in both}
 .pankart{position:absolute;left:0;right:0;top:21.5cqh;text-align:center;padding:2.4cqw 3cqw;
   background:var(--sicak);border-block:.8cqw solid var(--vurgu);transform:rotate(-2deg) scale(1.04);animation:pankart 3.4s ease both}
+/* OYUN.sahneYazi.pankart = "alt": sıralama kutusunun (en çok ~38cqh) altından, oyuncu şeridinin başından geçer */
+.pankart.alt{top:40.5cqh;animation-name:pankart-alt}
 .pankart .b1{font-family:var(--baslik);font-size:6.6cqw;line-height:1.05;color:var(--acik)}
 .pankart .b2{font-weight:700;font-size:4cqw;color:var(--vurgu);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ses-cagri{position:absolute;left:50%;bottom:9cqh;transform:translateX(-50%);pointer-events:auto;
@@ -81,12 +83,14 @@ button{cursor:pointer}
 @keyframes cik{to{opacity:0;transform:translateY(-2cqw)}}
 @keyframes pankart{0%{opacity:0;transform:rotate(-2deg) scale(1.6)}8%{opacity:1;transform:rotate(-2deg) scale(1.04)}
   88%{opacity:1;transform:rotate(-2deg) scale(1.04)}100%{opacity:0;transform:rotate(-2deg) scale(.9)}}
+@keyframes pankart-alt{0%{opacity:0;transform:rotate(-2deg) scale(1.2)}8%{opacity:1;transform:rotate(-2deg) scale(1.04)}
+  88%{opacity:1;transform:rotate(-2deg) scale(1.04)}100%{opacity:0;transform:rotate(-2deg) scale(.9)}}
 
 /* ---- yayın masası: panel (yayında görünmez) ----
    Üstte başlık ve durum şeridi, altında yayın güvenliği şeridi, sonra üç kart: sahnedekiler, olay akışı,
    sekmeli denetim (Deneme, Yayın, Müzik, Hediyeler). Kartların düzeni panelin genişliğine göre değişir
    (@container masa): dar panelde alt alta, orta genişlikte iki sütun, geniş panelde üç sütun. */
-body:not(.yayin){background:radial-gradient(1100px 620px at 78% -12%,var(--zemin-2),transparent 62%) var(--zemin)}
+body:not(.yayin){background:radial-gradient(1100px 620px at 78% -12%,var(--sayfa-zemin-2,var(--zemin-2)),transparent 62%) var(--sayfa-zemin,var(--zemin))}
 .panel{flex:1 1 0;max-width:1180px;min-width:0;height:100%;overflow:auto;display:flex;flex-direction:column;gap:12px;
   padding:2px 4px 2px 0;container:masa/inline-size}
 .panel h1,.panel h2{margin:0;font-weight:400}
@@ -1367,11 +1371,14 @@ function bildir(ad, orta, vurgu) {
     kutu.firstChild.remove();
   setTimeout(() => { d.classList.add('git'); setTimeout(() => d.remove(), 320); }, 2800);
 }
+// OYUN.sahneYazi = { pankart: 'alt' } (isteğe bağlı): pankart sıralama kutusunun üstünden değil, altından, oyuncu
+// şeridinin başından geçer (sıralama ve gösterge hep okunur). Öntanım 'ust': eski yeri, sıralama kutusunun üstü.
+const SAHNE_YAZI = Object.assign({ pankart: 'ust' }, OYUN.sahneYazi || {});
 function pankart(b1, b2) {
   const yer = $('pankart-yeri');
   yer.textContent = '';
   const p = document.createElement('div');
-  p.className = 'pankart';
+  p.className = SAHNE_YAZI.pankart === 'alt' ? 'pankart alt' : 'pankart';
   const a = document.createElement('div');
   a.className = 'b1';
   a.textContent = b1;
@@ -1466,10 +1473,14 @@ const tuval = $('tuval'), c = tuval.getContext('2d');
 const GW = 720, GH = 1280;
 // Tema renkleri. CSS'te aynı adlar --zemin, --zemin-2 … olarak kullanılır; panel açılışta bunları RENK'ten yazar.
 // Renkler #rrggbb biçiminde verilmeli (yarı saydam tonlar bunlardan türetilir).
-const RENK = Object.assign({
+const RENK_OTO = {
   zemin: '#0e1230', zemin2: '#171d47', zemin3: '#232b63', cizgi: '#343d80',
   vurgu: '#ffd166', sicak: '#e23d2f', serin: '#22b8a7', acik: '#f6ecd9', soluk: '#a9b0dc', murekkep: '#080a1c'
-}, OYUN.renk || {});
+};
+const RENK = Object.assign({}, RENK_OTO, OYUN.renk || {});
+// Yayın masasının (panelin) renkleri. OYUN.panelRenk verilmezse panel de RENK'i kullanır (eski davranış). Verilirse
+// eksik adlar çekirdeğin koyu temasından gelir: gündüz sahnesi açık renkli olsa da panel koyu ve okunaklı kalır.
+const PANEL_RENK = OYUN.panelRenk ? Object.assign({}, RENK_OTO, OYUN.panelRenk) : null;
 const MUREKKEP = RENK.murekkep;
 function renkSaydam(hex, a) {
   const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(String(hex));
@@ -1576,10 +1587,13 @@ function listeCiz() {
 // Sahnenin oyuncular için ayrılan dikey şeridi (sanal 1280 satırda): üstü HUD, altı TikTok'un yorum alanı.
 const ALAN_UST = 505, ALAN_ALT = 1006;
 let kamCy = kam.cy;
-// noktalar: kadraja girmesi gereken yer noktaları [[x, z], …] (oyunKamera() döndürür). Kamera sağa sola
-// dönmez, ortaya bakar; bu yüzden yalnız |x| önemlidir. Sonuç yumuşakça yaklaşır; kam.son = { enX, hd }
-// (en geniş |x| ve derinliğin yarısı) oyunun zeminini kalabalığa göre büyütmesi için saklanır.
-function kameraSigdir(noktalar, dt) {
+// Bir adın kutusunun başın tepesinden yukarı kapladığı en büyük yükseklik (lider: 22 punto + 9 + 5 boşluk).
+// OYUN.kamera.ustPx için hazır değer: ustPay başın tepesine kadar metre, ustPx adın kendisi piksel.
+const ETIKET_PAY = 36;
+// Bir kadraj: verilen noktalar (her biri [x, z] ya da [x, z, pay]) tx'e bakan kameraya sığsın diye uzaklık (hD),
+// derinliğin ortası (zOrta), yarı derinlik (hd), hedef satır (hCy) ve en geniş yana uzaklık (enX). Öntanımlarla
+// (tx = 0, pay 0,55, piksel payı 0) eski kameraSigdir'in hesabının aynısıdır.
+function kadrajHesap(noktalar, tx, ustPx, altPx) {
   let mnZ = Infinity, mxZ = -Infinity;
   for (const n of noktalar) {
     if (n[1] < mnZ)
@@ -1589,26 +1603,80 @@ function kameraSigdir(noktalar, dt) {
   }
   if (!(mxZ >= mnZ))
     mnZ = mxZ = 0;
-  const hd = (mxZ - mnZ) / 2, zOrta = (mnZ + mxZ) / 2, se = Math.sin(kam.egim), ce = Math.cos(kam.egim), kk = Math.min(1, dt * 1.6);
+  const hd = (mxZ - mnZ) / 2, zOrta = (mnZ + mxZ) / 2, se = Math.sin(kam.egim), ce = Math.cos(kam.egim);
   // Genişlik: kameraya yakın duran daha iri göründüğü için her nokta kendi derinliğiyle hesaba girer.
   let hD = kam.enYakin, ust = 0, alt = 0, enX = 0;
   for (const n of noktalar) {
-    const x = Math.abs(n[0]);
-    hD = Math.max(hD, (x + 0.55) * kam.F / 322 - (n[1] - zOrta) * ce);
+    const x = Math.abs(n[0] - tx);
+    hD = Math.max(hD, (x + (n[2] === undefined ? 0.55 : n[2])) * kam.F / 322 - (n[1] - zOrta) * ce);
     enX = Math.max(enX, x);
   }
+  // Piksel payları (ad etiketi gibi ekranda sabit boyda kalan şeyler) şeridi baştan daraltır.
+  const bant = ALAN_ALT - ALAN_UST - ustPx - altPx;
   for (let i = 0; i < 5; i++) {
     // en arkadakinin adının üstü ve en öndekinin ayağı, hedef noktaya göre ekranda ne kadar yer tutuyor
     ust = (hd * se + kam.ustPay * ce) * kam.F / (hD + hd * ce);
     alt = (hd * se + kam.altPay) * kam.F / (hD - hd * ce);
-    if (ust + alt <= ALAN_ALT - ALAN_UST)
+    if (ust + alt <= bant)
       break;
-    hD *= (ust + alt) / (ALAN_ALT - ALAN_UST);
+    hD *= (ust + alt) / bant;
   }
-  const hCy = ALAN_UST + ust + (ALAN_ALT - ALAN_UST - ust - alt) / 2;
+  return { hD, zOrta, hd, enX, mnZ, se, ce, ust, alt, bant };
+}
+// Kadrajın hedef satırı: üst ve alt payların arası şeridin ortasına gelsin.
+const kadrajCy = (h, ustPx) => ALAN_UST + ustPx + h.ust + (h.bant - h.ust - h.alt) / 2;
+// girdi (oyunKamera() döndürür) iki biçimde olabilir:
+//   [[x, z], …]   kadraja girmesi gereken yer noktaları; kamera x = 0'a bakar (eski biçim, öntanım).
+//   { noktalar, x, odak, odakEn, on, ustPx, altPx }   seçenekli biçim (docs/KANCALAR.md, "Kamera"):
+//     noktalar [[x, z, pay?], …] · x: bakılan x (sayı ya da 'orta') · odak: hep büyük kalacak noktalar,
+//     odakEn: kalabalık için en çok kaç kat uzaklaşılır (1,25) · on: en öndekinden bu kadar metre derine kadar
+//     sığdır, gerisi (kuyruk) kadrajdan taşabilir · ustPx / altPx: şeridin üstünde / altında piksel payı.
+//   Seçeneklerin öntanımı OYUN.kamera'dan gelir (orada da x, odakEn, on, ustPx, altPx yazılabilir).
+// Sonuç yumuşakça yaklaşır; kam.son = { enX, hd } (en geniş yana uzaklık ve derinliğin yarısı) oyunun zeminini
+// kalabalığa göre büyütmesi için saklanır.
+function kameraSigdir(girdi, dt) {
+  const s = Array.isArray(girdi) ? null : girdi || {};
+  let noktalar = s ? s.noktalar || [] : girdi;
+  const sec = ad => s && s[ad] !== undefined ? s[ad] : kam[ad];
+  const ustPx = sec('ustPx') || 0, altPx = sec('altPx') || 0, on = sec('on'), odak = s && s.odak ? s.odak : null;
+  let tx = sec('x');
+  if (tx === 'orta') {
+    let a = Infinity, b = -Infinity;
+    for (const n of odak || noktalar) {
+      a = Math.min(a, n[0]);
+      b = Math.max(b, n[0]);
+    }
+    tx = b >= a ? (a + b) / 2 : 0;
+  }
+  else if (!Number.isFinite(tx))
+    tx = 0;
+  if (odak)
+    noktalar = noktalar.concat(odak);
+  // Kuyruk: en öndekinden "on" metreden derindeki noktalar o derinliğe çekilir, genişlikleri sayılmaz.
+  if (on > 0 && noktalar.length) {
+    let mnZ = Infinity;
+    for (const n of noktalar)
+      mnZ = Math.min(mnZ, n[1]);
+    const sinir = mnZ + on;
+    noktalar = noktalar.map(n => n[1] > sinir ? [tx, sinir, 0] : n);
+  }
+  let h = kadrajHesap(noktalar, tx, ustPx, altPx), hD = h.hD;
+  // Odak: büyük nesne (televizyon, sahne) kalabalık yüzünden küçülmesin. Kalabalık odağın gerektirdiğinden en
+  // çok odakEn kat uzaklaştırabilir; fazlası kadrajdan taşar, kadraj odağa ortalanır.
+  if (odak && odak.length) {
+    const o = kadrajHesap(odak, tx, ustPx, altPx), en = o.hD * (sec('odakEn') || 1.25);
+    if (hD > en) {
+      h = o;
+      hD = en;
+      h.ust = (h.hd * h.se + kam.ustPay * h.ce) * kam.F / (hD + h.hd * h.ce);
+      h.alt = (h.hd * h.se + kam.altPay) * kam.F / (hD - h.hd * h.ce);
+    }
+  }
+  const hd = h.hd, zOrta = h.zOrta, enX = h.enX, kk = Math.min(1, dt * 1.6);
+  const hCy = kadrajCy(h, ustPx);
   kam.D += (hD - kam.D) * kk;
   kam.tz += (zOrta - kam.tz) * kk;
-  kam.tx += (0 - kam.tx) * kk;
+  kam.tx += (tx - kam.tx) * kk;
   kamCy += (hCy - kamCy) * kk;
   // hafif sağa sola salınım ve hediye sarsıntısı (D.sarsinti 0–1; oyun artırır, burada söner)
   kam.yaw = azHareket ? 0 : 0.035 * Math.sin(zaman * 0.21);
@@ -1633,7 +1701,18 @@ function golge(x, z, rx, rz) {
 }
 // k.et = { x, y, s, d }: etiketin oturacağı yer (başın tepesi), ölçek ve derinlik. insanEkle kendisi kurar;
 // insan çizmeyen oyun her karede kendisi yazar. Çekirdek her karede izleyicilerin k.et'ini boşaltır.
+// İsteğe bağlı alanlar (docs/KANCALAR.md, "Ad etiketleri"):
+//   et.asagi (ya da kalıcı k.etAsagi): ad başın üstüne değil, et.alt (yoksa et.y) noktasının altına asılır
+//   et.alt: alt bağlantı noktası (insanEkle çeneyi yazar) · et.bx / et.by: konuşma balonunun ucunun yeri
 // ekler: izleyici olmayan, etiketi olacak oyuncular (oyunEkAdlar()); k.ozel olanlar vurgu rengiyle yazılır.
+// OYUN.etiket = { ustSinir, altSinir, disari, balonSira } (hepsi isteğe bağlı; yoksa eski davranış):
+//   ustSinir: adın üst kenarı bu satırın üstüne çıkmaz (true = ALAN_UST, sıralama kutusunun altı)
+//   altSinir: adın alt kenarı bu satırın altına inmez (true = ALAN_ALT, yorum alanının üstü)
+//   disari: 'gizle' → bağlantı noktası ekran dışında kalanın adı (ve balonu) çizilmez; öntanım 'kenar' (kenara itilir)
+//   balonSira: 'ekleme' (öntanım) · 'derinlik' (uzaktaki önce, öndeki üstte) · 'oncelik' (lider en üstte)
+const ETIKET = Object.assign({ ustSinir: null, altSinir: null, disari: 'kenar', balonSira: 'ekleme' }, OYUN.etiket || {});
+for (const [ad, sinir] of [['ustSinir', ALAN_UST], ['altSinir', ALAN_ALT]])
+  ETIKET[ad] = ETIKET[ad] === true ? sinir : Number.isFinite(ETIKET[ad]) ? ETIKET[ad] : null;
 function etiketCiz(ekler) {
   const adlar = ekler.filter(k => k && k.et);
   for (const k of D.oy.values())
@@ -1645,25 +1724,50 @@ function etiketCiz(ekler) {
   // Yer yetmeyince kimin adı kalır: lider, yıldız, özel oyuncular, son konuşanlar, ilk beş, öndekiler.
   const onc = k => (k === D.lider ? 2000 : 0) + (k.yildiz ? 1500 : 0) + (k.ozel ? 900 : 0) + (zaman - k.son < 6 ? 600 - (zaman - k.son) * 20 : 0) + (!k.ozel && k.sn < 5 ? 200 - k.sn : 0) - k.et.d;
   const kutular = [], sirali = adlar.slice().sort((a, b) => onc(b) - onc(a));
+  const ustS = ETIKET.ustSinir, altS = ETIKET.altSinir, gizle = ETIKET.disari === 'gizle';
   for (const k of sirali) {
     const et = k.et, bas = k === D.lider, yeniMi = !k.ozel && zaman - k.yeni < 3;
+    k.etKutu = null;
+    k.etDisari = gizle && !(et.x >= 0 && et.x <= GW && et.y >= 0 && et.y <= GH);
+    if (k.etDisari)
+      continue;
     const punto = clamp(Math.round(et.s * 0.17), 13, 18) + (bas ? 4 : 0), yk = punto + 9, tac = bas ? punto * 1.05 : 0;
     c.font = (bas ? '700 ' : '500 ') + punto + 'px Rubik, system-ui, sans-serif';
     if (k.adYazi !== k.ad + punto) {
       k.adYazi = k.ad + punto;
       k.adW = c.measureText(k.ad).width;
     }
-    const w = k.adW + punto * 1.1 + tac, y0 = et.y - 5;
+    const asagi = !!(et.asagi || k.etAsagi);
+    const w = k.adW + punto * 1.1 + tac;
+    let y0 = asagi ? (et.alt === undefined ? et.y : et.alt) + 5 + yk : et.y - 5;
     const x = clamp(et.x, w / 2 + 4, GW - w / 2 - 4);
+    // Yer yoksa ad bir iki kat kayar: başın üstündeki ad yukarı, altına asılan ad aşağı. Sınıra dayanan ad
+    // sınırdan uzağa doğru kayar. Sınırın çok ötesine düşen (baş sınırın epey üstünde) ad, öncelikli değilse yazılmaz.
+    let yon = asagi ? 1 : -1, itme = 0;
+    if (ustS !== null && y0 - yk < ustS) {
+      itme = ustS - (y0 - yk);
+      y0 = ustS + yk;
+      yon = 1;
+    }
+    if (altS !== null && y0 > altS) {
+      itme = Math.max(itme, y0 - altS);
+      y0 = altS;
+      yon = -1;
+    }
+    k.etY = y0 - yk;
+    if (itme > yk * 2 && onc(k) < 500)
+      continue;
+    const adim = yon * (yk + 2);
     let y = null;
-    for (const dy of [0, -(yk + 2), -(yk + 2) * 2]) {
+    for (const dy of [0, adim, adim * 2]) {
       const a = x - w / 2, u = y0 + dy - yk;
+      if ((ustS !== null && u < ustS) || (altS !== null && u + yk > altS))
+        continue;
       if (!kutular.some(q => a < q[0] + q[2] && a + w > q[0] && u < q[1] + q[3] && u + yk > q[1])) {
         y = y0 + dy;
         break;
       }
     }
-    k.etY = y0 - yk;
     if (y === null) {
       if (onc(k) < 500)
         continue;
@@ -1671,6 +1775,7 @@ function etiketCiz(ekler) {
     }
     k.etY = y - yk;
     kutular.push([x - w / 2, y - yk, w, yk]);
+    k.etKutu = kutular[kutular.length - 1];
     c.fillStyle = bas ? RENK.vurgu : renkSaydam(MUREKKEP, 0.78);
     c.beginPath();
     c.roundRect(x - w / 2, y - yk, w, yk, yk / 2);
@@ -1696,7 +1801,13 @@ function etiketCiz(ekler) {
     c.fillStyle = bas ? MUREKKEP : yeniMi ? '#5fe0d0' : k.ozel ? RENK.vurgu : RENK.acik;
     c.fillText(k.ad, x + tac / 2, y - yk / 2 + 1);
   }
-  for (const k of adlar) {
+  // Balonların çizim sırası: sonra çizilen üstte kalır.
+  let balonlar = adlar;
+  if (ETIKET.balonSira === 'derinlik')
+    balonlar = adlar.slice().sort((a, b) => b.et.d - a.et.d);
+  else if (ETIKET.balonSira === 'oncelik')
+    balonlar = adlar.slice().sort((a, b) => onc(a) - onc(b));
+  for (const k of balonlar) {
     if (!k.balon)
       continue;
     const ya = zaman - k.balon.t0;
@@ -1704,9 +1815,19 @@ function etiketCiz(ekler) {
       k.balon = null;
       continue;
     }
-    const et = k.et, al = Math.min(1, ya * 8, (3.4 - ya) * 4), by = (k.etY ?? et.y - 60) - 12;
+    if (k.etDisari)
+      continue;
+    const et = k.et, al = Math.min(1, ya * 8, (3.4 - ya) * 4);
+    // Balonun ucu: oyunun verdiği yer, yoksa adın üstü; ad aşağı asılıysa başın üstü.
+    const bx = et.bx === undefined ? et.x : et.bx;
+    let by = et.by !== undefined ? et.by : (et.asagi || k.etAsagi) ? et.y - 12 : (k.etY ?? et.y - 60) - 12, kuyruk = true;
+    // Üst sınır varsa balon sıralama kutusuna girmez: sınıra dayanır, ucu ancak altında kalırsa çizilir.
+    if (ETIKET.ustSinir !== null && by - 36 < ETIKET.ustSinir) {
+      by = ETIKET.ustSinir + 36;
+      kuyruk = et.y > by + 4;
+    }
     c.font = '700 21px Rubik, system-ui, sans-serif';
-    const w = Math.min(330, c.measureText(k.balon.m).width + 28), x = clamp(et.x, w / 2 + 8, GW - w / 2 - 8);
+    const w = Math.min(330, c.measureText(k.balon.m).width + 28), x = clamp(bx, w / 2 + 8, GW - w / 2 - 8);
     c.globalAlpha = al;
     c.fillStyle = RENK.vurgu;
     c.strokeStyle = MUREKKEP;
@@ -1715,12 +1836,14 @@ function etiketCiz(ekler) {
     c.roundRect(x - w / 2, by - 36, w, 36, 14);
     c.fill();
     c.stroke();
-    c.beginPath();
-    c.moveTo(et.x - 8, by - 2);
-    c.lineTo(et.x, by + 9);
-    c.lineTo(et.x + 8, by - 2);
-    c.stroke();
-    c.fill();
+    if (kuyruk) {
+      c.beginPath();
+      c.moveTo(bx - 8, by - 2);
+      c.lineTo(bx, by + 9);
+      c.lineTo(bx + 8, by - 2);
+      c.stroke();
+      c.fill();
+    }
     c.fillStyle = MUREKKEP;
     c.fillText(k.balon.m, x, by - 17, w - 18);
     c.globalAlpha = 1;
@@ -1782,12 +1905,32 @@ function iskeletKur(k, poz) {
   k._hipX = hipX;
   return W;
 }
-// Omuzdan ele iki kol: dirsekler aşağı ve geriye bükülür.
+// Omuzdan ele iki kol: dirsekler aşağı ve geriye bükülür. k.kolBoy (isteğe bağlı, öntanım 1): kol kemiklerinin
+// çarpanı; uzağa uzanan, tavana tutunan, kucaklayan kol için 1,3–1,6. Kemikten uzaktaki el yine kola bağlı çizilir
+// ama dirsek düzleşir; kolBoy eli o uzaklığa dirsek bükülü yetiştirir.
 function kolKur(k) {
-  const j = k.j, boy = k.g.boy;
+  const j = k.j, boy = k.g.boy, kl = k.kolBoy === undefined ? KOL * boy : KOL * boy * k.kolBoy;
   const kutupR = [-k.f[0] * 0.6 - k.l[0] * 0.5, -0.7, -k.f[2] * 0.6 - k.l[2] * 0.5], kutupL = [-k.f[0] * 0.6 + k.l[0] * 0.5, -0.7, -k.f[2] * 0.6 + k.l[2] * 0.5];
-  j.drR = ik(j.omR, j.haR, KOL * boy, KOL * boy, kutupR, j.drR || [0, 0, 0]);
-  j.drL = ik(j.omL, j.haL, KOL * boy, KOL * boy, kutupL, j.drL || [0, 0, 0]);
+  j.drR = ik(j.omR, j.haR, kl, kl, kutupR, j.drR || [0, 0, 0]);
+  j.drL = ik(j.omL, j.haL, kl, kl, kutupL, j.drL || [0, 0, 0]);
+}
+// Oturma pozu. oturakY: oturağın üst yüzünün k.y0'dan yüksekliği (metre; verilmezse 0,2 × boy, alçak tabure).
+// Kalça oturağa konar, dizler öne çıkar. Oturak bacaktan alçaksa ayaklar yerde ve dizler kalkık; yüksekse
+// (sedir, bar taburesi) ayaklar sarkar ve vuruşla sırayla sallanır. Gövde vuruşla hafifçe öne arkaya oynar.
+// pozBekle gibi döner; ayrıca dizR / dizL: elleri dizlere koymak için yerel nokta [yana, yukarı, ileri].
+//   const poz = pozOtur(k, 0.42), W = iskeletKur(k, poz);
+//   k.j.haR = W(...poz.dizR); k.j.haL = W(...poz.dizL); kolKur(k);
+function pozOtur(k, oturakY) {
+  const boy = k.g.boy, vurus = 0.5 + 0.5 * Math.cos(TAU * B);
+  const hipY = (oturakY === undefined ? 0.2 * boy : oturakY) / boy + 0.06, dy = hipY - 0.06;
+  // ayak bileği kalçadan en çok 0,22 uzakta: diz hep bükülü kalır (bacak toplamı 0,27)
+  const ayakY = Math.max(0, dy - 0.2), sarkik = ayakY > 0, yer = Math.sqrt(Math.max(0, 0.0484 - (dy - ayakY) * (dy - ayakY)));
+  const sal = sarkik && !azHareket ? Math.sin(TAU * B / 2 + k.g.salin * 5) * 0.035 : 0;
+  return {
+    hipX: 0, hipY, egim: -0.03 + 0.035 * vurus, yat: azHareket ? 0 : Math.sin(TAU * B / 4) * 0.01, omL: 0, omR: 0,
+    aS: [-0.085, yer + sal, ayakY], aL: [0.085, yer - sal, ayakY],
+    dizR: [-0.1, hipY + 0.03, 0.14], dizL: [0.1, hipY + 0.03, 0.14]
+  };
 }
 // Bekleme pozu: her vuruşta hafifçe çöker, iki vuruşta bir sırayla ayak kaldırır, dört vuruşta bir yana salınır.
 // Dönen nesne değiştirilebilir (ör. egim, zıplama için hipY ve ayak yüksekliği).
@@ -1855,23 +1998,101 @@ function insanEkle(k) {
     const om = p['om' + y], dr = p['dr' + y], ha = p['ha' + y];
     kap(om, 0.056 * boy, dr, 0.05 * boy, g.gomlek);
     kap(dr, 0.05 * boy, ha, 0.046 * boy, g.gomlek);
-    if (ha.ok)
+    const sekil = k.elSekil && k.elSekil[y];
+    if (ha.ok && (sekil === 'avuc' || sekil === 'yumruk')) {
+      const gg = p.gogus;
+      ozel(ha.d - 0.02, () => elSekilCiz(k, ha, dr, sekil, gg));
+    }
+    else if (ha.ok)
       liste.push({ d: ha.d - 0.02, t: 2, x: ha.x, y: ha.y, r: 0.055 * boy * ha.s, c: g.ten, w: Math.max(1, ha.s * 0.011) });
   }
-  const ph = p.kafa;
-  ozel(ph.d - 0.05, () => kafaCiz(k, ph));
-  const et = k._et || (k._et = { x: 0, y: 0, s: 0, d: 0 });
+  const ph = p.kafa, bo = k.basOlcek;
+  ozel(ph.d - 0.05, () => kafaCiz(k, ph, bo));
+  const et = k._et || (k._et = { x: 0, y: 0, s: 0, d: 0 }), R = KAFA_R * (bo === undefined ? k.g.boy : k.g.boy * bo) * ph.s;
   et.x = ph.x;
-  et.y = ph.y - KAFA_R * k.g.boy * ph.s;
+  et.y = ph.y - R;
   et.s = ph.s;
   et.d = ph.d;
+  // çene: aşağı asılan adın (k.etAsagi) bağlantı noktası; balon yeri her karede oyunun yeniden yazması için silinir
+  et.alt = ph.y + R;
+  et.asagi = et.bx = et.by = undefined;
   k.et = et;
   return true;
 }
+// El biçimi (k.elSekil = { R: 'yumruk', L: 'avuc' }; tanımsız ya da başka değer: yuvarlak el). ha: el, dr: dirsek
+// (ekran noktaları); parmaklar önkolun doğrultusunda uzanır, başparmak gövdeye bakan yandadır.
+//   avuc: açık el (el sallama, tokat, "dur") · yumruk: kapalı el (yumruk, bayrak tutma, zafer)
+function elSekilCiz(k, ha, dr, sekil, gg) {
+  const a = Math.atan2(ha.y - dr.y, ha.x - dr.x), r = 0.07 * k.g.boy * ha.s;
+  // başparmağın yanı: önkolun hangi yanında gövde kalıyor
+  const yan = gg && gg.ok && (Math.cos(a) * (gg.y - ha.y) - Math.sin(a) * (gg.x - ha.x)) < 0 ? -1 : 1;
+  c.save();
+  c.translate(ha.x, ha.y);
+  c.rotate(a);
+  c.lineWidth = Math.max(1, ha.s * 0.011);
+  c.strokeStyle = MUREKKEP;
+  c.fillStyle = k.g.ten;
+  if (sekil === 'avuc') {
+    // dört parmak yelpaze, yanda başparmak, üstte avuç içi
+    for (let i = 0; i < 4; i++) {
+      const fa = (i - 1.5) * 0.3, uz = i === 1 || i === 2 ? 1.3 : 1.15;
+      c.beginPath();
+      c.ellipse(Math.cos(fa) * r * uz, Math.sin(fa) * r * uz, r * 0.6, r * 0.22, fa, 0, TAU);
+      c.fill();
+      c.stroke();
+    }
+    c.beginPath();
+    c.ellipse(r * 0.15, yan * r * 0.85, r * 0.5, r * 0.21, yan * 1.05, 0, TAU);
+    c.fill();
+    c.stroke();
+    c.beginPath();
+    c.arc(0, 0, r * 0.88, 0, TAU);
+    c.fill();
+    c.stroke();
+  }
+  else {
+    // kapalı el: iri, yuvarlak köşeli; boğum çizgileri ve önde kıvrılan başparmak
+    c.beginPath();
+    c.roundRect(-r * 0.85, -r * 0.82, r * 1.85, r * 1.64, r * 0.6);
+    c.fill();
+    c.stroke();
+    c.lineWidth = Math.max(1, ha.s * 0.007);
+    for (let i = -1; i <= 1; i++) {
+      c.beginPath();
+      c.moveTo(r * 0.55, i * r * 0.44);
+      c.lineTo(r * 0.98, i * r * 0.44);
+      c.stroke();
+    }
+    c.beginPath();
+    c.moveTo(-r * 0.25, yan * r * 0.8);
+    c.quadraticCurveTo(r * 0.35, yan * r * 0.15, r * 0.55, yan * r * 0.05);
+    c.stroke();
+  }
+  c.restore();
+}
 // Baş. Bayraklar: k.guler (hep güler), k.ciddi (hiç gülmez), k.ufle (yanaklar şişkin, ağız kapalı: üflemeli çalgı).
 // Bunlar yoksa hediye sevinci süresince (B < k.zip1) ve kalabalık coşkunken (D.cosku > 0.72) güler.
-function kafaCiz(k, ph) {
-  const g = k.g, R = KAFA_R * g.boy * ph.s, x0 = ph.x, y0 = ph.y, f = k.f, l = k.l;
+// olcek (isteğe bağlı): başın büyüklük çarpanı (araba büyürken baş da büyüsün, lider iri başlı olsun).
+// k.basYon (isteğe bağlı, sayı): başın dünyadaki yönü (k.yon gibi; π kameraya bakar). Tanımsızsa baş gövdeyle
+// aynı yöne bakar. Gövde yerinde dururken yan dönüp bakmak, konuşana çevrilmek için.
+// Çizilen başın ekrandaki yeri ve yarıçapı k.basEkran = { x, y, r, kare } olarak kalır (kare-cek ve testler okur).
+function kafaCiz(k, ph, olcek) {
+  const g = k.g, R = KAFA_R * (olcek === undefined ? g.boy : g.boy * olcek) * ph.s, x0 = ph.x, y0 = ph.y;
+  let f = k.f, l = k.l;
+  if (typeof k.basYon === 'number') {
+    const sb = Math.sin(k.basYon), cb = Math.cos(k.basYon);
+    f = k._basF || (k._basF = [0, 0, 0]);
+    l = k._basL || (k._basL = [0, 0, 0]);
+    f[0] = sb;
+    f[2] = cb;
+    l[0] = -cb;
+    l[2] = sb;
+  }
+  const be = k.basEkran || (k.basEkran = { x: 0, y: 0, r: 0, kare: 0 });
+  be.x = x0;
+  be.y = y0;
+  be.r = R;
+  be.kare = kareSay;
   const ku = kam.bu, kf = kam.bf;
   const fr = f[0] * kam.r[0] + f[2] * kam.r[2], fu = f[0] * ku[0] + f[2] * ku[2], fd = f[0] * kf[0] + f[2] * kf[2];
   const lr = l[0] * kam.r[0] + l[2] * kam.r[2], lu = l[0] * ku[0] + l[2] * ku[2], ld = l[0] * kf[0] + l[2] * kf[2];
@@ -2045,6 +2266,174 @@ function parcaCiz(dt) {
   c.globalAlpha = 1;
 }
 
+/* ── cekirdek/js/33-cizim.js ── */
+/* ÇİZİM YARDIMCILARI — insan dışındaki nesneler (araba, televizyon, dolap, sahne) için 3B kutu ve yüzeyler,
+ * renk karışımı, gök ve ufuk. Hepsi doğrudan c ile çizer: ozel(derinlik, fn) içindeki fn'den ya da oyunZemin'den
+ * çağrılır (fn içinden kap / top / ozel çağrılmaz, docs/KANCALAR.md).
+ * renkKat(a, b, t): iki rengin karışımı · donusum(x, y, z, yon, olcek): nesnenin yeri ve yönü (T)
+ * yerelNokta(T, yana, yukari, ileri): nesnenin yerel ekseninden dünyaya · yuzBakiyor(T, normal, merkez)
+ * cokgenCiz(p, renk, cizgi) · yuzCiz(T, noktalar, renk, cizgi) · kutuCiz(T, a0, a1, y0, y1, c0, c1, renk, cizgi, tonlar)
+ * daireCiz(p, r, renk, cizgi) · kapsulCiz(pa, ra, pb, rb, renk, cizgi) · ufukY() · gokCiz(g)
+ * Yerel eksen (insan takımıyla aynı): yana = nesnenin solu, yukarı = y, ileri = baktığı yön. yon = π kameraya bakar.
+ * Adlar oyunlarınkiyle çakışmasın diye "Ciz" / "Nokta" ekiyle verildi: oyunda aynı adla işlev yazma (derle uyarır).
+ */
+const renkKatBellek = new Map();
+// İki rengin karışımı (t: 0 → a, 1 → b), 'rgb(r,g,b)' döner. Yüzeylerin ışık ve gölge tonları buradan türer.
+// Renkler #rrggbb ya da #rgb; sonuç önbellekte tutulur (renkleri sabit bir paletten ver, her karede yenisini üretme).
+function renkKat(a, b, t) {
+  const anahtar = a + b + t;
+  let s = renkKatBellek.get(anahtar);
+  if (s)
+    return s;
+  const uzat = h => h.length === 4 ? '#' + h[1] + h[1] + h[2] + h[2] + h[3] + h[3] : h;
+  const x = parseInt(uzat(a).slice(1), 16), y = parseInt(uzat(b).slice(1), 16);
+  const kanal = sh => Math.round(lerp(x >> sh & 255, y >> sh & 255, t));
+  s = 'rgb(' + kanal(16) + ',' + kanal(8) + ',' + kanal(0) + ')';
+  if (renkKatBellek.size > 4000)
+    renkKatBellek.clear();
+  renkKatBellek.set(anahtar, s);
+  return s;
+}
+// Nesnenin yeri (x, y, z: dünyada, metre), yönü (yon: k.yon gibi, π kameraya bakar) ve ölçeği (olcek, öntanım 1).
+function donusum(x, y, z, yon, olcek) {
+  const fx = Math.sin(yon), fz = Math.cos(yon);
+  return { x, y, z, fx, fz, lx: -fz, lz: fx, k: olcek || 1 };
+}
+// Nesnenin yerel noktası → dünya [x, y, z]. a: yana (nesnenin solu +), y: yukarı, cc: ileri. Ölçek T.k ile çarpılır.
+function yerelNokta(T, a, y, cc) { const q = T.k; return [T.x + (a * T.lx + cc * T.fx) * q, T.y + y * q, T.z + (a * T.lz + cc * T.fz) * q]; }
+// Yerel normali n, yerel merkezi m olan yüzey kameraya bakıyor mu.
+function yuzBakiyor(T, n, m) {
+  const w = yerelNokta(T, m[0], m[1], m[2]), nx = n[0] * T.lx + n[2] * T.fx, nz = n[0] * T.lz + n[2] * T.fz;
+  return nx * (kam.C[0] - w[0]) + n[1] * (kam.C[1] - w[1]) + nz * (kam.C[2] - w[2]) > 0;
+}
+// Ekran noktalarından (pr() sonuçları) çokgen. renk null ise yalnız çizgi; cizgi verilmezse çizgisiz.
+function cokgenCiz(p, renk, cizgi) {
+  c.beginPath();
+  c.moveTo(p[0].x, p[0].y);
+  for (let i = 1; i < p.length; i++)
+    c.lineTo(p[i].x, p[i].y);
+  c.closePath();
+  if (renk) {
+    c.fillStyle = renk;
+    c.fill();
+  }
+  if (cizgi) {
+    c.lineWidth = cizgi;
+    c.strokeStyle = MUREKKEP;
+    c.stroke();
+  }
+}
+// Yerel noktalardan yüzey (dışbükey çokgen). Kameranın arkasına düşen nokta varsa çizmez, null döner; çizerse
+// ekran noktalarını döndürür (üstüne yazı, plaka gibi şey koymak için).
+function yuzCiz(T, noktalar, renk, cizgi) {
+  const p = noktalar.map(n => pr(yerelNokta(T, n[0], n[1], n[2])));
+  if (p.some(q => !q.ok))
+    return null;
+  cokgenCiz(p, renk, cizgi);
+  return p;
+}
+// Kutu: a0–a1 yana, y0–y1 yukarı, c0–c1 ileri (yerel, metre). Yalnız kameraya bakan yüzler çizilir; kutu dışbükey
+// olduğu için görünen yüzler birbirini örtmez, sıra gerekmez. Üst yüz açık, yanlar ve arka koyu tonda (renkKat);
+// tonlar = { ust, yan, arka } ile renkler ayrı ayrı verilebilir. Döner: { on, arka, sol, sag, ust } hangi yüz göründü.
+//   const T = donusum(1, 0, 2, Math.PI);
+//   ozel(pr([1, 0.5, 2]).d, () => { const g = kutuCiz(T, -0.5, 0.5, 0, 0.8, -0.3, 0.3, '#c0392b', 2); if (g.on) yuzCiz(T, …); });
+function kutuCiz(T, a0, a1, y0, y1, c0, c1, renk, cizgi, tonlar) {
+  const am = (a0 + a1) / 2, ym = (y0 + y1) / 2, cm = (c0 + c1) / 2, g = {};
+  const ust = tonlar && tonlar.ust || renkKat(renk, '#fff4dc', 0.22), yan = tonlar && tonlar.yan || renkKat(renk, '#120a1e', 0.22), arka = tonlar && tonlar.arka || renkKat(renk, '#120a1e', 0.35);
+  if ((g.on = yuzBakiyor(T, [0, 0, 1], [am, ym, c1])))
+    yuzCiz(T, [[a0, y0, c1], [a1, y0, c1], [a1, y1, c1], [a0, y1, c1]], renk, cizgi);
+  if ((g.arka = yuzBakiyor(T, [0, 0, -1], [am, ym, c0])))
+    yuzCiz(T, [[a0, y0, c0], [a1, y0, c0], [a1, y1, c0], [a0, y1, c0]], arka, cizgi);
+  if ((g.sol = yuzBakiyor(T, [1, 0, 0], [a1, ym, cm])))
+    yuzCiz(T, [[a1, y0, c0], [a1, y0, c1], [a1, y1, c1], [a1, y1, c0]], yan, cizgi);
+  if ((g.sag = yuzBakiyor(T, [-1, 0, 0], [a0, ym, cm])))
+    yuzCiz(T, [[a0, y0, c0], [a0, y0, c1], [a0, y1, c1], [a0, y1, c0]], yan, cizgi);
+  if ((g.ust = yuzBakiyor(T, [0, 1, 0], [am, y1, cm])))
+    yuzCiz(T, [[a0, y1, c0], [a1, y1, c0], [a1, y1, c1], [a0, y1, c1]], ust, cizgi);
+  return g;
+}
+// Ekran noktasında (pr() sonucu) r metrelik daire; cizgi verilirse mürekkep çizgili.
+function daireCiz(p, r, renk, cizgi) {
+  if (!p.ok)
+    return;
+  c.beginPath();
+  c.arc(p.x, p.y, r * p.s, 0, TAU);
+  c.fillStyle = renk;
+  c.fill();
+  if (cizgi) {
+    c.lineWidth = cizgi;
+    c.strokeStyle = MUREKKEP;
+    c.stroke();
+  }
+}
+// İki ekran noktası arasında kapsül (kap'ın listeye girmeyen, hemen çizen eşi). ra / rb metre.
+function kapsulCiz(pa, ra, pb, rb, renk, cizgi) {
+  if (!pa.ok || !pb.ok)
+    return;
+  kapYol(pa.x, pa.y, ra * pa.s, pb.x, pb.y, rb * pb.s);
+  c.fillStyle = renk;
+  c.fill();
+  c.lineWidth = cizgi;
+  c.strokeStyle = MUREKKEP;
+  c.stroke();
+}
+
+/* ---- gök ve ufuk ---- */
+// Gerçek ufuk çizgisinin ekrandaki satırı (720×1280 ölçeğinde). Kamera yaklaştıkça, eğildikçe değişir; dik bakan
+// kamerada (eğim 0,62, F 1400) ekranın çok üstünde kalır, alçak ve geniş açılı kamerada (eğim 0,5, F 700) görünür.
+function ufukY() { return kam.cy - kam.F * Math.tan(kam.egim); }
+// Gök ve uzak zemin: oyunZemin'in başında çağrılır, ufuk satırını döndürür; yol, tarla, sahne onun altına çizilir.
+// g (hepsi isteğe bağlı):
+//   gok: üstten ufka renkler, ör. ['#2a5a9c', '#7fb6e6', '#ffe3b0'] · zemin: ufuktan öne renkler, ör. ['#9bbf6a', '#5f8a3c']
+//   pus: ufuk çizgisindeki ince ışık şeridi rengi · gunes: { x: 0–1 (ekran genişliğinde), r: piksel, renk, isik }
+//   ufuk: hazır bir satır (verilmezse ufukY()); kamera hep dik bakıyorsa gök görünmesin diye ufuk ekranın üstüne düşer.
+//   const u = gokCiz({ gok: ['#2a5a9c', '#ffe3b0'], zemin: ['#9bbf6a', '#5f8a3c'], pus: '#fff1d0', gunes: { x: 0.7, r: 46 } });
+function gokCiz(g) {
+  g = g || {};
+  const u = g.ufuk === undefined ? ufukY() : g.ufuk, gok = g.gok || [RENK.zemin, RENK.zemin2], zemin = g.zemin || [RENK.zemin3, RENK.zemin2];
+  const boya = (y0, y1, renkler) => {
+    const b = c.createLinearGradient(0, y0, 0, y1);
+    renkler.forEach((r, i) => b.addColorStop(renkler.length > 1 ? i / (renkler.length - 1) : 0, r));
+    return b;
+  };
+  if (u > 0) {
+    c.fillStyle = boya(Math.min(0, u - 900), u, gok);
+    c.fillRect(0, 0, GW, Math.min(GH, u));
+  }
+  if (g.gunes && u > 0) {
+    const gn = g.gunes, x = (gn.x === undefined ? 0.5 : gn.x) * GW, r = gn.r || 50, y = u - r * 0.35;
+    c.save();
+    c.beginPath();
+    c.rect(0, 0, GW, u);
+    c.clip();
+    c.globalAlpha = 0.25;
+    c.fillStyle = gn.isik || '#ffd166';
+    c.beginPath();
+    c.arc(x, y, r * 2.1, 0, TAU);
+    c.fill();
+    c.globalAlpha = 1;
+    c.fillStyle = gn.renk || '#ffe2a0';
+    c.beginPath();
+    c.arc(x, y, r, 0, TAU);
+    c.fill();
+    c.restore();
+  }
+  if (u < GH) {
+    const y0 = Math.max(0, u);
+    c.fillStyle = boya(u, Math.max(u + 1, GH), zemin);
+    c.fillRect(0, y0, GW, GH - y0);
+  }
+  if (g.pus && u > -40 && u < GH + 40) {
+    const b = c.createLinearGradient(0, u - 46, 0, u + 30);
+    b.addColorStop(0, renkSaydam(g.pus, 0));
+    b.addColorStop(0.62, renkSaydam(g.pus, 0.55));
+    b.addColorStop(1, renkSaydam(g.pus, 0));
+    c.fillStyle = b;
+    c.fillRect(0, u - 46, GW, 76);
+  }
+  return u;
+}
+
 /* ── cekirdek/js/35-kare.js ── */
 /* KARE DÖNGÜSÜ — her karede: müzik saatini oku, oyunu ilerlet, kamerayı ayarla, her şeyi çiz.
  * Sıra (docs/KANCALAR.md): müzik saati (B) → coşkunun sönmesi → boşta kalanı çıkarma → oyunGuncelle →
@@ -2055,6 +2444,8 @@ function parcaCiz(dt) {
 const KANCA_UST = typeof oyunUst === 'function' ? oyunUst : null;
 const KANCA_EK_ADLAR = typeof oyunEkAdlar === 'function' ? oyunEkAdlar : null;
 let sonKare = 0, kareSay = 0;
+// Yalnız testler ve kare-cek için: doluysa B müzikten okunmaz, bu değerde durur (CanliOyun._test.vurusDondur).
+let vurusKilit = null;
 // Döngü: bir kare hata verse de sonraki kare istenir. Yoksa oyun kodundaki tek bir hata sahneyi sessizce
 // dondurur ve neden donduğu görünmez. Hata konsola ve sayfaya (pageerror) bir kez düşer; deneme görünümünde
 // sahnenin ortasına da yazılır ki kareye bakan hemen görsün. Yayın görünümünde (#yayin) ekrana yazılmaz.
@@ -2095,6 +2486,8 @@ function kareIc(simdiMs) {
   muzik.planla(0.2);
   const mt = muzik.simdi();
   B = muzik.beatAt(mt);
+  if (vurusKilit !== null)
+    B = vurusKilit;
   const ol = muzik.olaylar;
   while (ol.length && ol[0].t <= mt) {
     const e = ol.shift();
@@ -2132,8 +2525,10 @@ function kareIc(simdiMs) {
   c.lineCap = 'round';
   oyunZemin();
   liste.length = 0;
-  for (const k of D.oy.values())
+  for (const k of D.oy.values()) {
     k.et = null;
+    k.etKutu = null;
+  }
   oyunCiz();
   listeCiz();
   if (KANCA_UST)
@@ -2411,13 +2806,33 @@ catch (e) { } boyutla(); if (!v)
   masaYaz(); }
 
 // Sayfadaki oyuna özgü her yazı OYUN'dan gelir (hepsi textContent; HTML yazılmaz).
+// Tema renklerini CSS değişkenlerine yazar. sahne: sahne ve sahne üstü yazılar (kökte, her yere geçer);
+// panel (isteğe bağlı): yalnız yayın masası ve sayfanın arka planı. panel yoksa masa da sahnenin renklerini alır.
+function renkUygula(sahne, panel) {
+  const yaz = (st, R) => {
+    for (const [ad, css] of [['zemin', '--zemin'], ['zemin2', '--zemin-2'], ['zemin3', '--zemin-3'], ['cizgi', '--cizgi'], ['vurgu', '--vurgu'], ['sicak', '--sicak'], ['serin', '--serin'], ['acik', '--acik'], ['soluk', '--soluk'], ['murekkep', '--murekkep']])
+      st.setProperty(css, R[ad]);
+    // panelin yarı saydam tonları da temadan türetilir
+    for (const [ad, css, a] of [['vurgu', '--vurgu-a', 0.13], ['sicak', '--sicak-a', 0.17], ['sicak', '--sicak-b', 0.42], ['serin', '--serin-a', 0.16], ['acik', '--acik-a', 0.05], ['acik', '--acik-b', 0.1], ['murekkep', '--murekkep-a', 0.55]])
+      st.setProperty(css, renkSaydam(R[ad], a));
+  };
+  const kok = document.documentElement.style, ps = $('panel').style;
+  yaz(kok, sahne);
+  if (panel) {
+    yaz(ps, panel);
+    ps.color = panel.acik;
+    kok.setProperty('--sayfa-zemin', panel.zemin);
+    kok.setProperty('--sayfa-zemin-2', panel.zemin2);
+  }
+  else {
+    for (const css of ['--sayfa-zemin', '--sayfa-zemin-2'])
+      kok.removeProperty(css);
+    ps.cssText = ps.cssText.replace(/--[\w-]+:[^;]*;?/g, '');
+    ps.color = '';
+  }
+}
 function sayfaYaz() {
-  const kok = document.documentElement.style;
-  for (const [ad, css] of [['zemin', '--zemin'], ['zemin2', '--zemin-2'], ['zemin3', '--zemin-3'], ['cizgi', '--cizgi'], ['vurgu', '--vurgu'], ['sicak', '--sicak'], ['serin', '--serin'], ['acik', '--acik'], ['soluk', '--soluk'], ['murekkep', '--murekkep']])
-    kok.setProperty(css, RENK[ad]);
-  // panelin yarı saydam tonları da temadan türetilir
-  for (const [ad, css, a] of [['vurgu', '--vurgu-a', 0.13], ['sicak', '--sicak-a', 0.17], ['sicak', '--sicak-b', 0.42], ['serin', '--serin-a', 0.16], ['acik', '--acik-a', 0.05], ['acik', '--acik-b', 0.1], ['murekkep', '--murekkep-a', 0.55]])
-    kok.setProperty(css, renkSaydam(RENK[ad], a));
+  renkUygula(RENK, PANEL_RENK);
   const y = OYUN.yazi, logo = $('logo'), lp = [].concat(OYUN.logo || OYUN.ad || '').map(String);
   logo.textContent = '';
   logo.append(lp[0] + (lp.length > 1 ? ' ' : ''));
@@ -2916,6 +3331,31 @@ function baslat(kayit) {
   requestAnimationFrame(t => { sonKare = t; kare(t); });
 }
 
+// Son karenin ölçümü (720×1280 ölçeğinde): sahne yazılarının kutuları, her oyuncunun yüzü (merkez ve yarıçap) ve
+// ad etiketinin kutusu. kare-cek.js bunu kare-<ad>.json olarak yazar; testler adların sıralama kutusuna girip
+// girmediğine buradan bakar. Kutular [x, y, genişlik, yükseklik].
+function kareOlcum() {
+  const s = $('sahne').getBoundingClientRect(), o = GW / (s.width || GW), yuv = v => Math.round(v * 10) / 10;
+  const kutu = el => {
+    if (!el || el.hidden)
+      return null;
+    const r = el.getBoundingClientRect();
+    return r.width ? [yuv((r.left - s.left) * o), yuv((r.top - s.top) * o), yuv(r.width * o), yuv(r.height * o)] : null;
+  };
+  const kisiler = [], gor = new Set();
+  for (const k of [...D.oy.values(), ...(KANCA_EK_ADLAR ? KANCA_EK_ADLAR() || [] : [])]) {
+    if (!k || gor.has(k) || k.cikiyor)
+      continue;
+    gor.add(k);
+    const be = k.basEkran && k.basEkran.kare >= kareSay - 1 ? k.basEkran : null;
+    kisiler.push({ ad: k.ad, lider: k === D.lider, ozel: !!k.ozel, bas: be ? { x: yuv(be.x), y: yuv(be.y), r: yuv(be.r) } : null, etiket: k.etKutu ? k.etKutu.map(yuv) : null });
+  }
+  return {
+    kare: kareSay, alan: [ALAN_UST, ALAN_ALT],
+    kutular: { sira: kutu($('sira-liste').parentElement), cosku: kutu(document.querySelector('.cosku')), bildirim: [...$('bildirim').children].map(kutu), pankart: kutu(document.querySelector('.pankart')) },
+    kisiler
+  };
+}
 // Dışarıya açık küçük arayüz: köprü yazanlar ve denemeler için.
 window.CanliOyun = {
   olay, baglan: a => Yayin.baglan(a), kes: () => Yayin.kes(), cevir: m => Yayin.cevir(m),
@@ -2925,7 +3365,17 @@ window.CanliOyun = {
       KANCA_DURUM(d);
     return d;
   },
-  _test: { D, muzik, Muzik, HAVALAR, ayar, OYUN, KADEME, zamanEkle: sn => { zaman += sn; }, zaman: () => zaman },
+  _test: {
+    D, muzik, Muzik, HAVALAR, ayar, OYUN, KADEME, zamanEkle: sn => { zaman += sn; }, zaman: () => zaman,
+    // Vuruş saatini dondurur / ilerletir / bırakır (yalnız test ve kare almak için: dondurulmuş B geri de alınabilir,
+    // oyunda kullanılmaz). Kare döngüsü sürer; yalnız B sabit kalır, hareketin aynı evresi tekrar tekrar alınabilir.
+    vurusDondur: b => { vurusKilit = b === undefined ? B : +b; B = vurusKilit; return vurusKilit; },
+    vurusIlerle: db => { vurusKilit = (vurusKilit === null ? B : vurusKilit) + (+db || 0); B = vurusKilit; return vurusKilit; },
+    vurusCoz: () => { vurusKilit = null; },
+    olcum: kareOlcum,
+    // Çekirdeğin çizim ve kamera işlevleri: testler ve gösterim kareleri sahne dışı denemeler için çağırır.
+    cekirdek: { kam, pr, kameraSigdir, kadrajHesap, etiketCiz, ETIKET, listeCiz, liste, karakterYap, iskeletKur, kolKur, pozBekle, pozOtur, insanEkle, kafaCiz, elSekilCiz, renkKat, donusum, yerelNokta, yuzBakiyor, cokgenCiz, yuzCiz, kutuCiz, daireCiz, kapsulCiz, ufukY, gokCiz, renkUygula, RENK, RENK_OTO, PANEL_RENK, SAHNE_YAZI, pankart, bildir, ALAN_UST, ALAN_ALT, ETIKET_PAY, c, GW, GH }
+  },
   async _sesTesti(sn, i) {
     const oc = new OfflineAudioContext(2, 44100 * sn, 44100), m = new Muzik();
     m.hava = HAVALAR[i || 0];

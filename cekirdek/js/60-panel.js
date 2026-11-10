@@ -57,13 +57,33 @@ catch (e) { } boyutla(); if (!v)
   masaYaz(); }
 
 // Sayfadaki oyuna özgü her yazı OYUN'dan gelir (hepsi textContent; HTML yazılmaz).
+// Tema renklerini CSS değişkenlerine yazar. sahne: sahne ve sahne üstü yazılar (kökte, her yere geçer);
+// panel (isteğe bağlı): yalnız yayın masası ve sayfanın arka planı. panel yoksa masa da sahnenin renklerini alır.
+function renkUygula(sahne, panel) {
+  const yaz = (st, R) => {
+    for (const [ad, css] of [['zemin', '--zemin'], ['zemin2', '--zemin-2'], ['zemin3', '--zemin-3'], ['cizgi', '--cizgi'], ['vurgu', '--vurgu'], ['sicak', '--sicak'], ['serin', '--serin'], ['acik', '--acik'], ['soluk', '--soluk'], ['murekkep', '--murekkep']])
+      st.setProperty(css, R[ad]);
+    // panelin yarı saydam tonları da temadan türetilir
+    for (const [ad, css, a] of [['vurgu', '--vurgu-a', 0.13], ['sicak', '--sicak-a', 0.17], ['sicak', '--sicak-b', 0.42], ['serin', '--serin-a', 0.16], ['acik', '--acik-a', 0.05], ['acik', '--acik-b', 0.1], ['murekkep', '--murekkep-a', 0.55]])
+      st.setProperty(css, renkSaydam(R[ad], a));
+  };
+  const kok = document.documentElement.style, ps = $('panel').style;
+  yaz(kok, sahne);
+  if (panel) {
+    yaz(ps, panel);
+    ps.color = panel.acik;
+    kok.setProperty('--sayfa-zemin', panel.zemin);
+    kok.setProperty('--sayfa-zemin-2', panel.zemin2);
+  }
+  else {
+    for (const css of ['--sayfa-zemin', '--sayfa-zemin-2'])
+      kok.removeProperty(css);
+    ps.cssText = ps.cssText.replace(/--[\w-]+:[^;]*;?/g, '');
+    ps.color = '';
+  }
+}
 function sayfaYaz() {
-  const kok = document.documentElement.style;
-  for (const [ad, css] of [['zemin', '--zemin'], ['zemin2', '--zemin-2'], ['zemin3', '--zemin-3'], ['cizgi', '--cizgi'], ['vurgu', '--vurgu'], ['sicak', '--sicak'], ['serin', '--serin'], ['acik', '--acik'], ['soluk', '--soluk'], ['murekkep', '--murekkep']])
-    kok.setProperty(css, RENK[ad]);
-  // panelin yarı saydam tonları da temadan türetilir
-  for (const [ad, css, a] of [['vurgu', '--vurgu-a', 0.13], ['sicak', '--sicak-a', 0.17], ['sicak', '--sicak-b', 0.42], ['serin', '--serin-a', 0.16], ['acik', '--acik-a', 0.05], ['acik', '--acik-b', 0.1], ['murekkep', '--murekkep-a', 0.55]])
-    kok.setProperty(css, renkSaydam(RENK[ad], a));
+  renkUygula(RENK, PANEL_RENK);
   const y = OYUN.yazi, logo = $('logo'), lp = [].concat(OYUN.logo || OYUN.ad || '').map(String);
   logo.textContent = '';
   logo.append(lp[0] + (lp.length > 1 ? ' ' : ''));
@@ -562,6 +582,31 @@ function baslat(kayit) {
   requestAnimationFrame(t => { sonKare = t; kare(t); });
 }
 
+// Son karenin ölçümü (720×1280 ölçeğinde): sahne yazılarının kutuları, her oyuncunun yüzü (merkez ve yarıçap) ve
+// ad etiketinin kutusu. kare-cek.js bunu kare-<ad>.json olarak yazar; testler adların sıralama kutusuna girip
+// girmediğine buradan bakar. Kutular [x, y, genişlik, yükseklik].
+function kareOlcum() {
+  const s = $('sahne').getBoundingClientRect(), o = GW / (s.width || GW), yuv = v => Math.round(v * 10) / 10;
+  const kutu = el => {
+    if (!el || el.hidden)
+      return null;
+    const r = el.getBoundingClientRect();
+    return r.width ? [yuv((r.left - s.left) * o), yuv((r.top - s.top) * o), yuv(r.width * o), yuv(r.height * o)] : null;
+  };
+  const kisiler = [], gor = new Set();
+  for (const k of [...D.oy.values(), ...(KANCA_EK_ADLAR ? KANCA_EK_ADLAR() || [] : [])]) {
+    if (!k || gor.has(k) || k.cikiyor)
+      continue;
+    gor.add(k);
+    const be = k.basEkran && k.basEkran.kare >= kareSay - 1 ? k.basEkran : null;
+    kisiler.push({ ad: k.ad, lider: k === D.lider, ozel: !!k.ozel, bas: be ? { x: yuv(be.x), y: yuv(be.y), r: yuv(be.r) } : null, etiket: k.etKutu ? k.etKutu.map(yuv) : null });
+  }
+  return {
+    kare: kareSay, alan: [ALAN_UST, ALAN_ALT],
+    kutular: { sira: kutu($('sira-liste').parentElement), cosku: kutu(document.querySelector('.cosku')), bildirim: [...$('bildirim').children].map(kutu), pankart: kutu(document.querySelector('.pankart')) },
+    kisiler
+  };
+}
 // Dışarıya açık küçük arayüz: köprü yazanlar ve denemeler için.
 window.CanliOyun = {
   olay, baglan: a => Yayin.baglan(a), kes: () => Yayin.kes(), cevir: m => Yayin.cevir(m),
@@ -571,7 +616,17 @@ window.CanliOyun = {
       KANCA_DURUM(d);
     return d;
   },
-  _test: { D, muzik, Muzik, HAVALAR, ayar, OYUN, KADEME, zamanEkle: sn => { zaman += sn; }, zaman: () => zaman },
+  _test: {
+    D, muzik, Muzik, HAVALAR, ayar, OYUN, KADEME, zamanEkle: sn => { zaman += sn; }, zaman: () => zaman,
+    // Vuruş saatini dondurur / ilerletir / bırakır (yalnız test ve kare almak için: dondurulmuş B geri de alınabilir,
+    // oyunda kullanılmaz). Kare döngüsü sürer; yalnız B sabit kalır, hareketin aynı evresi tekrar tekrar alınabilir.
+    vurusDondur: b => { vurusKilit = b === undefined ? B : +b; B = vurusKilit; return vurusKilit; },
+    vurusIlerle: db => { vurusKilit = (vurusKilit === null ? B : vurusKilit) + (+db || 0); B = vurusKilit; return vurusKilit; },
+    vurusCoz: () => { vurusKilit = null; },
+    olcum: kareOlcum,
+    // Çekirdeğin çizim ve kamera işlevleri: testler ve gösterim kareleri sahne dışı denemeler için çağırır.
+    cekirdek: { kam, pr, kameraSigdir, kadrajHesap, etiketCiz, ETIKET, listeCiz, liste, karakterYap, iskeletKur, kolKur, pozBekle, pozOtur, insanEkle, kafaCiz, elSekilCiz, renkKat, donusum, yerelNokta, yuzBakiyor, cokgenCiz, yuzCiz, kutuCiz, daireCiz, kapsulCiz, ufukY, gokCiz, renkUygula, RENK, RENK_OTO, PANEL_RENK, SAHNE_YAZI, pankart, bildir, ALAN_UST, ALAN_ALT, ETIKET_PAY, c, GW, GH }
+  },
   async _sesTesti(sn, i) {
     const oc = new OfflineAudioContext(2, 44100 * sn, 44100), m = new Muzik();
     m.hava = HAVALAR[i || 0];

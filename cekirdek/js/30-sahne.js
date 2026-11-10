@@ -9,10 +9,14 @@ const tuval = $('tuval'), c = tuval.getContext('2d');
 const GW = 720, GH = 1280;
 // Tema renkleri. CSS'te aynı adlar --zemin, --zemin-2 … olarak kullanılır; panel açılışta bunları RENK'ten yazar.
 // Renkler #rrggbb biçiminde verilmeli (yarı saydam tonlar bunlardan türetilir).
-const RENK = Object.assign({
+const RENK_OTO = {
   zemin: '#0e1230', zemin2: '#171d47', zemin3: '#232b63', cizgi: '#343d80',
   vurgu: '#ffd166', sicak: '#e23d2f', serin: '#22b8a7', acik: '#f6ecd9', soluk: '#a9b0dc', murekkep: '#080a1c'
-}, OYUN.renk || {});
+};
+const RENK = Object.assign({}, RENK_OTO, OYUN.renk || {});
+// Yayın masasının (panelin) renkleri. OYUN.panelRenk verilmezse panel de RENK'i kullanır (eski davranış). Verilirse
+// eksik adlar çekirdeğin koyu temasından gelir: gündüz sahnesi açık renkli olsa da panel koyu ve okunaklı kalır.
+const PANEL_RENK = OYUN.panelRenk ? Object.assign({}, RENK_OTO, OYUN.panelRenk) : null;
 const MUREKKEP = RENK.murekkep;
 function renkSaydam(hex, a) {
   const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(String(hex));
@@ -119,10 +123,13 @@ function listeCiz() {
 // Sahnenin oyuncular için ayrılan dikey şeridi (sanal 1280 satırda): üstü HUD, altı TikTok'un yorum alanı.
 const ALAN_UST = 505, ALAN_ALT = 1006;
 let kamCy = kam.cy;
-// noktalar: kadraja girmesi gereken yer noktaları [[x, z], …] (oyunKamera() döndürür). Kamera sağa sola
-// dönmez, ortaya bakar; bu yüzden yalnız |x| önemlidir. Sonuç yumuşakça yaklaşır; kam.son = { enX, hd }
-// (en geniş |x| ve derinliğin yarısı) oyunun zeminini kalabalığa göre büyütmesi için saklanır.
-function kameraSigdir(noktalar, dt) {
+// Bir adın kutusunun başın tepesinden yukarı kapladığı en büyük yükseklik (lider: 22 punto + 9 + 5 boşluk).
+// OYUN.kamera.ustPx için hazır değer: ustPay başın tepesine kadar metre, ustPx adın kendisi piksel.
+const ETIKET_PAY = 36;
+// Bir kadraj: verilen noktalar (her biri [x, z] ya da [x, z, pay]) tx'e bakan kameraya sığsın diye uzaklık (hD),
+// derinliğin ortası (zOrta), yarı derinlik (hd), hedef satır (hCy) ve en geniş yana uzaklık (enX). Öntanımlarla
+// (tx = 0, pay 0,55, piksel payı 0) eski kameraSigdir'in hesabının aynısıdır.
+function kadrajHesap(noktalar, tx, ustPx, altPx) {
   let mnZ = Infinity, mxZ = -Infinity;
   for (const n of noktalar) {
     if (n[1] < mnZ)
@@ -132,26 +139,80 @@ function kameraSigdir(noktalar, dt) {
   }
   if (!(mxZ >= mnZ))
     mnZ = mxZ = 0;
-  const hd = (mxZ - mnZ) / 2, zOrta = (mnZ + mxZ) / 2, se = Math.sin(kam.egim), ce = Math.cos(kam.egim), kk = Math.min(1, dt * 1.6);
+  const hd = (mxZ - mnZ) / 2, zOrta = (mnZ + mxZ) / 2, se = Math.sin(kam.egim), ce = Math.cos(kam.egim);
   // Genişlik: kameraya yakın duran daha iri göründüğü için her nokta kendi derinliğiyle hesaba girer.
   let hD = kam.enYakin, ust = 0, alt = 0, enX = 0;
   for (const n of noktalar) {
-    const x = Math.abs(n[0]);
-    hD = Math.max(hD, (x + 0.55) * kam.F / 322 - (n[1] - zOrta) * ce);
+    const x = Math.abs(n[0] - tx);
+    hD = Math.max(hD, (x + (n[2] === undefined ? 0.55 : n[2])) * kam.F / 322 - (n[1] - zOrta) * ce);
     enX = Math.max(enX, x);
   }
+  // Piksel payları (ad etiketi gibi ekranda sabit boyda kalan şeyler) şeridi baştan daraltır.
+  const bant = ALAN_ALT - ALAN_UST - ustPx - altPx;
   for (let i = 0; i < 5; i++) {
     // en arkadakinin adının üstü ve en öndekinin ayağı, hedef noktaya göre ekranda ne kadar yer tutuyor
     ust = (hd * se + kam.ustPay * ce) * kam.F / (hD + hd * ce);
     alt = (hd * se + kam.altPay) * kam.F / (hD - hd * ce);
-    if (ust + alt <= ALAN_ALT - ALAN_UST)
+    if (ust + alt <= bant)
       break;
-    hD *= (ust + alt) / (ALAN_ALT - ALAN_UST);
+    hD *= (ust + alt) / bant;
   }
-  const hCy = ALAN_UST + ust + (ALAN_ALT - ALAN_UST - ust - alt) / 2;
+  return { hD, zOrta, hd, enX, mnZ, se, ce, ust, alt, bant };
+}
+// Kadrajın hedef satırı: üst ve alt payların arası şeridin ortasına gelsin.
+const kadrajCy = (h, ustPx) => ALAN_UST + ustPx + h.ust + (h.bant - h.ust - h.alt) / 2;
+// girdi (oyunKamera() döndürür) iki biçimde olabilir:
+//   [[x, z], …]   kadraja girmesi gereken yer noktaları; kamera x = 0'a bakar (eski biçim, öntanım).
+//   { noktalar, x, odak, odakEn, on, ustPx, altPx }   seçenekli biçim (docs/KANCALAR.md, "Kamera"):
+//     noktalar [[x, z, pay?], …] · x: bakılan x (sayı ya da 'orta') · odak: hep büyük kalacak noktalar,
+//     odakEn: kalabalık için en çok kaç kat uzaklaşılır (1,25) · on: en öndekinden bu kadar metre derine kadar
+//     sığdır, gerisi (kuyruk) kadrajdan taşabilir · ustPx / altPx: şeridin üstünde / altında piksel payı.
+//   Seçeneklerin öntanımı OYUN.kamera'dan gelir (orada da x, odakEn, on, ustPx, altPx yazılabilir).
+// Sonuç yumuşakça yaklaşır; kam.son = { enX, hd } (en geniş yana uzaklık ve derinliğin yarısı) oyunun zeminini
+// kalabalığa göre büyütmesi için saklanır.
+function kameraSigdir(girdi, dt) {
+  const s = Array.isArray(girdi) ? null : girdi || {};
+  let noktalar = s ? s.noktalar || [] : girdi;
+  const sec = ad => s && s[ad] !== undefined ? s[ad] : kam[ad];
+  const ustPx = sec('ustPx') || 0, altPx = sec('altPx') || 0, on = sec('on'), odak = s && s.odak ? s.odak : null;
+  let tx = sec('x');
+  if (tx === 'orta') {
+    let a = Infinity, b = -Infinity;
+    for (const n of odak || noktalar) {
+      a = Math.min(a, n[0]);
+      b = Math.max(b, n[0]);
+    }
+    tx = b >= a ? (a + b) / 2 : 0;
+  }
+  else if (!Number.isFinite(tx))
+    tx = 0;
+  if (odak)
+    noktalar = noktalar.concat(odak);
+  // Kuyruk: en öndekinden "on" metreden derindeki noktalar o derinliğe çekilir, genişlikleri sayılmaz.
+  if (on > 0 && noktalar.length) {
+    let mnZ = Infinity;
+    for (const n of noktalar)
+      mnZ = Math.min(mnZ, n[1]);
+    const sinir = mnZ + on;
+    noktalar = noktalar.map(n => n[1] > sinir ? [tx, sinir, 0] : n);
+  }
+  let h = kadrajHesap(noktalar, tx, ustPx, altPx), hD = h.hD;
+  // Odak: büyük nesne (televizyon, sahne) kalabalık yüzünden küçülmesin. Kalabalık odağın gerektirdiğinden en
+  // çok odakEn kat uzaklaştırabilir; fazlası kadrajdan taşar, kadraj odağa ortalanır.
+  if (odak && odak.length) {
+    const o = kadrajHesap(odak, tx, ustPx, altPx), en = o.hD * (sec('odakEn') || 1.25);
+    if (hD > en) {
+      h = o;
+      hD = en;
+      h.ust = (h.hd * h.se + kam.ustPay * h.ce) * kam.F / (hD + h.hd * h.ce);
+      h.alt = (h.hd * h.se + kam.altPay) * kam.F / (hD - h.hd * h.ce);
+    }
+  }
+  const hd = h.hd, zOrta = h.zOrta, enX = h.enX, kk = Math.min(1, dt * 1.6);
+  const hCy = kadrajCy(h, ustPx);
   kam.D += (hD - kam.D) * kk;
   kam.tz += (zOrta - kam.tz) * kk;
-  kam.tx += (0 - kam.tx) * kk;
+  kam.tx += (tx - kam.tx) * kk;
   kamCy += (hCy - kamCy) * kk;
   // hafif sağa sola salınım ve hediye sarsıntısı (D.sarsinti 0–1; oyun artırır, burada söner)
   kam.yaw = azHareket ? 0 : 0.035 * Math.sin(zaman * 0.21);
@@ -176,7 +237,18 @@ function golge(x, z, rx, rz) {
 }
 // k.et = { x, y, s, d }: etiketin oturacağı yer (başın tepesi), ölçek ve derinlik. insanEkle kendisi kurar;
 // insan çizmeyen oyun her karede kendisi yazar. Çekirdek her karede izleyicilerin k.et'ini boşaltır.
+// İsteğe bağlı alanlar (docs/KANCALAR.md, "Ad etiketleri"):
+//   et.asagi (ya da kalıcı k.etAsagi): ad başın üstüne değil, et.alt (yoksa et.y) noktasının altına asılır
+//   et.alt: alt bağlantı noktası (insanEkle çeneyi yazar) · et.bx / et.by: konuşma balonunun ucunun yeri
 // ekler: izleyici olmayan, etiketi olacak oyuncular (oyunEkAdlar()); k.ozel olanlar vurgu rengiyle yazılır.
+// OYUN.etiket = { ustSinir, altSinir, disari, balonSira } (hepsi isteğe bağlı; yoksa eski davranış):
+//   ustSinir: adın üst kenarı bu satırın üstüne çıkmaz (true = ALAN_UST, sıralama kutusunun altı)
+//   altSinir: adın alt kenarı bu satırın altına inmez (true = ALAN_ALT, yorum alanının üstü)
+//   disari: 'gizle' → bağlantı noktası ekran dışında kalanın adı (ve balonu) çizilmez; öntanım 'kenar' (kenara itilir)
+//   balonSira: 'ekleme' (öntanım) · 'derinlik' (uzaktaki önce, öndeki üstte) · 'oncelik' (lider en üstte)
+const ETIKET = Object.assign({ ustSinir: null, altSinir: null, disari: 'kenar', balonSira: 'ekleme' }, OYUN.etiket || {});
+for (const [ad, sinir] of [['ustSinir', ALAN_UST], ['altSinir', ALAN_ALT]])
+  ETIKET[ad] = ETIKET[ad] === true ? sinir : Number.isFinite(ETIKET[ad]) ? ETIKET[ad] : null;
 function etiketCiz(ekler) {
   const adlar = ekler.filter(k => k && k.et);
   for (const k of D.oy.values())
@@ -188,25 +260,50 @@ function etiketCiz(ekler) {
   // Yer yetmeyince kimin adı kalır: lider, yıldız, özel oyuncular, son konuşanlar, ilk beş, öndekiler.
   const onc = k => (k === D.lider ? 2000 : 0) + (k.yildiz ? 1500 : 0) + (k.ozel ? 900 : 0) + (zaman - k.son < 6 ? 600 - (zaman - k.son) * 20 : 0) + (!k.ozel && k.sn < 5 ? 200 - k.sn : 0) - k.et.d;
   const kutular = [], sirali = adlar.slice().sort((a, b) => onc(b) - onc(a));
+  const ustS = ETIKET.ustSinir, altS = ETIKET.altSinir, gizle = ETIKET.disari === 'gizle';
   for (const k of sirali) {
     const et = k.et, bas = k === D.lider, yeniMi = !k.ozel && zaman - k.yeni < 3;
+    k.etKutu = null;
+    k.etDisari = gizle && !(et.x >= 0 && et.x <= GW && et.y >= 0 && et.y <= GH);
+    if (k.etDisari)
+      continue;
     const punto = clamp(Math.round(et.s * 0.17), 13, 18) + (bas ? 4 : 0), yk = punto + 9, tac = bas ? punto * 1.05 : 0;
     c.font = (bas ? '700 ' : '500 ') + punto + 'px Rubik, system-ui, sans-serif';
     if (k.adYazi !== k.ad + punto) {
       k.adYazi = k.ad + punto;
       k.adW = c.measureText(k.ad).width;
     }
-    const w = k.adW + punto * 1.1 + tac, y0 = et.y - 5;
+    const asagi = !!(et.asagi || k.etAsagi);
+    const w = k.adW + punto * 1.1 + tac;
+    let y0 = asagi ? (et.alt === undefined ? et.y : et.alt) + 5 + yk : et.y - 5;
     const x = clamp(et.x, w / 2 + 4, GW - w / 2 - 4);
+    // Yer yoksa ad bir iki kat kayar: başın üstündeki ad yukarı, altına asılan ad aşağı. Sınıra dayanan ad
+    // sınırdan uzağa doğru kayar. Sınırın çok ötesine düşen (baş sınırın epey üstünde) ad, öncelikli değilse yazılmaz.
+    let yon = asagi ? 1 : -1, itme = 0;
+    if (ustS !== null && y0 - yk < ustS) {
+      itme = ustS - (y0 - yk);
+      y0 = ustS + yk;
+      yon = 1;
+    }
+    if (altS !== null && y0 > altS) {
+      itme = Math.max(itme, y0 - altS);
+      y0 = altS;
+      yon = -1;
+    }
+    k.etY = y0 - yk;
+    if (itme > yk * 2 && onc(k) < 500)
+      continue;
+    const adim = yon * (yk + 2);
     let y = null;
-    for (const dy of [0, -(yk + 2), -(yk + 2) * 2]) {
+    for (const dy of [0, adim, adim * 2]) {
       const a = x - w / 2, u = y0 + dy - yk;
+      if ((ustS !== null && u < ustS) || (altS !== null && u + yk > altS))
+        continue;
       if (!kutular.some(q => a < q[0] + q[2] && a + w > q[0] && u < q[1] + q[3] && u + yk > q[1])) {
         y = y0 + dy;
         break;
       }
     }
-    k.etY = y0 - yk;
     if (y === null) {
       if (onc(k) < 500)
         continue;
@@ -214,6 +311,7 @@ function etiketCiz(ekler) {
     }
     k.etY = y - yk;
     kutular.push([x - w / 2, y - yk, w, yk]);
+    k.etKutu = kutular[kutular.length - 1];
     c.fillStyle = bas ? RENK.vurgu : renkSaydam(MUREKKEP, 0.78);
     c.beginPath();
     c.roundRect(x - w / 2, y - yk, w, yk, yk / 2);
@@ -239,7 +337,13 @@ function etiketCiz(ekler) {
     c.fillStyle = bas ? MUREKKEP : yeniMi ? '#5fe0d0' : k.ozel ? RENK.vurgu : RENK.acik;
     c.fillText(k.ad, x + tac / 2, y - yk / 2 + 1);
   }
-  for (const k of adlar) {
+  // Balonların çizim sırası: sonra çizilen üstte kalır.
+  let balonlar = adlar;
+  if (ETIKET.balonSira === 'derinlik')
+    balonlar = adlar.slice().sort((a, b) => b.et.d - a.et.d);
+  else if (ETIKET.balonSira === 'oncelik')
+    balonlar = adlar.slice().sort((a, b) => onc(a) - onc(b));
+  for (const k of balonlar) {
     if (!k.balon)
       continue;
     const ya = zaman - k.balon.t0;
@@ -247,9 +351,19 @@ function etiketCiz(ekler) {
       k.balon = null;
       continue;
     }
-    const et = k.et, al = Math.min(1, ya * 8, (3.4 - ya) * 4), by = (k.etY ?? et.y - 60) - 12;
+    if (k.etDisari)
+      continue;
+    const et = k.et, al = Math.min(1, ya * 8, (3.4 - ya) * 4);
+    // Balonun ucu: oyunun verdiği yer, yoksa adın üstü; ad aşağı asılıysa başın üstü.
+    const bx = et.bx === undefined ? et.x : et.bx;
+    let by = et.by !== undefined ? et.by : (et.asagi || k.etAsagi) ? et.y - 12 : (k.etY ?? et.y - 60) - 12, kuyruk = true;
+    // Üst sınır varsa balon sıralama kutusuna girmez: sınıra dayanır, ucu ancak altında kalırsa çizilir.
+    if (ETIKET.ustSinir !== null && by - 36 < ETIKET.ustSinir) {
+      by = ETIKET.ustSinir + 36;
+      kuyruk = et.y > by + 4;
+    }
     c.font = '700 21px Rubik, system-ui, sans-serif';
-    const w = Math.min(330, c.measureText(k.balon.m).width + 28), x = clamp(et.x, w / 2 + 8, GW - w / 2 - 8);
+    const w = Math.min(330, c.measureText(k.balon.m).width + 28), x = clamp(bx, w / 2 + 8, GW - w / 2 - 8);
     c.globalAlpha = al;
     c.fillStyle = RENK.vurgu;
     c.strokeStyle = MUREKKEP;
@@ -258,12 +372,14 @@ function etiketCiz(ekler) {
     c.roundRect(x - w / 2, by - 36, w, 36, 14);
     c.fill();
     c.stroke();
-    c.beginPath();
-    c.moveTo(et.x - 8, by - 2);
-    c.lineTo(et.x, by + 9);
-    c.lineTo(et.x + 8, by - 2);
-    c.stroke();
-    c.fill();
+    if (kuyruk) {
+      c.beginPath();
+      c.moveTo(bx - 8, by - 2);
+      c.lineTo(bx, by + 9);
+      c.lineTo(bx + 8, by - 2);
+      c.stroke();
+      c.fill();
+    }
     c.fillStyle = MUREKKEP;
     c.fillText(k.balon.m, x, by - 17, w - 18);
     c.globalAlpha = 1;

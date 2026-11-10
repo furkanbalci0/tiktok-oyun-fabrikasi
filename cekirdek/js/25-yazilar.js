@@ -54,11 +54,14 @@ function bildir(ad, orta, vurgu) {
     kutu.firstChild.remove();
   setTimeout(() => { d.classList.add('git'); setTimeout(() => d.remove(), 320); }, 2800);
 }
+// OYUN.sahneYazi = { pankart: 'alt' } (isteğe bağlı): pankart sıralama kutusunun üstünden değil, altından, oyuncu
+// şeridinin başından geçer (sıralama ve gösterge hep okunur). Öntanım 'ust': eski yeri, sıralama kutusunun üstü.
+const SAHNE_YAZI = Object.assign({ pankart: 'ust' }, OYUN.sahneYazi || {});
 function pankart(b1, b2) {
   const yer = $('pankart-yeri');
   yer.textContent = '';
   const p = document.createElement('div');
-  p.className = 'pankart';
+  p.className = SAHNE_YAZI.pankart === 'alt' ? 'pankart alt' : 'pankart';
   const a = document.createElement('div');
   a.className = 'b1';
   a.textContent = b1;

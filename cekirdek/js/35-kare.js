@@ -7,6 +7,8 @@
 const KANCA_UST = typeof oyunUst === 'function' ? oyunUst : null;
 const KANCA_EK_ADLAR = typeof oyunEkAdlar === 'function' ? oyunEkAdlar : null;
 let sonKare = 0, kareSay = 0;
+// Yalnız testler ve kare-cek için: doluysa B müzikten okunmaz, bu değerde durur (CanliOyun._test.vurusDondur).
+let vurusKilit = null;
 // Döngü: bir kare hata verse de sonraki kare istenir. Yoksa oyun kodundaki tek bir hata sahneyi sessizce
 // dondurur ve neden donduğu görünmez. Hata konsola ve sayfaya (pageerror) bir kez düşer; deneme görünümünde
 // sahnenin ortasına da yazılır ki kareye bakan hemen görsün. Yayın görünümünde (#yayin) ekrana yazılmaz.
@@ -47,6 +49,8 @@ function kareIc(simdiMs) {
   muzik.planla(0.2);
   const mt = muzik.simdi();
   B = muzik.beatAt(mt);
+  if (vurusKilit !== null)
+    B = vurusKilit;
   const ol = muzik.olaylar;
   while (ol.length && ol[0].t <= mt) {
     const e = ol.shift();
@@ -84,8 +88,10 @@ function kareIc(simdiMs) {
   c.lineCap = 'round';
   oyunZemin();
   liste.length = 0;
-  for (const k of D.oy.values())
+  for (const k of D.oy.values()) {
     k.et = null;
+    k.etKutu = null;
+  }
   oyunCiz();
   listeCiz();
   if (KANCA_UST)

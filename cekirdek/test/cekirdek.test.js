@@ -371,6 +371,226 @@ const { sonuc, kontrol } = kontrolcu();
   const gizli = await u.evaluate(async () => { const v0 = CanliOyun.durum().vurus; Object.defineProperty(document, 'hidden', { value: true, configurable: true }); await new Promise(r => setTimeout(r, 2500)); Object.defineProperty(document, 'hidden', { value: false, configurable: true }); await new Promise(r => setTimeout(r, 800)); const v1 = CanliOyun.durum().vurus; return { v0, v1 }; });
   kontrol('Sekme arkaya gidip gelince saat ilerlemeye devam eder', gizli.v1 > gizli.v0 + 3 && gizli.v1 < gizli.v0 + 14, gizli);
 
+  // ---------- ÇEKİRDEK YARDIMCILARI: kamera, ad etiketleri, insan takımı, çizim, sahne yazıları, tema, saat ----------
+  // Ayrı sayfada, oyunun kendi sahnesine dokunmadan: işlevler CanliOyun._test.cekirdek üzerinden çağrılır, sonuç aynı
+  // evaluate içinde okunur (kare döngüsü araya giremez). Değiştirilen ayarlar sonunda geri konur.
+  const e = await ac(540, 960, '#yayin');
+  await e.evaluate(() => { document.getElementById('bosalt').click(); if (document.getElementById('oto').getAttribute('aria-pressed') === 'true') document.getElementById('oto').click(); });
+  const kmr = await e.evaluate(() => {
+    const T = CanliOyun._test, K = T.cekirdek, kam = K.kam, r = {};
+    T.D.sarsinti = 0;
+    const al = () => ({ D: kam.D, tx: kam.tx, tz: kam.tz, cy: kam.cy });
+    const pts = [[-2, 0], [2, 0], [0, 2.5], [1.2, -1]];
+    K.kameraSigdir(pts, 1); const eski = al();
+    K.kameraSigdir({ noktalar: pts }, 1); const yeni = al();
+    r.ayni = JSON.stringify(eski) === JSON.stringify(yeni);
+    // yana bakış: sahne x = 3…5 arasında; eskisi x = 0'a bakıp uzaklaşırdı
+    const yan = [[3, 0], [5, 0], [4, 2]];
+    K.kameraSigdir(yan, 1); const dOrta0 = kam.D;
+    K.kameraSigdir({ noktalar: yan, x: 'orta' }, 1);
+    const m = K.pr([4, 0, kam.tz]);
+    r.yan = { tx: +kam.tx.toFixed(3), D0: +dOrta0.toFixed(2), D: +kam.D.toFixed(2), ekranX: +m.x.toFixed(1), icinde: yan.every(n => { const p = K.pr([n[0], 0, n[1]]); return p.x > 0 && p.x < 720; }) };
+    // nokta başına pay
+    K.kameraSigdir([[0, 0], [1, 0]], 1); const p0 = kam.D;
+    K.kameraSigdir([[0, 0], [1, 0, 2.5]], 1); r.pay = { varsayilan: +p0.toFixed(2), genis: +kam.D.toFixed(2) };
+    // odak: ortadaki büyük nesne kalabalık yüzünden küçülmez
+    const odak = [[-1.4, -0.6], [1.4, -0.6], [-1.4, 0.6], [1.4, 0.6]], kalabalik = [];
+    for (let i = 0; i < 30; i++) kalabalik.push([-7 + i * 0.5, 2 + (i % 3)]);
+    K.kameraSigdir({ noktalar: odak }, 1); const dOdak = kam.D;
+    K.kameraSigdir({ noktalar: kalabalik.concat(odak) }, 1); const dHepsi = kam.D;
+    K.kameraSigdir({ noktalar: kalabalik, odak, odakEn: 1.25 }, 1);
+    r.odak = { odak: +dOdak.toFixed(2), hepsi: +dHepsi.toFixed(2), odakli: +kam.D.toFixed(2), odakIcinde: odak.every(n => { const p = K.pr([n[0], 0, n[1]]); return p.x > 0 && p.x < 720 && p.y > K.ALAN_UST && p.y < K.ALAN_ALT; }) };
+    // ön sığdırma: konvoy gibi 30 m'lik kuyruk; öndeki 4 m sığar, kuyruk üstten taşar
+    const kuyruk = []; for (let z = 0; z <= 30; z += 1.5) kuyruk.push([0.9, z]);
+    K.kameraSigdir(kuyruk, 1); const dKuyruk = kam.D;
+    K.kameraSigdir({ noktalar: kuyruk, on: 4 }, 1);
+    const on = K.pr([0.9, 0, 0]), uc = K.pr([0, 0, 30]);
+    r.on = { tum: +dKuyruk.toFixed(2), on: +kam.D.toFixed(2), onY: +on.y.toFixed(1), kuyrukY: +uc.y.toFixed(1) };
+    // piksel payı: en arkadakinin adının üstü (ustPay) şeridin ustPx altında kalır
+    const iki = [[0, 0], [0, 3]];
+    K.kameraSigdir({ noktalar: iki }, 1);
+    const ust0 = K.pr([0, kam.ustPay, 3]).y, on0 = K.pr([0, 0, 0]).y;
+    K.kameraSigdir({ noktalar: iki, ustPx: 60 }, 1);
+    const ust1 = K.pr([0, kam.ustPay, 3]).y, on1 = K.pr([0, 0, 0]).y;
+    r.ustPx = { ust0: +ust0.toFixed(1), ust60: +ust1.toFixed(1), on0: +on0.toFixed(1), on60: +on1.toFixed(1), etiketPay: K.ETIKET_PAY };
+    return r;
+  });
+  kontrol('Kamera: seçeneksiz nesne biçimi eski dizi biçimiyle aynı kadrajı verir', kmr.ayni, kmr.ayni);
+  kontrol('Kamera: x hedefi ("orta") yana kaymış sahneye bakar, daha yakından sığdırır', Math.abs(kmr.yan.tx - 4) < 1e-6 && Math.abs(kmr.yan.ekranX - 360) < 2 && kmr.yan.D < kmr.yan.D0 * 0.8 && kmr.yan.icinde, kmr.yan);
+  kontrol('Kamera: nokta başına pay ([x, z, pay]) kadrajı genişletir', kmr.pay.genis > kmr.pay.varsayilan * 1.3, kmr.pay);
+  kontrol('Kamera: odak, kalabalık ne kadar yayılırsa yayılsın en çok odakEn kat uzaklaşır ve kadrajda kalır', kmr.odak.odakli <= kmr.odak.odak * 1.25 + 1e-6 && kmr.odak.hepsi > kmr.odak.odakli * 1.2 && kmr.odak.odakIcinde, kmr.odak);
+  kontrol('Kamera: "on" öndekileri sığdırır, kuyruk kadrajın üstünden taşar', kmr.on.on < kmr.on.tum * 0.6 && kmr.on.onY < 1006 && kmr.on.onY > 505 && kmr.on.kuyrukY < 505, kmr.on);
+  kontrol('Kamera: ustPx en arkadakinin üstüne piksel payı bırakır (üst kenar ~ustPx aşağı iner, öndeki şeritte kalır)', kmr.ustPx.ust60 - kmr.ustPx.ust0 > 45 && kmr.ustPx.on60 <= 1006, kmr.ustPx);
+
+  const etk = await e.evaluate(() => {
+    const T = CanliOyun._test, K = T.cekirdek, ET = K.ETIKET, eski = { ...ET }, r = {};
+    const kisi = (ad, x, y, ek) => Object.assign({ ad, et: Object.assign({ x, y, s: 90, d: 10 }, ek || {}), son: -99, sn: 9, yeni: -99, katilim: 0 }, ek && ek.k || {});
+    const ciz = (ayar, ekler) => { Object.assign(ET, { ustSinir: null, altSinir: null, disari: 'kenar', balonSira: 'ekleme' }, ayar); K.etiketCiz(ekler); return ekler.map(k => k.etKutu ? k.etKutu.map(Math.round) : null); };
+    r.serbest = ciz({}, [kisi('kutuya', 200, 330)])[0];
+    r.sinirli = ciz({ ustSinir: K.ALAN_UST }, [kisi('kutuya', 200, 520)])[0];
+    r.cokUstte = ciz({ ustSinir: K.ALAN_UST }, [kisi('cokUstte', 200, 120)])[0];
+    r.asagi = ciz({}, [kisi('asagi', 300, 600, { asagi: true, alt: 640 })])[0];
+    r.kenar = ciz({}, [kisi('disarda', -80, 700)])[0];
+    r.gizli = ciz({ disari: 'gizle' }, [kisi('disarda', -80, 700)])[0];
+    r.altSinir = ciz({ altSinir: K.ALAN_ALT }, [kisi('dipte', 300, 1040)])[0];
+    // üst üste iki ad: sınıra dayalıyken ikincisi aşağı kayar, kutuya girmez
+    r.ikiAd = ciz({ ustSinir: K.ALAN_UST }, [kisi('bir', 300, 515), kisi('iki', 305, 515)]);
+    // balon: ucunun yeri ve çizim sırası (sonra çizilen üstte)
+    const c = K.c, yazilan = [], asil = c.fillText;
+    c.fillText = function (m, ...a) { yazilan.push(m); return asil.call(this, m, ...a); };
+    const z = T.zaman(), b1 = kisi('yakin', 300, 700, { d: 5 }), b2 = kisi('uzak', 330, 700, { d: 20 });
+    b1.balon = { m: 'ÖNDEKİ', t0: z - 1 }; b2.balon = { m: 'ARKADAKİ', t0: z - 1 };
+    ciz({ balonSira: 'derinlik' }, [b1, b2]);
+    r.derinlik = yazilan.filter(m => m === 'ÖNDEKİ' || m === 'ARKADAKİ');
+    yazilan.length = 0;
+    const b3 = kisi('yer', 300, 700, { bx: 500, by: 900 }); b3.balon = { m: 'BURADA', t0: z - 1 };
+    c.fillStyle = '#000000'; c.fillRect(0, 0, 720, 1280);
+    ciz({}, [b3]);
+    const px = c.getImageData(Math.round(500 * c.canvas.width / 720), Math.round(867 * c.canvas.height / 1280), 1, 1).data;
+    r.balonYer = { px: [...px.slice(0, 3)], vurgu: K.RENK.vurgu };
+    c.fillText = asil;
+    Object.assign(ET, eski);
+    return r;
+  });
+  const UST = 505;
+  kontrol('Ad etiketi: üst sınır yokken ad sıralama kutusunun alanına çıkabilir (eski davranış)', etk.serbest && etk.serbest[1] < UST, etk.serbest);
+  kontrol('Ad etiketi: ustSinir ile ad ALAN_UST\'un altında kalır; sınırın çok üstündeki (öncelikli olmayan) ad yazılmaz', etk.sinirli && etk.sinirli[1] >= UST && etk.cokUstte === null, { sinirli: etk.sinirli, cokUstte: etk.cokUstte });
+  kontrol('Ad etiketi: üst üste iki ad sınırdayken ikincisi aşağı kayar, ikisi de sınırın altında', etk.ikiAd.every(k => k && k[1] >= UST) && etk.ikiAd[1][1] > etk.ikiAd[0][1], etk.ikiAd);
+  kontrol('Ad etiketi: asagi ile ad bağlantı noktasının (et.alt) altına asılır', etk.asagi && etk.asagi[1] >= 645, etk.asagi);
+  kontrol('Ad etiketi: ekran dışındaki ad öntanımda kenara itilir, disari: "gizle" ile çizilmez', etk.kenar && etk.kenar[0] <= 5 && etk.gizli === null, { kenar: etk.kenar, gizli: etk.gizli });
+  kontrol('Ad etiketi: altSinir ile ad yorum alanına inmez', etk.altSinir && etk.altSinir[1] + etk.altSinir[3] <= 1006, etk.altSinir);
+  kontrol('Konuşma balonu: balonSira "derinlik" öndekini en son (üstte) çizer; et.bx / et.by balonun yerini seçer', etk.derinlik.join() === 'ARKADAKİ,ÖNDEKİ' && Math.abs(etk.balonYer.px[0] - parseInt(etk.balonYer.vurgu.slice(1, 3), 16)) < 8, etk);
+
+  const ins = await e.evaluate(() => {
+    const T = CanliOyun._test, K = T.cekirdek, c = K.c, r = {};
+    // Chrome birkaç okumadan sonra tuvali GPU'dan yazılım çizimine geçirir, kenar yumuşatması değişir: karşılaştırmadan önce geçsin.
+    for (let i = 0; i < 4; i++) c.getImageData(0, 0, 4, 4);
+    K.kameraSigdir([[-1, -1], [1, 1]], 1);
+    const kur = (id, f) => { const k = K.karakterYap(id, id); k.x = 0; k.z = 0; k.yon = Math.PI; k.g.boy = 1; f && f(k); return k; };
+    const govdeCiz = (k, poz) => { const W = K.iskeletKur(k, poz || K.pozBekle(k)); k.j.haR = k.j.haR || W(-0.2, 0.33, 0.05); k.j.haL = k.j.haL || W(0.2, 0.33, 0.05); K.kolKur(k); return W; };
+    const resim = fn => { c.setTransform(c.canvas.width / 720, 0, 0, c.canvas.height / 1280, 0, 0); c.fillStyle = '#336699'; c.fillRect(0, 0, 720, 1280); K.liste.length = 0; fn(); K.listeCiz(); return c.getImageData(0, 0, c.canvas.width, c.canvas.height).data; };
+    const fark = (a, b) => { let n = 0; for (let i = 0; i < a.length; i += 4) if (a[i] !== b[i] || a[i + 1] !== b[i + 1] || a[i + 2] !== b[i + 2]) n++; return n; };
+    // baş yönü
+    const k1 = kur('test:bas'); govdeCiz(k1);
+    const duz = resim(() => K.insanEkle(k1));
+    k1.basYon = Math.PI; const ayni = resim(() => K.insanEkle(k1));
+    k1.basYon = Math.PI + 0.9; const donuk = resim(() => K.insanEkle(k1));
+    r.bas = { ayni: fark(duz, ayni), donuk: fark(duz, donuk), govdeYon: +k1.yon.toFixed(3) };
+    delete k1.basYon;
+    // baş ölçeği
+    resim(() => K.insanEkle(k1)); const r1 = k1.basEkran.r;
+    k1.basOlcek = 1.5; resim(() => K.insanEkle(k1)); r.olcek = { r1: +r1.toFixed(2), r15: +k1.basEkran.r.toFixed(2), etiketY: +k1.et.y.toFixed(1) };
+    delete k1.basOlcek;
+    // oturma: yüksek oturakta ayaklar sarkar, alçak oturakta yerde; dizler önde
+    const k2 = kur('test:otur'), pY = K.pozOtur(k2, 0.45); govdeCiz(k2, pY);
+    r.yuksek = { kalca: +k2.j.hip[1].toFixed(3), ayak: +k2.j.ayR[1].toFixed(3), dizOnde: (k2.j.dzR[2] - k2.j.hip[2]) * k2.f[2] + (k2.j.dzR[0] - k2.j.hip[0]) * k2.f[0] };
+    const pA = K.pozOtur(k2, 0.16); govdeCiz(k2, pA);
+    r.alcak = { kalca: +k2.j.hip[1].toFixed(3), ayak: +k2.j.ayR[1].toFixed(3), dizUstte: k2.j.dzR[1] > k2.j.ayR[1] + 0.05, dizOnde: (k2.j.dzR[2] - k2.j.hip[2]) * k2.f[2] > 0.05 };
+    // el biçimleri
+    const k3 = kur('test:el'); const W3 = K.iskeletKur(k3, K.pozBekle(k3)); k3.j.haR = W3(-0.3, 0.75, 0.1); k3.j.haL = W3(0.3, 0.75, 0.1); K.kolKur(k3);
+    const yuvarlak = resim(() => K.insanEkle(k3));
+    k3.elSekil = { R: 'avuc', L: 'avuc' }; const avuc = resim(() => K.insanEkle(k3));
+    k3.elSekil = { R: 'yumruk', L: 'yumruk' }; const yumruk = resim(() => K.insanEkle(k3));
+    r.el = { avuc: fark(yuvarlak, avuc), yumruk: fark(yuvarlak, yumruk), birbirinden: fark(avuc, yumruk) };
+    // uzun kol: omuzdan 0,48 boy uzaktaki el, öntanımda kol düz (dirsek doğrunun üstünde), kolBoy 1,8 ile dirsek bükülü
+    const k4 = kur('test:kol'); const W4 = K.iskeletKur(k4, K.pozBekle(k4));
+    const om = k4.j.omR, el = [om[0] - 0.48, om[1] + 0.05, om[2]];
+    const bukum = () => { const a = k4.j.omR, d = k4.j.drR, h = el; const ad = Math.hypot(d[0] - a[0], d[1] - a[1], d[2] - a[2]), dh = Math.hypot(h[0] - d[0], h[1] - d[1], h[2] - d[2]), ah = Math.hypot(h[0] - a[0], h[1] - a[1], h[2] - a[2]); return +(ad + dh - ah).toFixed(3); };
+    k4.j.haR = el; k4.j.haL = W4(0.2, 0.3, 0.05); K.kolKur(k4); const b0 = bukum(), u0 = Math.hypot(...[0, 1, 2].map(i => k4.j.drR[i] - om[i]));
+    k4.kolBoy = 1.8; K.kolKur(k4); const b1 = bukum(), u1 = Math.hypot(...[0, 1, 2].map(i => k4.j.drR[i] - om[i]));
+    r.kol = { duzBukum: b0, uzunBukum: b1, ustKol0: +u0.toFixed(3), ustKol1: +u1.toFixed(3) };
+    return r;
+  });
+  kontrol('İnsan: k.basYon başı gövdeden bağımsız döndürür; gövdeyle aynı yönde değer verilince görüntü değişmez', ins.bas.ayni === 0 && ins.bas.donuk > 50 && ins.bas.govdeYon === 3.142, ins.bas);
+  kontrol('İnsan: kafaCiz ölçeği (k.basOlcek) başı büyütür, ad etiketi büyüyen başın üstüne kayar', Math.abs(ins.olcek.r15 / ins.olcek.r1 - 1.5) < 0.01, ins.olcek);
+  kontrol('İnsan: pozOtur yüksek oturakta kalça oturakta, ayaklar yerden yukarıda sarkar, dizler önde', Math.abs(ins.yuksek.kalca - 0.51) < 0.02 && ins.yuksek.ayak > 0.06 && ins.yuksek.dizOnde > 0.05, ins.yuksek);
+  kontrol('İnsan: pozOtur alçak oturakta ayaklar yerde, dizler kalkık ve önde', ins.alcak.ayak < 0.05 && ins.alcak.dizUstte && ins.alcak.dizOnde, ins.alcak);
+  kontrol('İnsan: k.elSekil açık avuç ve yumruk çizer (ikisi de yuvarlak elden ve birbirinden farklı)', ins.el.avuc > 30 && ins.el.yumruk > 30 && ins.el.birbirinden > 30, ins.el);
+  kontrol('İnsan: k.kolBoy kolu uzatır, uzaktaki ele dirsek bükülü yetişir', ins.kol.duzBukum < 0.01 && ins.kol.uzunBukum > 0.02 && ins.kol.ustKol1 > ins.kol.ustKol0 * 1.5, ins.kol);
+
+  const czm = await e.evaluate(() => {
+    const T = CanliOyun._test, K = T.cekirdek, c = K.c, r = {};
+    c.setTransform(c.canvas.width / 720, 0, 0, c.canvas.height / 1280, 0, 0);
+    const px = (x, y) => [...c.getImageData(Math.round(x * c.canvas.width / 720), Math.round(y * c.canvas.height / 1280), 1, 1).data.slice(0, 3)];
+    r.renk = [K.renkKat('#000000', '#ffffff', 0.5), K.renkKat('#f00', '#00f', 0.25), K.renkKat('#102030', '#102030', 0.7)];
+    K.kameraSigdir([[-1.5, -1.5], [1.5, 1.5]], 1);
+    const Tk = K.donusum(0, 0, 0, Math.PI, 1);
+    c.fillStyle = '#000000'; c.fillRect(0, 0, 720, 1280);
+    const g = K.kutuCiz(Tk, -0.6, 0.6, 0, 0.8, -0.4, 0.4, '#c0392b', 2);
+    const on = K.pr(K.yerelNokta(Tk, 0, 0.3, 0.4)), ust = K.pr(K.yerelNokta(Tk, 0, 0.8, 0));
+    r.kutu = { gorunen: g, onPx: px(on.x, on.y), ustPx: px(ust.x, ust.y), ustRenk: K.renkKat('#c0392b', '#fff4dc', 0.22) };
+    c.fillStyle = '#000000'; c.fillRect(0, 0, 720, 1280);
+    const u = K.gokCiz({ gok: ['#2050a0', '#80c0ff'], zemin: ['#40a040', '#206020'], ufuk: 420, gunes: { x: 0.7, r: 40, renk: '#ffee00' } });
+    r.gok = { u, gokPx: px(100, 100), zeminPx: px(100, 900), gunesPx: px(504, 404), ufukY: +K.ufukY().toFixed(1), beklenen: +(K.kam.cy - K.kam.F * Math.tan(K.kam.egim)).toFixed(1) };
+    return r;
+  });
+  kontrol('Çizim: renkKat iki rengi karıştırır (#rgb kısa biçim de)', czm.renk[0] === 'rgb(128,128,128)' && czm.renk[1] === 'rgb(191,0,64)' && czm.renk[2] === 'rgb(16,32,48)', czm.renk);
+  kontrol('Çizim: kutuCiz yalnız kameraya bakan yüzleri çizer (ön ve üst; arka değil), üst yüz açık tonda', czm.kutu.gorunen.on && czm.kutu.gorunen.ust && !czm.kutu.gorunen.arka && czm.kutu.onPx.join() === '192,57,43' && 'rgb(' + czm.kutu.ustPx.join(',') + ')' === czm.kutu.ustRenk, czm.kutu);
+  kontrol('Çizim: gokCiz ufkun üstüne gök, altına zemin, ufukta güneş çizer; ufukY kameradan hesaplanır', czm.gok.u === 420 && czm.gok.gokPx[2] > 150 && czm.gok.zeminPx[1] > czm.gok.zeminPx[0] + 20 && czm.gok.gunesPx[0] > 200 && czm.gok.gunesPx[2] < 80 && czm.gok.ufukY === czm.gok.beklenen, czm.gok);
+
+  // sahne yazıları: sıralama kutusu dolu, üç bildirim, pankart (öntanım ve "alt")
+  const yzi = await e.evaluate(async () => {
+    const T = CanliOyun._test, K = T.cekirdek, bekle = ms => new Promise(r => setTimeout(r, ms)), r = {};
+    for (let i = 0; i < 6; i++) CanliOyun.olay({ tip: 'hediye', kullanici: { id: 'yz' + i, ad: 'çok_uzun_bir_ad_' + i }, jeton: 10 + i });
+    const kesis = (a, b) => !!(a && b && a[0] < b[0] + b[2] && a[0] + a[2] > b[0] && a[1] < b[1] + b[3] && a[1] + a[3] > b[1]);
+    for (let i = 0; i < 3; i++) { T.zamanEkle(1); K.bildir('çok_uzun_bir_izleyici_adı_' + i, '29999 jeton', 'Meydan senin!'); }
+    const eski = K.SAHNE_YAZI.pankart;
+    K.pankart('Yeni lider', 'çok_uzun_bir_ad_5'); await bekle(450);
+    let o = T.olcum(); r.ust = { sira: o.kutular.sira, pankart: o.kutular.pankart, bildirim: o.kutular.bildirim };
+    r.ustKesisir = kesis(o.kutular.pankart, o.kutular.sira);
+    r.bildirimKesisir = o.kutular.bildirim.some(b => kesis(b, o.kutular.sira));
+    K.SAHNE_YAZI.pankart = 'alt';
+    K.pankart('Yeni lider', 'çok_uzun_bir_ad_5'); await bekle(450);
+    o = T.olcum(); r.alt = { pankart: o.kutular.pankart, sira: o.kutular.sira };
+    r.altKesisir = kesis(o.kutular.pankart, o.kutular.sira);
+    r.altAlanda = o.kutular.pankart && o.kutular.pankart[1] + o.kutular.pankart[3] < K.ALAN_ALT;
+    K.SAHNE_YAZI.pankart = eski;
+    // ölçüm: sahnedeki herkesin yüzü ve (yazıldıysa) ad kutusu
+    r.kisiler = o.kisiler.length; r.yuzlu = o.kisiler.filter(k => k.bas && k.bas.r > 0).length; r.adli = o.kisiler.filter(k => k.etiket).length;
+    return r;
+  });
+  kontrol('Sahne yazıları: bildirimler sıralama kutusunun üstüne binmez', !yzi.bildirimKesisir, yzi.ust);
+  kontrol('Sahne yazıları: sahneYazi.pankart "alt" ile pankart sıralama kutusunun altından, oyuncu şeridinden geçer', !yzi.altKesisir && yzi.altAlanda, { alt: yzi.alt, oncekiYerKesisir: yzi.ustKesisir });
+  kontrol('Ölçüm (_test.olcum, kare-cek JSON): sahne yazılarının kutuları ve oyuncuların yüzü ölçülür', yzi.ust.sira && yzi.ust.bildirim.length === 3 && yzi.kisiler >= 6 && yzi.adli >= 1, { kisi: yzi.kisiler, yuzlu: yzi.yuzlu, adli: yzi.adli });
+
+  // tema: sahne ve panel ayrı renk
+  const tema = await e.evaluate(() => {
+    const K = CanliOyun._test.cekirdek, oku = (el, ad) => getComputedStyle(el).getPropertyValue(ad).trim();
+    K.renkUygula(Object.assign({}, K.RENK, { zemin: '#87c5ea', acik: '#1d2a3a' }), K.RENK_OTO);
+    const r = { kokZemin: oku(document.documentElement, '--zemin'), panelZemin: oku(document.getElementById('panel'), '--zemin'), panelYazi: getComputedStyle(document.getElementById('panel')).color, sayfa: getComputedStyle(document.body).backgroundColor, sahneYazi: oku(document.querySelector('.hud'), '--acik') };
+    K.renkUygula(K.RENK, K.PANEL_RENK);
+    r.geri = { kok: oku(document.documentElement, '--zemin'), panel: oku(document.getElementById('panel'), '--zemin'), sayfaDegisken: oku(document.documentElement, '--sayfa-zemin') };
+    r.oyunRenk = K.RENK.zemin;
+    return r;
+  });
+  kontrol('Tema: panelRenk verilince sahne renkleri sahnede, panel ve sayfa arka planı panelin renginde; verilmezse eski hâl', tema.kokZemin === '#87c5ea' && tema.panelZemin === '#0e1230' && tema.sahneYazi === '#1d2a3a' && tema.panelYazi === 'rgb(246, 236, 217)' && tema.geri.kok === tema.oyunRenk && tema.geri.panel === tema.oyunRenk && tema.geri.sayfaDegisken === '', tema);
+
+  // vuruş saatini dondurma (test kancası)
+  const dnd = await e.evaluate(async () => {
+    const T = CanliOyun._test, bekle = ms => new Promise(r => setTimeout(r, ms)), r = {};
+    T.vurusDondur(5.25); await bekle(250); r.dondu = CanliOyun.durum().vurus;
+    T.vurusIlerle(0.5); await bekle(120); r.ilerledi = CanliOyun.durum().vurus;
+    T.vurusCoz(); await bekle(300); const a = CanliOyun.durum().vurus; await bekle(500); r.cozuldu = [a, CanliOyun.durum().vurus];
+    return r;
+  });
+  kontrol('Test kancası: vurusDondur B\'yi sabitler, vurusIlerle ilerletir, vurusCoz müziğe bırakır', dnd.dondu === 5.25 && dnd.ilerledi === 5.75 && dnd.cozuldu[1] > dnd.cozuldu[0] + 0.3, dnd);
+
+  // ana iş parçacığı uzun kilitlenince (olay seli, ağır kare) vuruş saati donmamalı
+  const kilit = await e.evaluate(async () => {
+    const ornek = []; let dur = false;
+    const al = () => { ornek.push([performance.now(), CanliOyun.durum().vurus]); if (!dur) requestAnimationFrame(al); }; al();
+    await new Promise(r => setTimeout(r, 700));
+    const t0 = performance.now(); while (performance.now() - t0 < 900); const tk = performance.now();
+    await new Promise(r => setTimeout(r, 1500)); dur = true;
+    const sonra = ornek.filter(o => o[0] > tk), once = ornek.filter(o => o[0] < t0);
+    let enDurma = 0, bas = sonra[0][0];
+    for (let i = 1; i < sonra.length; i++) { if (sonra[i][1] - sonra[i - 1][1] > 1e-4) bas = sonra[i][0]; else enDurma = Math.max(enDurma, (sonra[i][0] - bas) / 1000); }
+    const ilk = sonra.filter(o => o[0] < tk + 1000), hiz = (once[once.length - 1][1] - once[0][1]) / ((once[once.length - 1][0] - once[0][0]) / 1000);
+    return { onceHiz: +hiz.toFixed(2), kilittenSonra1sn: +(ilk[ilk.length - 1][1] - ilk[0][1]).toFixed(2), enDurmaSn: +enDurma.toFixed(2), geri: sonra.some((o, i) => i && o[1] < sonra[i - 1][1]) };
+  });
+  kontrol('Müzik saati: 0,9 sn kilitten sonra vuruş saati donmaz, hemen eski hızında yürür', kilit.enDurmaSn < 0.2 && kilit.kilittenSonra1sn > kilit.onceHiz * 0.7 && !kilit.geri, kilit);
+  await e.close();
+
   // Oyun kodunda hata: döngü donmaz, hata bir kez bildirilir (ayrı sayfa; bilerek çıkarılan hata yukarıdaki
   // "sayfada hata çıkmadı" sayımına girmesin).
   const hs = await b.newPage({ viewport: { width: 720, height: 800 } }), hsHata = [];

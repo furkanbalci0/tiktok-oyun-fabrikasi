@@ -14,7 +14,7 @@
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 html,body{height:100%}
-body{background:var(--zemin);color:var(--acik);font-family:var(--govde);font-size:14px;line-height:1.45}
+body{background:var(--sayfa-zemin,var(--zemin));color:var(--acik);font-family:var(--govde);font-size:14px;line-height:1.45}
 button,input,select{font:inherit;color:inherit}
 button{cursor:pointer}
 :focus-visible{outline:2px solid var(--vurgu);outline-offset:2px}
@@ -59,6 +59,8 @@ button{cursor:pointer}
 .bildirim div.git{animation:cik .3s ease-in both}
 .pankart{position:absolute;left:0;right:0;top:21.5cqh;text-align:center;padding:2.4cqw 3cqw;
   background:var(--sicak);border-block:.8cqw solid var(--vurgu);transform:rotate(-2deg) scale(1.04);animation:pankart 3.4s ease both}
+/* OYUN.sahneYazi.pankart = "alt": sıralama kutusunun (en çok ~38cqh) altından, oyuncu şeridinin başından geçer */
+.pankart.alt{top:40.5cqh;animation-name:pankart-alt}
 .pankart .b1{font-family:var(--baslik);font-size:6.6cqw;line-height:1.05;color:var(--acik)}
 .pankart .b2{font-weight:700;font-size:4cqw;color:var(--vurgu);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ses-cagri{position:absolute;left:50%;bottom:9cqh;transform:translateX(-50%);pointer-events:auto;
@@ -71,12 +73,14 @@ button{cursor:pointer}
 @keyframes cik{to{opacity:0;transform:translateY(-2cqw)}}
 @keyframes pankart{0%{opacity:0;transform:rotate(-2deg) scale(1.6)}8%{opacity:1;transform:rotate(-2deg) scale(1.04)}
   88%{opacity:1;transform:rotate(-2deg) scale(1.04)}100%{opacity:0;transform:rotate(-2deg) scale(.9)}}
+@keyframes pankart-alt{0%{opacity:0;transform:rotate(-2deg) scale(1.2)}8%{opacity:1;transform:rotate(-2deg) scale(1.04)}
+  88%{opacity:1;transform:rotate(-2deg) scale(1.04)}100%{opacity:0;transform:rotate(-2deg) scale(.9)}}
 
 /* ---- yayın masası: panel (yayında görünmez) ----
    Üstte başlık ve durum şeridi, altında yayın güvenliği şeridi, sonra üç kart: sahnedekiler, olay akışı,
    sekmeli denetim (Deneme, Yayın, Müzik, Hediyeler). Kartların düzeni panelin genişliğine göre değişir
    (@container masa): dar panelde alt alta, orta genişlikte iki sütun, geniş panelde üç sütun. */
-body:not(.yayin){background:radial-gradient(1100px 620px at 78% -12%,var(--zemin-2),transparent 62%) var(--zemin)}
+body:not(.yayin){background:radial-gradient(1100px 620px at 78% -12%,var(--sayfa-zemin-2,var(--zemin-2)),transparent 62%) var(--sayfa-zemin,var(--zemin))}
 .panel{flex:1 1 0;max-width:1180px;min-width:0;height:100%;overflow:auto;display:flex;flex-direction:column;gap:12px;
   padding:2px 4px 2px 0;container:masa/inline-size}
 .panel h1,.panel h2{margin:0;font-weight:400}

@@ -41,12 +41,32 @@ function iskeletKur(k, poz) {
   k._hipX = hipX;
   return W;
 }
-// Omuzdan ele iki kol: dirsekler aşağı ve geriye bükülür.
+// Omuzdan ele iki kol: dirsekler aşağı ve geriye bükülür. k.kolBoy (isteğe bağlı, öntanım 1): kol kemiklerinin
+// çarpanı; uzağa uzanan, tavana tutunan, kucaklayan kol için 1,3–1,6. Kemikten uzaktaki el yine kola bağlı çizilir
+// ama dirsek düzleşir; kolBoy eli o uzaklığa dirsek bükülü yetiştirir.
 function kolKur(k) {
-  const j = k.j, boy = k.g.boy;
+  const j = k.j, boy = k.g.boy, kl = k.kolBoy === undefined ? KOL * boy : KOL * boy * k.kolBoy;
   const kutupR = [-k.f[0] * 0.6 - k.l[0] * 0.5, -0.7, -k.f[2] * 0.6 - k.l[2] * 0.5], kutupL = [-k.f[0] * 0.6 + k.l[0] * 0.5, -0.7, -k.f[2] * 0.6 + k.l[2] * 0.5];
-  j.drR = ik(j.omR, j.haR, KOL * boy, KOL * boy, kutupR, j.drR || [0, 0, 0]);
-  j.drL = ik(j.omL, j.haL, KOL * boy, KOL * boy, kutupL, j.drL || [0, 0, 0]);
+  j.drR = ik(j.omR, j.haR, kl, kl, kutupR, j.drR || [0, 0, 0]);
+  j.drL = ik(j.omL, j.haL, kl, kl, kutupL, j.drL || [0, 0, 0]);
+}
+// Oturma pozu. oturakY: oturağın üst yüzünün k.y0'dan yüksekliği (metre; verilmezse 0,2 × boy, alçak tabure).
+// Kalça oturağa konar, dizler öne çıkar. Oturak bacaktan alçaksa ayaklar yerde ve dizler kalkık; yüksekse
+// (sedir, bar taburesi) ayaklar sarkar ve vuruşla sırayla sallanır. Gövde vuruşla hafifçe öne arkaya oynar.
+// pozBekle gibi döner; ayrıca dizR / dizL: elleri dizlere koymak için yerel nokta [yana, yukarı, ileri].
+//   const poz = pozOtur(k, 0.42), W = iskeletKur(k, poz);
+//   k.j.haR = W(...poz.dizR); k.j.haL = W(...poz.dizL); kolKur(k);
+function pozOtur(k, oturakY) {
+  const boy = k.g.boy, vurus = 0.5 + 0.5 * Math.cos(TAU * B);
+  const hipY = (oturakY === undefined ? 0.2 * boy : oturakY) / boy + 0.06, dy = hipY - 0.06;
+  // ayak bileği kalçadan en çok 0,22 uzakta: diz hep bükülü kalır (bacak toplamı 0,27)
+  const ayakY = Math.max(0, dy - 0.2), sarkik = ayakY > 0, yer = Math.sqrt(Math.max(0, 0.0484 - (dy - ayakY) * (dy - ayakY)));
+  const sal = sarkik && !azHareket ? Math.sin(TAU * B / 2 + k.g.salin * 5) * 0.035 : 0;
+  return {
+    hipX: 0, hipY, egim: -0.03 + 0.035 * vurus, yat: azHareket ? 0 : Math.sin(TAU * B / 4) * 0.01, omL: 0, omR: 0,
+    aS: [-0.085, yer + sal, ayakY], aL: [0.085, yer - sal, ayakY],
+    dizR: [-0.1, hipY + 0.03, 0.14], dizL: [0.1, hipY + 0.03, 0.14]
+  };
 }
 // Bekleme pozu: her vuruşta hafifçe çöker, iki vuruşta bir sırayla ayak kaldırır, dört vuruşta bir yana salınır.
 // Dönen nesne değiştirilebilir (ör. egim, zıplama için hipY ve ayak yüksekliği).
@@ -114,23 +134,101 @@ function insanEkle(k) {
     const om = p['om' + y], dr = p['dr' + y], ha = p['ha' + y];
     kap(om, 0.056 * boy, dr, 0.05 * boy, g.gomlek);
     kap(dr, 0.05 * boy, ha, 0.046 * boy, g.gomlek);
-    if (ha.ok)
+    const sekil = k.elSekil && k.elSekil[y];
+    if (ha.ok && (sekil === 'avuc' || sekil === 'yumruk')) {
+      const gg = p.gogus;
+      ozel(ha.d - 0.02, () => elSekilCiz(k, ha, dr, sekil, gg));
+    }
+    else if (ha.ok)
       liste.push({ d: ha.d - 0.02, t: 2, x: ha.x, y: ha.y, r: 0.055 * boy * ha.s, c: g.ten, w: Math.max(1, ha.s * 0.011) });
   }
-  const ph = p.kafa;
-  ozel(ph.d - 0.05, () => kafaCiz(k, ph));
-  const et = k._et || (k._et = { x: 0, y: 0, s: 0, d: 0 });
+  const ph = p.kafa, bo = k.basOlcek;
+  ozel(ph.d - 0.05, () => kafaCiz(k, ph, bo));
+  const et = k._et || (k._et = { x: 0, y: 0, s: 0, d: 0 }), R = KAFA_R * (bo === undefined ? k.g.boy : k.g.boy * bo) * ph.s;
   et.x = ph.x;
-  et.y = ph.y - KAFA_R * k.g.boy * ph.s;
+  et.y = ph.y - R;
   et.s = ph.s;
   et.d = ph.d;
+  // çene: aşağı asılan adın (k.etAsagi) bağlantı noktası; balon yeri her karede oyunun yeniden yazması için silinir
+  et.alt = ph.y + R;
+  et.asagi = et.bx = et.by = undefined;
   k.et = et;
   return true;
 }
+// El biçimi (k.elSekil = { R: 'yumruk', L: 'avuc' }; tanımsız ya da başka değer: yuvarlak el). ha: el, dr: dirsek
+// (ekran noktaları); parmaklar önkolun doğrultusunda uzanır, başparmak gövdeye bakan yandadır.
+//   avuc: açık el (el sallama, tokat, "dur") · yumruk: kapalı el (yumruk, bayrak tutma, zafer)
+function elSekilCiz(k, ha, dr, sekil, gg) {
+  const a = Math.atan2(ha.y - dr.y, ha.x - dr.x), r = 0.07 * k.g.boy * ha.s;
+  // başparmağın yanı: önkolun hangi yanında gövde kalıyor
+  const yan = gg && gg.ok && (Math.cos(a) * (gg.y - ha.y) - Math.sin(a) * (gg.x - ha.x)) < 0 ? -1 : 1;
+  c.save();
+  c.translate(ha.x, ha.y);
+  c.rotate(a);
+  c.lineWidth = Math.max(1, ha.s * 0.011);
+  c.strokeStyle = MUREKKEP;
+  c.fillStyle = k.g.ten;
+  if (sekil === 'avuc') {
+    // dört parmak yelpaze, yanda başparmak, üstte avuç içi
+    for (let i = 0; i < 4; i++) {
+      const fa = (i - 1.5) * 0.3, uz = i === 1 || i === 2 ? 1.3 : 1.15;
+      c.beginPath();
+      c.ellipse(Math.cos(fa) * r * uz, Math.sin(fa) * r * uz, r * 0.6, r * 0.22, fa, 0, TAU);
+      c.fill();
+      c.stroke();
+    }
+    c.beginPath();
+    c.ellipse(r * 0.15, yan * r * 0.85, r * 0.5, r * 0.21, yan * 1.05, 0, TAU);
+    c.fill();
+    c.stroke();
+    c.beginPath();
+    c.arc(0, 0, r * 0.88, 0, TAU);
+    c.fill();
+    c.stroke();
+  }
+  else {
+    // kapalı el: iri, yuvarlak köşeli; boğum çizgileri ve önde kıvrılan başparmak
+    c.beginPath();
+    c.roundRect(-r * 0.85, -r * 0.82, r * 1.85, r * 1.64, r * 0.6);
+    c.fill();
+    c.stroke();
+    c.lineWidth = Math.max(1, ha.s * 0.007);
+    for (let i = -1; i <= 1; i++) {
+      c.beginPath();
+      c.moveTo(r * 0.55, i * r * 0.44);
+      c.lineTo(r * 0.98, i * r * 0.44);
+      c.stroke();
+    }
+    c.beginPath();
+    c.moveTo(-r * 0.25, yan * r * 0.8);
+    c.quadraticCurveTo(r * 0.35, yan * r * 0.15, r * 0.55, yan * r * 0.05);
+    c.stroke();
+  }
+  c.restore();
+}
 // Baş. Bayraklar: k.guler (hep güler), k.ciddi (hiç gülmez), k.ufle (yanaklar şişkin, ağız kapalı: üflemeli çalgı).
 // Bunlar yoksa hediye sevinci süresince (B < k.zip1) ve kalabalık coşkunken (D.cosku > 0.72) güler.
-function kafaCiz(k, ph) {
-  const g = k.g, R = KAFA_R * g.boy * ph.s, x0 = ph.x, y0 = ph.y, f = k.f, l = k.l;
+// olcek (isteğe bağlı): başın büyüklük çarpanı (araba büyürken baş da büyüsün, lider iri başlı olsun).
+// k.basYon (isteğe bağlı, sayı): başın dünyadaki yönü (k.yon gibi; π kameraya bakar). Tanımsızsa baş gövdeyle
+// aynı yöne bakar. Gövde yerinde dururken yan dönüp bakmak, konuşana çevrilmek için.
+// Çizilen başın ekrandaki yeri ve yarıçapı k.basEkran = { x, y, r, kare } olarak kalır (kare-cek ve testler okur).
+function kafaCiz(k, ph, olcek) {
+  const g = k.g, R = KAFA_R * (olcek === undefined ? g.boy : g.boy * olcek) * ph.s, x0 = ph.x, y0 = ph.y;
+  let f = k.f, l = k.l;
+  if (typeof k.basYon === 'number') {
+    const sb = Math.sin(k.basYon), cb = Math.cos(k.basYon);
+    f = k._basF || (k._basF = [0, 0, 0]);
+    l = k._basL || (k._basL = [0, 0, 0]);
+    f[0] = sb;
+    f[2] = cb;
+    l[0] = -cb;
+    l[2] = sb;
+  }
+  const be = k.basEkran || (k.basEkran = { x: 0, y: 0, r: 0, kare: 0 });
+  be.x = x0;
+  be.y = y0;
+  be.r = R;
+  be.kare = kareSay;
   const ku = kam.bu, kf = kam.bf;
   const fr = f[0] * kam.r[0] + f[2] * kam.r[2], fu = f[0] * ku[0] + f[2] * ku[2], fd = f[0] * kf[0] + f[2] * kf[2];
   const lr = l[0] * kam.r[0] + l[2] * kam.r[2], lu = l[0] * ku[0] + l[2] * ku[2], ld = l[0] * kf[0] + l[2] * kf[2];
