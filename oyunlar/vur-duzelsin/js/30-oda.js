@@ -66,6 +66,13 @@ function oyunZemin() {
   pencere(lw);
   saat(lw);
   tablo(lw);
+  // Tavan gölgesi: sahne yazılarının arkasındaki desen sönükleşir, yazılar okunur. Oyuncu şeridine inmez.
+  const tavan = c.createLinearGradient(0, 0, 0, ALAN_UST - 20);
+  tavan.addColorStop(0, 'rgba(38,16,8,.86)');
+  tavan.addColorStop(0.55, 'rgba(38,16,8,.62)');
+  tavan.addColorStop(1, 'rgba(38,16,8,0)');
+  c.fillStyle = tavan;
+  c.fillRect(0, 0, GW, ALAN_UST - 20);
   // süpürgelik
   dortgen([pr([-8, 0.16, DUVAR_Z - 0.01]), pr([8, 0.16, DUVAR_Z - 0.01]), pr([8, 0, DUVAR_Z - 0.01]), pr([-8, 0, DUVAR_Z - 0.01])], '#6a3519', lw);
   // parke: duvardan öne uzanan tahtalar
@@ -112,6 +119,7 @@ function oyunZemin() {
     c.fill();
   }
   golge(KULE.x, KULE.z, 0.32, 0.2);
+  minderCiz();
   for (const k of D.oy.values())
     golge(k.x, k.z, 0.25 * k.g.boy * (1 - k.y0 * 0.4), 0.13 * k.g.boy * (1 - k.y0 * 0.4));
   if (D.dugme)

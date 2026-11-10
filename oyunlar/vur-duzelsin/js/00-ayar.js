@@ -31,5 +31,5 @@ const OYUN = {
   // Mürekkep ve açık ton çekirdeğinkiyle aynı kalır (stil dosyasındaki yarı saydam tonlar onlardan türetildi).
   renk: { zemin: '#2a1712', zemin2: '#43251a', zemin3: '#6a3b25', cizgi: '#8c5636', vurgu: '#ffc947', sicak: '#e4572e', serin: '#56c7c0', soluk: '#d8b896' },
   // Televizyon yıldız: kamera ona yakın durur. Antenin ucu ve anteni tutanın başı için üstte pay.
-  kamera: { egim: 0.7, F: 1400, ustPay: 1.6, altPay: 0.12 }
+  kamera: { egim: 0.62, F: 1400, ustPay: 2.1, altPay: 0.06 }
 };

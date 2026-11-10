@@ -28,9 +28,10 @@ function tvDunya(p) { return [p[0] * TV_C + p[2] * TV_S, p[1], -p[0] * TV_S + p[
 // televizyona tam dönmez, kameraya doğru biraz açılır.
 const SOL_NORMAL = [-TV_C, 0, TV_S];
 const ISTASYON = (() => {
-  const t = tvDunya([-TV_W, 0, -0.08]), x = t[0] + SOL_NORMAL[0] * 0.34, z = t[2] + SOL_NORMAL[2] * 0.34;
+  const t = tvDunya([-TV_W, 0, 0.1]), x = t[0] + SOL_NORMAL[0] * 0.36, z = t[2] + SOL_NORMAL[2] * 0.36;
   const fx = -SOL_NORMAL[0], fz = -SOL_NORMAL[2] - 0.5;
-  return { x, z, yon: Math.atan2(fx, fz), kosX: x + SOL_NORMAL[0] * 1.15, kosZ: z + SOL_NORMAL[2] * 1.15 - 0.25 };
+  // uçan tekmenin koşusu sol arkadan gelir: vuran kadrajın soluna yaslanmasın
+  return { x, z, yon: Math.atan2(fx, fz), kosX: x - 0.35, kosZ: z + 1.05 };
 })();
 // Anten yığını: sandalye (0,48) + tabure (0,34) + ansiklopedi (0,14). Lider bunun üstünde durur.
 const KULE = (() => {
@@ -38,21 +39,25 @@ const KULE = (() => {
   return { x: p[0], z: p[2], h: 0.98, yon: Math.atan2(-0.86, -0.5) };
 })();
 
-/* ---- kalabalığın yerleri ---- */
-// Televizyonun önünde dört sıra; sıra içi ortadan kenara dolar, öndeki sıra daha değerli. Sol uçlar vuruş
-// yerinin önünü kapatmasın diye kalabalık biraz sağa kaydırılmış.
-const YERLER = (() => {
-  const y = [], siralar = [[-1.1, 6], [-1.46, 6], [-1.82, 6], [-2.18, 5]];
-  siralar.forEach(([z, n], s) => {
-    const xs = [];
-    for (let i = 0; i < n; i++)
-      xs.push((i - (n - 1) / 2) * 0.46 + 0.1 + (s % 2 ? 0.23 : 0));
-    xs.sort((a, b) => Math.abs(a - 0.1) - Math.abs(b - 0.1) || a - b);
-    for (const x of xs)
-      y.push([x, z]);
-  });
-  return y;
-})();
+/* ---- kalabalığın yerleri: at nalı ---- */
+// Televizyon ortada, tamamen görünür kalır. Önünde minderde çömelenler (alçak: ekranı kapatmaz), iki yanında
+// ayakta duranlar, sağ arkada sedirde oturanlar ve sedirin arkasında ayakta duranlar (basamak basamak yükselir).
+// Vuruş yerinin önü ve yanı boş bırakılır: vuran televizyonla birlikte iri görünsün. Sol arka sıralar
+// sıralama kutusunun altına girmesin diye alçak tutulur. Sıra önceliğe göredir: öndekiler daha çok jetonludur.
+// tur: 'comel' minderde çömelir · 'ayak' ayakta · 'sedir' sedirde oturur
+const SEDIR = { x0: 1.2, x1: 2.12, z0: 1.48, z1: 1.92, h: 0.42 };
+const YERLER = [
+  [0.1, -0.38, 'comel'], [-0.36, -0.38, 'comel'], [0.56, -0.38, 'comel'],
+  [-1.12, -0.72, 'ayak'], [1.36, -0.42, 'ayak'],
+  [-0.14, -0.74, 'comel'], [0.34, -0.74, 'comel'], [-0.6, -0.74, 'comel'], [0.8, -0.74, 'comel'],
+  [-1.62, -0.42, 'ayak'], [1.66, 0.02, 'ayak'],
+  [1.72, 0.55, 'ayak'], [-1.78, 0.3, 'ayak'],
+  [1.44, 1.68, 'sedir'], [1.88, 1.68, 'sedir'],
+  [-1.5, 1.36, 'ayak'], [1.82, 1.08, 'ayak'], [-1.78, 1.0, 'ayak'],
+  [1.62, 2.18, 'ayak'], [-1.38, 1.86, 'ayak'], [-1.74, 1.72, 'ayak'], [1.98, 2.12, 'ayak'], [1.24, 2.26, 'ayak']
+];
+// Kamera hep aynı kadrajı tutar (kalabalık büyüdükçe televizyon küçülmesin): bu noktalar sığdırılır.
+const KADRAJ = [[-1.3, 0.9], [1.3, 0.9], [0, -0.82], [0, 1.75]];
 
 /* ---- vuruşlar ---- */
 // sure: vuruş sayısı · temas: zaman çizgisinde değme anı (0–1) · net: görüntüye katkı · guc: televizyonun
@@ -81,11 +86,13 @@ function oyunYerlesim() {
     if (i === 0) {
       k.hedefX = KULE.x;
       k.hedefZ = KULE.z;
+      k.tur = 'kule';
       return;
     }
     const y = YERLER[Math.min(i - 1, YERLER.length - 1)];
     k.hedefX = y[0];
     k.hedefZ = y[1];
+    k.tur = y[2];
   });
 }
 // Yeni gelen kapıdan girer gibi yandan, kendi sırasının hizasından gelir.
@@ -178,6 +185,7 @@ function oyunDurum(d) {
   const o = tvP([(EKRAN.x0 + EKRAN.x1) / 2, TV_UST - (EKRAN.y0 + EKRAN.y1) / 2, TV_ON]);
   d.ekranOrta = { x: o.x, y: o.y, s: o.s };
   d.ezilme = +(D.tv.sqL + D.tv.sqR + D.tv.sqT).toFixed(3);
+  d.kadraj = kadrajOlc();
 }
 
 /* ---- görüntü ---- */
@@ -191,6 +199,6 @@ function gol(ad) {
   D.golB = B;
   D.skor[0]++;
   D.sevincB = B + 4;
-  konfeti(90, 0.8);
-  D.sarsinti = Math.max(D.sarsinti, 0.4);
+  konfeti(160, 1);
+  D.sarsinti = Math.max(D.sarsinti, 0.6);
 }

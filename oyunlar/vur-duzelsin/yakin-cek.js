@@ -75,6 +75,14 @@ fs.mkdirSync(cikti, { recursive: true });
   await p.waitForTimeout(70);
   await cek('kule-tokat-temas');
   await p.evaluate(() => { CanliOyun._test.D.dondurU = null; });
+  // usta işi: gösterinin ortası (iri usta, adı, spot) ve gol anı (tam kadraj)
+  await p.evaluate(() => { const D = CanliOyun._test.D; D.netSabit = false; D.netlik = 0.2; CanliOyun.olay({ tip: 'hediye', kullanici: { id: 'c', ad: 'mert.can.21' }, jeton: 1000 }); });
+  for (let i = 0; i < 60 && !(await p.evaluate(() => { const s = CanliOyun._test.D.ist; return s && s.seq && s.faz === 'vur' && s.si === 1; })); i++) await p.waitForTimeout(50);
+  await p.waitForTimeout(250);
+  { const y = path.join(cikti, 'yakin-usta-gosteri.png'); await p.screenshot({ path: y }); yollar.push(y); }
+  for (let i = 0; i < 120 && !(await p.evaluate(() => !!CanliOyun._test.D.gol)); i++) await p.waitForTimeout(50);
+  await p.waitForTimeout(350);
+  { const y = path.join(cikti, 'yakin-usta-gol.png'); await p.screenshot({ path: y }); yollar.push(y); }
   // hepsi bir arada
   const boy = await Promise.all(yollar.map(async y => { const im = await b.newPage(); await im.setContent('<img src="data:image/png;base64,' + fs.readFileSync(y).toString('base64') + '">'); const r = await im.evaluate(() => [document.images[0].naturalWidth, document.images[0].naturalHeight]); await im.close(); return r; }));
   const W = 420, H = Math.round(W * boy[0][1] / boy[0][0]), sut = 5, sat = Math.ceil(yollar.length / sut);

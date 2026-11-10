@@ -118,12 +118,53 @@ const { sonuc, kontrol } = kontrolcu();
   await O({ tip: 'hediye', kullanici: { id: 'b', ad: 'Bora' }, jeton: 1000 });
   const ustaVar = await bekle(() => CanliOyun.durum().usta === 'Bora', 1500);
   const yildiz = await p.evaluate(() => CanliOyun._test.D.oy.get('b').yildiz);
+  await p.waitForTimeout(1200);
+  const iri = await p.evaluate(() => { const k = CanliOyun._test.D.oy.get('b'); return +(k.g.boy / k.asilBoy).toFixed(2); });
+  kontrol('Usta gösteride iri: boyu en az 1,3 katına çıkar', iri >= 1.3, iri);
   const golOldu = await bekle(() => CanliOyun.durum().gol > 0, 15000);
   d = await durum();
   await p.locator('#sahne').screenshot({ path: CIKTI + '/v-usta-gol.png' });
   kontrol('Usta işi: gönderen yıldız olur, dört vuruştan sonra görüntü tam net ve gol', ustaVar && yildiz && golOldu && d.gol === g0 + 1 && d.netlik > 0.95 && d.asama === 4, { ustaVar, yildiz, golOldu, gol: d.gol, netlik: d.netlik });
   await bekle(() => !CanliOyun.durum().usta, 6000);
   kontrol('Usta işi bitince yıldızlık kalkar', !(await p.evaluate(() => CanliOyun._test.D.oy.get('b').yildiz)));
+
+  // kadraj: tam kalabalıkta televizyon yarıdan geniş, ekranı baş örtmez, televizyon / anten / lider sahne
+  // yazılarının altına girmez, kimse kadrajdan taşmaz, adlar yorum alanına (1006 sonrası) inmez
+  const kadrajOlc = async (w, h) => {
+    const q = await b.newPage({ viewport: { width: w, height: h } });
+    q.on('pageerror', e => hatalar.push('SAYFA HATASI: ' + e.message));
+    await q.goto(OYUN_URL + '#yayin');
+    await q.waitForTimeout(500);
+    await q.evaluate(() => {
+      if (document.getElementById('oto').getAttribute('aria-pressed') === 'true') document.getElementById('oto').click();
+      document.getElementById('bosalt').click();
+      for (let i = 0; i < 30; i++) CanliOyun.olay(i < 6 ? { tip: 'hediye', kullanici: { id: 'k' + i, ad: 'izleyici_adi_' + i }, jeton: 300 - i * 40 } : { tip: 'yorum', kullanici: { id: 'k' + i, ad: 'izleyici_adi_' + i }, metin: '' });
+    });
+    await q.waitForTimeout(800);
+    await q.evaluate(() => { CanliOyun._test.D.kuyruk.length = 0; });
+    await q.waitForTimeout(6500);
+    const r = await q.evaluate(() => {
+      const t = document.getElementById('tuval').getBoundingClientRect(), k = 720 / t.width;
+      const kut = s => { const x = document.querySelector(s).getBoundingClientRect(); return { x0: (x.left - t.left) * k, x1: (x.right - t.left) * k, y1: (x.bottom - t.top) * k }; };
+      const d = CanliOyun.durum(), kj = d.kadraj, sira = kut('.sira'), cosku = kut('.cosku');
+      const altinda = (x0, x1, y) => [sira, cosku].some(b => x1 > b.x0 && x0 < b.x1 && y < b.y1 + 2);
+      return { kisi: d.kisi, tvGen: Math.round(kj.tv.x1 - kj.tv.x0), orten: kj.orten,
+        tvKutu: altinda(kj.tv.x0, kj.tv.x1, kj.tv.y0), antenKutu: kj.anten.noktalar.some(([x, y]) => altinda(x - 6, x + 6, y - 8)),
+        liderKutu: !!kj.lider && (altinda(kj.lider.x0, kj.lider.x1, kj.lider.ust) || (kj.lider.etiket !== null && altinda(kj.lider.x0, kj.lider.x1, kj.lider.etiket))),
+        tasan: kj.kisiler.filter(q => q.x0 < -4 || q.x1 > 724).map(q => q.ad),
+        kutuAltinda: kj.kisiler.filter(q => altinda(q.x0, q.x1, q.ust) || (q.et && q.etiket !== null && altinda(q.x0, q.x1, q.etiket))).map(q => q.ad),
+        altaInen: kj.kisiler.filter(q => q.ayak > 1006 || (q.et && q.etiket !== null && q.etiket + 30 > 1010)).map(q => q.ad) };
+    });
+    await q.screenshot({ path: CIKTI + '/v-kadraj-' + w + '.png' });
+    await q.close();
+    return r;
+  };
+  for (const [w, h] of [[540, 960], [1080, 1920]]) {
+    const r = await kadrajOlc(w, h);
+    kontrol(w + '×' + h + ', ' + r.kisi + ' kişi: televizyon kadrajın yarısından geniş, ekranını baş örtmüyor', r.kisi === 24 && r.tvGen >= 360 && r.orten.length === 0, { tvGenislik: r.tvGen + '/720', orten: r.orten });
+    kontrol(w + '×' + h + ': televizyon, anten ve lider sıralama kutusunun / göstergenin altında kalmıyor', !r.tvKutu && !r.antenKutu && !r.liderKutu, r);
+    kontrol(w + '×' + h + ': kimse kadrajdan taşmıyor, kimsenin başı ya da adı kutuların altında değil, adlar yorum alanına inmiyor', r.tasan.length === 0 && r.kutuAltinda.length === 0 && r.altaInen.length === 0, { tasan: r.tasan, kutuAltinda: r.kutuAltinda, altaInen: r.altaInen });
+  }
 
   // selde vuruş sırası ve parçacıklar sınırlı
   await bosalt();

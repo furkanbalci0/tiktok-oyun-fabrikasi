@@ -550,7 +550,7 @@ const OYUN = {
   // Mürekkep ve açık ton çekirdeğinkiyle aynı kalır (stil dosyasındaki yarı saydam tonlar onlardan türetildi).
   renk: { zemin: '#2a1712', zemin2: '#43251a', zemin3: '#6a3b25', cizgi: '#8c5636', vurgu: '#ffc947', sicak: '#e4572e', serin: '#56c7c0', soluk: '#d8b896' },
   // Televizyon yıldız: kamera ona yakın durur. Antenin ucu ve anteni tutanın başı için üstte pay.
-  kamera: { egim: 0.7, F: 1400, ustPay: 1.6, altPay: 0.12 }
+  kamera: { egim: 0.62, F: 1400, ustPay: 2.1, altPay: 0.06 }
 };
 
 /* ── cekirdek/js/00-yardimci.js ── */
@@ -2953,9 +2953,10 @@ function tvDunya(p) { return [p[0] * TV_C + p[2] * TV_S, p[1], -p[0] * TV_S + p[
 // televizyona tam dönmez, kameraya doğru biraz açılır.
 const SOL_NORMAL = [-TV_C, 0, TV_S];
 const ISTASYON = (() => {
-  const t = tvDunya([-TV_W, 0, -0.08]), x = t[0] + SOL_NORMAL[0] * 0.34, z = t[2] + SOL_NORMAL[2] * 0.34;
+  const t = tvDunya([-TV_W, 0, 0.1]), x = t[0] + SOL_NORMAL[0] * 0.36, z = t[2] + SOL_NORMAL[2] * 0.36;
   const fx = -SOL_NORMAL[0], fz = -SOL_NORMAL[2] - 0.5;
-  return { x, z, yon: Math.atan2(fx, fz), kosX: x + SOL_NORMAL[0] * 1.15, kosZ: z + SOL_NORMAL[2] * 1.15 - 0.25 };
+  // uçan tekmenin koşusu sol arkadan gelir: vuran kadrajın soluna yaslanmasın
+  return { x, z, yon: Math.atan2(fx, fz), kosX: x - 0.35, kosZ: z + 1.05 };
 })();
 // Anten yığını: sandalye (0,48) + tabure (0,34) + ansiklopedi (0,14). Lider bunun üstünde durur.
 const KULE = (() => {
@@ -2963,21 +2964,25 @@ const KULE = (() => {
   return { x: p[0], z: p[2], h: 0.98, yon: Math.atan2(-0.86, -0.5) };
 })();
 
-/* ---- kalabalığın yerleri ---- */
-// Televizyonun önünde dört sıra; sıra içi ortadan kenara dolar, öndeki sıra daha değerli. Sol uçlar vuruş
-// yerinin önünü kapatmasın diye kalabalık biraz sağa kaydırılmış.
-const YERLER = (() => {
-  const y = [], siralar = [[-1.1, 6], [-1.46, 6], [-1.82, 6], [-2.18, 5]];
-  siralar.forEach(([z, n], s) => {
-    const xs = [];
-    for (let i = 0; i < n; i++)
-      xs.push((i - (n - 1) / 2) * 0.46 + 0.1 + (s % 2 ? 0.23 : 0));
-    xs.sort((a, b) => Math.abs(a - 0.1) - Math.abs(b - 0.1) || a - b);
-    for (const x of xs)
-      y.push([x, z]);
-  });
-  return y;
-})();
+/* ---- kalabalığın yerleri: at nalı ---- */
+// Televizyon ortada, tamamen görünür kalır. Önünde minderde çömelenler (alçak: ekranı kapatmaz), iki yanında
+// ayakta duranlar, sağ arkada sedirde oturanlar ve sedirin arkasında ayakta duranlar (basamak basamak yükselir).
+// Vuruş yerinin önü ve yanı boş bırakılır: vuran televizyonla birlikte iri görünsün. Sol arka sıralar
+// sıralama kutusunun altına girmesin diye alçak tutulur. Sıra önceliğe göredir: öndekiler daha çok jetonludur.
+// tur: 'comel' minderde çömelir · 'ayak' ayakta · 'sedir' sedirde oturur
+const SEDIR = { x0: 1.2, x1: 2.12, z0: 1.48, z1: 1.92, h: 0.42 };
+const YERLER = [
+  [0.1, -0.38, 'comel'], [-0.36, -0.38, 'comel'], [0.56, -0.38, 'comel'],
+  [-1.12, -0.72, 'ayak'], [1.36, -0.42, 'ayak'],
+  [-0.14, -0.74, 'comel'], [0.34, -0.74, 'comel'], [-0.6, -0.74, 'comel'], [0.8, -0.74, 'comel'],
+  [-1.62, -0.42, 'ayak'], [1.66, 0.02, 'ayak'],
+  [1.72, 0.55, 'ayak'], [-1.78, 0.3, 'ayak'],
+  [1.44, 1.68, 'sedir'], [1.88, 1.68, 'sedir'],
+  [-1.5, 1.36, 'ayak'], [1.82, 1.08, 'ayak'], [-1.78, 1.0, 'ayak'],
+  [1.62, 2.18, 'ayak'], [-1.38, 1.86, 'ayak'], [-1.74, 1.72, 'ayak'], [1.98, 2.12, 'ayak'], [1.24, 2.26, 'ayak']
+];
+// Kamera hep aynı kadrajı tutar (kalabalık büyüdükçe televizyon küçülmesin): bu noktalar sığdırılır.
+const KADRAJ = [[-1.3, 0.9], [1.3, 0.9], [0, -0.82], [0, 1.75]];
 
 /* ---- vuruşlar ---- */
 // sure: vuruş sayısı · temas: zaman çizgisinde değme anı (0–1) · net: görüntüye katkı · guc: televizyonun
@@ -3006,11 +3011,13 @@ function oyunYerlesim() {
     if (i === 0) {
       k.hedefX = KULE.x;
       k.hedefZ = KULE.z;
+      k.tur = 'kule';
       return;
     }
     const y = YERLER[Math.min(i - 1, YERLER.length - 1)];
     k.hedefX = y[0];
     k.hedefZ = y[1];
+    k.tur = y[2];
   });
 }
 // Yeni gelen kapıdan girer gibi yandan, kendi sırasının hizasından gelir.
@@ -3103,6 +3110,7 @@ function oyunDurum(d) {
   const o = tvP([(EKRAN.x0 + EKRAN.x1) / 2, TV_UST - (EKRAN.y0 + EKRAN.y1) / 2, TV_ON]);
   d.ekranOrta = { x: o.x, y: o.y, s: o.s };
   d.ezilme = +(D.tv.sqL + D.tv.sqR + D.tv.sqT).toFixed(3);
+  d.kadraj = kadrajOlc();
 }
 
 /* ---- görüntü ---- */
@@ -3116,8 +3124,8 @@ function gol(ad) {
   D.golB = B;
   D.skor[0]++;
   D.sevincB = B + 4;
-  konfeti(90, 0.8);
-  D.sarsinti = Math.max(D.sarsinti, 0.4);
+  konfeti(160, 1);
+  D.sarsinti = Math.max(D.sarsinti, 0.6);
 }
 
 /* ── oyunlar/vur-duzelsin/js/20-hareket.js ── */
@@ -3224,7 +3232,9 @@ function temas(is) {
     const yl = tvYerel(yer);
     D.izler.push({ z: clamp(yl[2], TV_ON + 0.12, TV_ARKA - 0.12), y: clamp(yl[1], TV_ALT + 0.12, TV_UST - 0.12), tip: is.tip, b0: B });
   }
-  tozAt(yer, is.tip === 'ucan' ? 14 : is.tip === 'tekme' ? 9 : 5);
+  // toz kasanın yüzünden kalkar (vuranın yüzünü örtmesin diye kasaya doğru kaydırılır)
+  const ic = tvDunya(tvYerel(yer).map((v, i) => i === 0 ? v * 0.9 : v));
+  tozAt(ic, is.tip === 'ucan' ? 12 : is.tip === 'tekme' ? 7 : 2);
   if ((is.tip === 'tekme' || is.tip === 'ucan') && !D.dugme)
     dugmeFirlat(kule ? 1 : -1);
   if (is.tip === 'ucan' || is.seq) {
@@ -3422,6 +3432,13 @@ function oyunGuncelle(dt) {
 
 function kisiGuncelle(k, dt) {
   const is = k.is, ist = is && is.yer === 'ist', lider = k === D.lider && !k.cikiyor;
+  const usta = D.usta && D.usta.k === k;
+  // Usta işinde gösteriyi yapan iri görünür: boyu bir vuruşta büyür, gösteri bitince eski hâline döner.
+  if (k.asilBoy === undefined)
+    k.asilBoy = k.g.boy;
+  // vuruş yerine çıkan da biraz irileşir: televizyonla aynı karede okunsun
+  const sahnede = usta ? 1.4 : ist ? 1.2 : 1;
+  k.g.boy += (k.asilBoy * sahnede - k.g.boy) * Math.min(1, dt * 5);
   // hedef yer
   let hx = k.hedefX, hz = k.hedefZ;
   if (k.cikiyor) {
@@ -3432,6 +3449,19 @@ function kisiGuncelle(k, dt) {
     const kos = is.tip === 'ucan' && is.faz === 'git';
     hx = kos ? ISTASYON.kosX : ISTASYON.x;
     hz = kos ? ISTASYON.kosZ : ISTASYON.z;
+  }
+  else if (D.usta && !lider) {
+    // usta iş başındayken kalabalık bir adım geri çekilir: televizyondan ve ustanın yanından uzaklaşır
+    const ox = hx - 0.1, oz = hz - TVZ, d = Math.hypot(ox, oz) || 1;
+    hx += ox / d * 0.3;
+    hz += oz / d * 0.2;
+    const ux = hx - ISTASYON.x, uzz = hz - ISTASYON.z, du = Math.hypot(ux, uzz) || 1;
+    if (du < 1.5) {
+      hx += ux / du * (1.5 - du) * 0.6;
+      hz += uzz / du * (1.5 - du) * 0.6;
+    }
+    // ön sıra kameraya doğru inmez: adları yorum alanına düşmesin
+    hz = Math.max(hz, Math.min(k.hedefZ, -0.4));
   }
   const ucanVur = ist && is.faz === 'vur' && is.tip === 'ucan';
   const dx = hx - k.x, dz = hz - k.z, uz = Math.hypot(dx, dz);
@@ -3448,10 +3478,12 @@ function kisiGuncelle(k, dt) {
   k.yer += ((uz < 0.16 && !k.cikiyor ? 1 : 0) - k.yer) * Math.min(1, dt * 7);
   if (k.cikiyor)
     k.gitti = Math.abs(k.x) > 4;
-  // Yığına çıkma / inme
+  // yerinde mi: yığın, sedir, minder
+  const yerinde = !ist && !k.cikiyor && uz < 0.12;
   const kulede = lider && Math.hypot(k.x - KULE.x, k.z - KULE.z) < 0.3 && !ist;
-  k.y0 += ((kulede ? KULE.h : 0) - k.y0) * Math.min(1, dt * 7);
-  // bakış
+  const oturur = yerinde && !lider && k.tur === 'sedir', comel = yerinde && !lider && k.tur === 'comel';
+  k.y0 += ((kulede ? KULE.h : oturur ? SEDIR.h + 0.06 - KALCA * k.g.boy : 0) - k.y0) * Math.min(1, dt * 7);
+  // bakış: televizyona dönük ama yüz kameraya açık (iki yönün ortası); öndekiler kameraya bakar
   let bak;
   if (ist && is.faz === 'vur')
     bak = ISTASYON.yon;
@@ -3459,8 +3491,10 @@ function kisiGuncelle(k, dt) {
     bak = KULE.yon;
   else if (uz > 0.25)
     bak = Math.atan2(dx / uz + (kam.C[0] - k.x) * 0.02, dz / uz - 0.3);
-  else
-    bak = Math.atan2(kam.C[0] - k.x, kam.C[2] - k.z) - (k.x - 0.1) * 0.16;
+  else {
+    const kamBak = Math.atan2(kam.C[0] - k.x, kam.C[2] - k.z), tvBak = Math.atan2(0.1 - k.x, TVZ - k.z);
+    bak = comel ? kamBak - (k.x - 0.1) * 0.35 : kamBak + aciFark(kamBak, tvBak) * 0.42;
+  }
   k.yon += aciFark(k.yon, bak) * Math.min(1, dt * (is && is.faz === 'vur' ? 30 : 8));
   // poz
   k.el = null;
@@ -3476,11 +3510,28 @@ function kisiGuncelle(k, dt) {
     poz.aL[1] = -Math.sin(w) * 0.06;
     poz.egim = 0.06;
   }
+  if (comel) {
+    // minderde çömelmiş: kalça yere yakın, dizler önde
+    poz.hipY = 0.14 + 0.012 * Math.cos(TAU * B);
+    poz.aS = [-0.1, 0.07, 0];
+    poz.aL = [0.1, 0.07, 0];
+    poz.egim = 0.1;
+  }
+  else if (oturur) {
+    // sedirde oturuyor: ayaklar sedirin önünden sarkar, vuruşla sallanır
+    poz.hipY = KALCA;
+    const s = Math.sin(TAU * B / 2 + k.g.salin * 5) * 0.03;
+    poz.aS = [-0.08, 0.15 + s, -0.02];
+    poz.aL = [0.08, 0.15 - s, -0.02];
+    poz.egim = -0.04;
+  }
   const sevinc = B < D.sevincB || (D.gol && B - D.gol.b0 < 6), uzgun = B < D.uzuntuB;
-  const zip = B >= k.zip0 && B < k.zip1 ? 0.22 * Math.abs(Math.sin(Math.PI * (B - k.zip0))) : sevinc && !kulede ? 0.12 * Math.abs(Math.sin(Math.PI * B)) : 0;
+  const zip = B >= k.zip0 && B < k.zip1 ? 0.22 * Math.abs(Math.sin(Math.PI * (B - k.zip0))) : sevinc && !kulede && !oturur ? 0.12 * Math.abs(Math.sin(Math.PI * B)) : 0;
   poz.hipY += zip;
-  poz.aS[2] += zip * 0.8;
-  poz.aL[2] += zip * 0.8;
+  if (!oturur) {
+    poz.aS[2] += zip * 0.8;
+    poz.aL[2] += zip * 0.8;
+  }
   if (kulede) {
     // Yığın sarsılır, anteni tutan da onunla sallanır.
     poz.yat += D.tv.kule * 0.12;
@@ -3502,6 +3553,11 @@ function kisiGuncelle(k, dt) {
     k.j.haR = W(-0.15, poz.hipY + 0.52, 0.04);
     k.j.haL = W(0.15, poz.hipY + 0.52, 0.04);
   }
+  else if (comel || oturur) {
+    // eller dizlerde
+    k.j.haR = W(-0.12, poz.hipY + 0.04, 0.16);
+    k.j.haL = W(0.12, poz.hipY + 0.04, 0.16);
+  }
   else {
     const sal = Math.sin(TAU * B / 2 + k.g.salin * 6) * 0.03;
     k.j.haR = W(-0.21, poz.hipY + 0.07 + sal, 0.04);
@@ -3514,7 +3570,7 @@ function kisiGuncelle(k, dt) {
 // Vurulacak nokta (dünya): istasyonda sol yan yüz, kulede sağ yanın üstü (el) ya da ortası (ayak).
 function vurusHedef(is) {
   const ayakla = is.tip === 'tekme' || is.tip === 'ucan';
-  return is.yer === 'kule' ? tvDunya([TV_W + 0.02, ayakla ? TV_ALT + 0.82 : TV_UST - 0.32, -0.3]) : tvDunya([-TV_W - 0.02, VURUS[is.tip].y, -0.1]);
+  return is.yer === 'kule' ? tvDunya([TV_W + 0.02, ayakla ? TV_ALT + 0.82 : TV_UST - 0.32, -0.3]) : tvDunya([-TV_W - 0.02, VURUS[is.tip].y, 0.08]);
 }
 // is.u boyunca: hazırlık (geri çekil, kur), vuruş (hızlanarak hedefe), değme (kısa bekleme), geri çekilme.
 // el: yakın kol / bacak (istasyonda sağ, a < 0; kulede sol, a > 0). Hedef dünyada sabit, yerele çevrilir.
@@ -3683,17 +3739,9 @@ function izKaydet(k, is, p, acik) {
 }
 
 /* ---- kamera ---- */
-// Kadraja girmesi gerekenler: televizyon (anteni ve sehpasıyla), vuruş yeri, yığın ve dolu yerler.
-// Çekirdek her noktaya 0,55 m pay ekler; televizyonun kenarları için bu pay düşülerek verilir.
+// Kadraj sabit (KADRAJ, 10-oyun.js): kalabalık büyüyünce televizyon küçülmesin. Yerler bu kadraja göre seçildi.
 function oyunKamera() {
-  const n = [[ISTASYON.x - 0.1, ISTASYON.z], [KULE.x, KULE.z], [0, TVZ + 0.62], [0, TVZ - 0.5]];
-  // uçan tekmenin koşu yeri: koşu boyunca kamera biraz açılır
-  if (D.ist && D.ist.tip === 'ucan')
-    n.push([ISTASYON.kosX + 0.2, ISTASYON.kosZ]);
-  for (const k of D.sira)
-    if (k !== D.lider)
-      n.push([k.hedefX, k.hedefZ]);
-  return n;
+  return KADRAJ;
 }
 
 /* ── oyunlar/vur-duzelsin/js/30-oda.js ── */
@@ -3765,6 +3813,13 @@ function oyunZemin() {
   pencere(lw);
   saat(lw);
   tablo(lw);
+  // Tavan gölgesi: sahne yazılarının arkasındaki desen sönükleşir, yazılar okunur. Oyuncu şeridine inmez.
+  const tavan = c.createLinearGradient(0, 0, 0, ALAN_UST - 20);
+  tavan.addColorStop(0, 'rgba(38,16,8,.86)');
+  tavan.addColorStop(0.55, 'rgba(38,16,8,.62)');
+  tavan.addColorStop(1, 'rgba(38,16,8,0)');
+  c.fillStyle = tavan;
+  c.fillRect(0, 0, GW, ALAN_UST - 20);
   // süpürgelik
   dortgen([pr([-8, 0.16, DUVAR_Z - 0.01]), pr([8, 0.16, DUVAR_Z - 0.01]), pr([8, 0, DUVAR_Z - 0.01]), pr([-8, 0, DUVAR_Z - 0.01])], '#6a3519', lw);
   // parke: duvardan öne uzanan tahtalar
@@ -3811,6 +3866,7 @@ function oyunZemin() {
     c.fill();
   }
   golge(KULE.x, KULE.z, 0.32, 0.2);
+  minderCiz();
   for (const k of D.oy.values())
     golge(k.x, k.z, 0.25 * k.g.boy * (1 - k.y0 * 0.4), 0.13 * k.g.boy * (1 - k.y0 * 0.4));
   if (D.dugme)
@@ -5160,12 +5216,24 @@ function oyunCiz() {
   ekranGuncelle();
   const tvd = tvP([0, 1.0, TV_ARKA]).d;
   ozel(tvd, tvCiz);
+  const sd = pr([(SEDIR.x0 + SEDIR.x1) / 2, SEDIR.h, SEDIR.z0]);
+  if (sd.ok)
+    ozel(sd.d + 0.05, sedirCiz);
   const ky = pr([KULE.x, 0.5, KULE.z]);
   if (ky.ok)
     ozel(ky.d, kuleCiz);
   for (const k of D.oy.values()) {
     if (!insanEkle(k))
       continue;
+    // ustanın adı büyük levhada yazılır (ustaAdi), küçük etiketi çıkmasın
+    if (D.usta && D.usta.k === k)
+      k.et = null;
+    // Minderdeki çömelenlerin adı ayaklarının altına yazılır: başlarının üstü ekranın alt kenarıdır.
+    else if (k.et && k.tur === 'comel' && !k.is && k.yer > 0.5 && k !== D.lider) {
+      const a = pr([k.x, 0, k.z - 0.16]);
+      if (a.ok)
+        k.et.y = Math.min(a.y + 30, ALAN_ALT - 4);
+    }
     if (k.el) {
       const ha = k.p[k.el.yan < 0 ? 'haR' : 'haL'], dr = k.p[k.el.yan < 0 ? 'drR' : 'drL'];
       if (ha && ha.ok && dr && dr.ok)
@@ -5320,6 +5388,8 @@ function dugmeUcan(p) {
 function oyunUst() {
   if (D.usta)
     spot();
+  if (D.gol)
+    golIsigi();
   hizIzi(D.ist);
   hizIzi(D.kuleIs);
   tozCiz();
@@ -5327,19 +5397,86 @@ function oyunUst() {
     carpma(e);
   seslenis();
   basamakYazisi();
+  if (D.usta)
+    ustaAdi();
 }
-// Usta işinde oda kararır; televizyon ve usta aydınlıkta kalır.
+// Usta işinde oda kararır; televizyon ve usta aydınlıkta kalır. Gol olunca karanlık kalkar.
 function spot() {
-  const a = clamp((B - D.usta.b0) / 1.5, 0, 1) * 0.5, t = tvP([0, 1.0, 0]), k = pr([D.usta.k.x, 0.6 + D.usta.k.y0, D.usta.k.z]);
-  if (!t.ok || !k.ok)
+  const a = D.gol ? 0 : clamp((B - D.usta.b0) / 1.5, 0, 1) * 0.45;
+  const t = tvP([0, 1.0, 0]), k = pr([D.usta.k.x, 0.6 * D.usta.k.g.boy + D.usta.k.y0, D.usta.k.z]);
+  if (a <= 0.01 || !t.ok || !k.ok)
     return;
+  // iki delik: önce televizyonun dışına kırp, sonra ustanın dışını boya (çakışan delikler kararmasın)
   c.save();
-  c.fillStyle = 'rgba(12,6,4,' + a.toFixed(3) + ')';
   c.beginPath();
   c.rect(0, 0, GW, GH);
-  c.ellipse(t.x, t.y, 1.55 * t.s, 1.3 * t.s, 0, 0, TAU, true);
-  c.ellipse(k.x, k.y, 1.0 * k.s, 1.1 * k.s, 0, 0, TAU, true);
+  c.ellipse(t.x, t.y, 1.55 * t.s, 1.35 * t.s, 0, 0, TAU);
+  c.clip('evenodd');
+  c.beginPath();
+  c.rect(0, 0, GW, GH);
+  c.ellipse(k.x, k.y, 0.85 * k.s, 1.05 * k.s, 0, 0, TAU);
+  c.fillStyle = 'rgba(12,6,4,' + a.toFixed(3) + ')';
   c.fill('evenodd');
+  c.restore();
+}
+// Ustanın adı: başının üstünde büyük levha.
+function ustaAdi() {
+  const k = D.usta.k, p = pr([k.x, k.y0 + 1.12 * k.g.boy, k.z]);
+  if (!p.ok)
+    return;
+  const al = clamp((B - D.usta.b0) * 2, 0, 1);
+  c.save();
+  c.globalAlpha = al;
+  c.font = '30px "Lilita One", Rubik, system-ui, sans-serif';
+  c.textAlign = 'center';
+  c.textBaseline = 'middle';
+  const w = Math.min(330, c.measureText(k.ad).width + 44), x = clamp(p.x + 30, w / 2 + 8, GW - w / 2 - 8), y = Math.max(ALAN_UST - 10, p.y - 40);
+  c.fillStyle = RENK.vurgu;
+  c.strokeStyle = MUREKKEP;
+  c.lineWidth = 3;
+  c.beginPath();
+  c.roundRect(x - w / 2, y - 24, w, 48, 24);
+  c.fill();
+  c.stroke();
+  c.fillStyle = MUREKKEP;
+  c.fillText(k.ad, x, y + 1, w - 24);
+  c.font = '20px "Lilita One", Rubik, system-ui, sans-serif';
+  c.lineWidth = 5;
+  c.strokeText('USTA İŞ BAŞINDA!', x, y - 36);
+  c.fillStyle = RENK.sicak;
+  c.fillText('USTA İŞ BAŞINDA!', x, y - 36);
+  c.restore();
+}
+// Gol anı: ekranın ışığı odaya taşar; sahnenin en parlak anı.
+function golIsigi() {
+  const a = B - D.gol.b0;
+  if (a > 8)
+    return;
+  const o = tvP([(EKRAN.x0 + EKRAN.x1) / 2, TV_UST - (EKRAN.y0 + EKRAN.y1) / 2, TV_ON]);
+  if (!o.ok)
+    return;
+  const g = clamp(1 - a / 8, 0, 1) * (0.85 + 0.15 * Math.sin(a * Math.PI * 4));
+  c.save();
+  c.globalCompositeOperation = 'lighter';
+  const r = 4.2 * o.s, gr = c.createRadialGradient(o.x, o.y, 0.3 * o.s, o.x, o.y, r);
+  gr.addColorStop(0, 'rgba(255,250,215,' + (0.55 * g).toFixed(3) + ')');
+  gr.addColorStop(0.35, 'rgba(190,255,170,' + (0.28 * g).toFixed(3) + ')');
+  gr.addColorStop(1, 'rgba(120,200,120,0)');
+  c.fillStyle = gr;
+  c.fillRect(0, 0, GW, GH);
+  // ışın demetleri
+  c.translate(o.x, o.y);
+  c.rotate(a * 0.4);
+  c.fillStyle = 'rgba(255,240,180,' + (0.16 * g).toFixed(3) + ')';
+  for (let i = 0; i < 10; i++) {
+    c.rotate(TAU / 10);
+    c.beginPath();
+    c.moveTo(0, 0);
+    c.lineTo(r, -0.35 * o.s);
+    c.lineTo(r, 0.35 * o.s);
+    c.closePath();
+    c.fill();
+  }
   c.restore();
 }
 // Vuran uzvun arkasında beyaz, incelen hız izi.
@@ -5377,11 +5514,11 @@ function carpma(e) {
   const p = pr(e.p), a = B - e.b0;
   if (!p.ok || a < 0)
     return;
-  const v = VURUS[e.tip], buyuk = e.tip === 'ucan' ? 1.5 : e.tip === 'tekme' ? 1.2 : 1;
+  const v = VURUS[e.tip], buyuk = e.tip === 'ucan' ? 1.25 : e.tip === 'tekme' ? 1.1 : 1;
   const ol = (a < 0.25 ? yumusak(a / 0.25) * 1.25 : 1.25 - 0.25 * yumusak((a - 0.25) / 0.3)) * buyuk, al = clamp((2.2 - a) / 0.8, 0, 1);
-  const r = 0.24 * p.s * ol, yon = e.sol ? 1 : -1;
+  const elle = e.tip === 'tokat' || e.tip === 'yumruk', r = (elle ? 0.19 : 0.24) * p.s * ol, yon = e.sol ? 1 : -1;
   // yıldız vurulan yüzün üstüne kayar: vuranın elini, yüzünü örtmesin
-  const cx = p.x + yon * r * 1.05, cy = p.y - r * 0.35;
+  const cx = p.x + yon * r * (elle ? 1.0 : 0.35), cy = p.y + (elle ? r * 0.25 : -r * 0.2);
   c.save();
   c.globalAlpha = al;
   c.translate(cx, cy);
@@ -5465,7 +5602,8 @@ function seslenis() {
 const BASAMAK_YAZI = [['Yine karlandı…', ''], ['Bir şey görünüyor!', 'Kayıyor…'], ['Görüntü geliyor!', 'Çift görüntü…'], ['Siyah beyaz geldi!', 'Renk gitti…'], ['RENKLİ! MAÇ BAŞLADI!', '']];
 function basamakYazisi() {
   const a = B - D.asamaB;
-  if (a < 0 || a > 3.5 || !D.asamaYon)
+  // golde ve ustanın gösterisinde ekranın kendi yazısı (GOOOL, usta bandı) konuşur
+  if (a < 0 || a > 3.5 || !D.asamaYon || D.gol || D.usta)
     return;
   const yazi = BASAMAK_YAZI[D.asama][D.asamaYon > 0 ? 0 : 1] || BASAMAK_YAZI[D.asama][0];
   if (!yazi)
@@ -5486,6 +5624,120 @@ function basamakYazisi() {
   c.fillStyle = D.asamaYon > 0 ? RENK.vurgu : '#cfe3ff';
   c.fillText(yazi, p.x, y);
   c.restore();
+}
+
+/* ── oyunlar/vur-duzelsin/js/55-sedir.js ── */
+/* SEDİR VE MİNDERLER — kalabalığın basamakları. Sağ arkada kilim örtülü sedir (oturanlar), televizyonun
+ * önünde kadife minderler (çömelenler). Sedir çizim listesine tek ozel ile girer; minderler yerde, zeminle
+ * birlikte çizilir. Ayrıca kadraj ölçümü: testler televizyonun, antenin, liderin ve kalabalığın ekrandaki
+ * yerini buradan okur (sahne yazılarıyla çakışma, ekranın örtülmesi, alt kenar).
+ */
+const MINDER_RENK = ['#b8322b', '#2f6f4a', '#d27a2c', '#7a3b8c', '#2f62b8', '#c9a23a', '#a83c62'];
+function minderCiz() {
+  let i = 0;
+  for (const [x, z, tur] of YERLER) {
+    if (tur !== 'comel')
+      continue;
+    const p = pr([x, 0.03, z + 0.04]);
+    if (!p.ok)
+      continue;
+    c.beginPath();
+    c.ellipse(p.x, p.y, 0.27 * p.s, 0.12 * p.s, 0, 0, TAU);
+    c.fillStyle = MINDER_RENK[i++ % MINDER_RENK.length];
+    c.fill();
+    c.lineWidth = Math.max(1.2, p.s * 0.012);
+    c.strokeStyle = MUREKKEP;
+    c.stroke();
+    // köşe püskülleri ve dikiş
+    c.strokeStyle = 'rgba(255,230,180,.55)';
+    c.beginPath();
+    c.ellipse(p.x, p.y, 0.19 * p.s, 0.08 * p.s, 0, 0, TAU);
+    c.stroke();
+  }
+}
+// Kilim örtülü sedir: oturak, arkalık, üç yastık, yanlarda kol; arkalığın üstünde dantel.
+function sedirCiz() {
+  const S = SEDIR, lw = Math.max(1.5, pr([S.x0, S.h, S.z0]).s * 0.016);
+  const P = (x, y, z) => pr([x, y, z]);
+  const kat = (x0, y0, z0, x1, y1, z1) => [P(x0, y1, z0), P(x1, y1, z0), P(x1, y0, z0), P(x0, y0, z0)];
+  // arkalık (arkada, önce)
+  cokgen([P(S.x0, 0.95, S.z1), P(S.x1, 0.95, S.z1), P(S.x1, S.h, S.z1), P(S.x0, S.h, S.z1)], '#7a3a1e', lw);
+  cokgen([P(S.x0, 0.95, S.z1), P(S.x1, 0.95, S.z1), P(S.x1, 0.95, S.z1 + 0.15), P(S.x0, 0.95, S.z1 + 0.15)], '#8f4826', lw);
+  // dantel arkalık örtüsü
+  const d = [P(S.x0 + 0.25, 0.96, S.z1 - 0.01), P(S.x1 - 0.25, 0.96, S.z1 - 0.01), P(S.x1 - 0.25, 0.8, S.z1 - 0.01), P(S.x0 + 0.25, 0.8, S.z1 - 0.01)];
+  cokgen(d, '#f6f0e2', lw * 0.5);
+  // yastıklar
+  for (let i = 0; i < 3; i++) {
+    const x = lerp(S.x0 + 0.2, S.x1 - 0.2, i / 2), p = P(x, S.h + 0.2, S.z1 - 0.08);
+    c.beginPath();
+    c.roundRect(p.x - 0.17 * p.s, p.y - 0.15 * p.s, 0.34 * p.s, 0.3 * p.s, 0.08 * p.s);
+    c.fillStyle = ['#c9a23a', '#2f6f4a', '#b8322b'][i];
+    c.fill();
+    c.lineWidth = lw * 0.8;
+    c.strokeStyle = MUREKKEP;
+    c.stroke();
+  }
+  // oturak: üst yüz ve kilim örtülü ön yüz
+  cokgen([P(S.x0, S.h, S.z0), P(S.x1, S.h, S.z0), P(S.x1, S.h, S.z1), P(S.x0, S.h, S.z1)], '#a8452a', lw);
+  const on = kat(S.x0, 0, S.z0, S.x1, S.h, S.z0);
+  cokgen(on, '#9e2b25', lw);
+  // kilim deseni: şeritler ve baklavalar
+  for (const [y, renk] of [[0.34, '#efe2c0'], [0.3, '#23305a'], [0.1, '#23305a'], [0.06, '#efe2c0']]) {
+    const a = P(S.x0, y, S.z0 - 0.005), b = P(S.x1, y, S.z0 - 0.005);
+    c.strokeStyle = renk;
+    c.lineWidth = Math.max(1.5, a.s * 0.025);
+    c.beginPath();
+    c.moveTo(a.x, a.y);
+    c.lineTo(b.x, b.y);
+    c.stroke();
+  }
+  for (let x = S.x0 + 0.12; x < S.x1 - 0.05; x += 0.22) {
+    const m = P(x, 0.2, S.z0 - 0.006), r = 0.06 * m.s;
+    c.beginPath();
+    c.moveTo(m.x, m.y - r);
+    c.lineTo(m.x + r * 0.8, m.y);
+    c.lineTo(m.x, m.y + r);
+    c.lineTo(m.x - r * 0.8, m.y);
+    c.closePath();
+    c.fillStyle = '#e7b546';
+    c.fill();
+  }
+  // yan kol
+  cokgen(kat(S.x0 - 0.08, 0, S.z0, S.x0 + 0.04, S.h + 0.22, S.z0), '#7a3a1e', lw);
+}
+
+/* ---- kadraj ölçümü (720×1280 ölçeğinde) ---- */
+function kadrajOlc() {
+  const kutu = noktalar => {
+    const ok = noktalar.filter(p => p.ok);
+    return { x0: Math.min(...ok.map(p => p.x)), x1: Math.max(...ok.map(p => p.x)), y0: Math.min(...ok.map(p => p.y)), y1: Math.max(...ok.map(p => p.y)) };
+  };
+  const tvKose = [];
+  for (const x of [-TV_W, TV_W])
+    for (const y of [TV_ALT, TV_UST + 0.06])
+      for (const z of [TV_ON, TV_ARKA])
+        tvKose.push(tvP([x, y, z]));
+  for (const x of [-0.9, 0.9])
+    for (const z of [-0.5, 0.5])
+      tvKose.push(sehpaP([x * 1.12, 0, z * 1.12]));
+  const tv = kutu(tvKose), u = antenUclari(), an = [u.kok, u.sol, u.sag].map(pr);
+  const ekran = kutu([tvP([EKRAN.x0, TV_UST - EKRAN.y0, TV_ON]), tvP([EKRAN.x1, TV_UST - EKRAN.y0, TV_ON]), tvP([EKRAN.x0, TV_UST - EKRAN.y1, TV_ON]), tvP([EKRAN.x1, TV_UST - EKRAN.y1, TV_ON])]);
+  const tvd = tvP([0, 1.0, TV_ARKA]).d;
+  let lider = null, orten = [], kisiler = [];
+  for (const k of D.oy.values()) {
+    if (k.cikiyor || !k.p.kafa || !k.p.kafa.ok)
+      continue;
+    const ph = k.p.kafa, R = KAFA_R * k.g.boy * ph.s, ayak = pr([k.x, 0, k.z]);
+    const b = { ad: k.ad, x0: ph.x - R, x1: ph.x + R, ust: ph.y - R, ayak: ayak.y, etiket: k.etY === undefined ? null : k.etY, et: !!k.et };
+    if (k === D.lider)
+      lider = b;
+    else
+      kisiler.push(b);
+    // ekranın önünde çizilen bir baş ekranın içine giriyorsa ekranı örtüyor demektir
+    if (ph.d < tvd && ph.x + R > ekran.x0 && ph.x - R < ekran.x1 && ph.y + R > ekran.y0 && ph.y - R < ekran.y1)
+      orten.push(k.ad);
+  }
+  return { tv, ekran, anten: { y0: Math.min(...an.map(p => p.y)), x0: Math.min(...an.map(p => p.x)), x1: Math.max(...an.map(p => p.x)), noktalar: an.map(p => [Math.round(p.x), Math.round(p.y)]) }, lider, kisiler, orten };
 }
 })();
 </script>

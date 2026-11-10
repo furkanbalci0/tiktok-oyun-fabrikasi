@@ -6,12 +6,24 @@ function oyunCiz() {
   ekranGuncelle();
   const tvd = tvP([0, 1.0, TV_ARKA]).d;
   ozel(tvd, tvCiz);
+  const sd = pr([(SEDIR.x0 + SEDIR.x1) / 2, SEDIR.h, SEDIR.z0]);
+  if (sd.ok)
+    ozel(sd.d + 0.05, sedirCiz);
   const ky = pr([KULE.x, 0.5, KULE.z]);
   if (ky.ok)
     ozel(ky.d, kuleCiz);
   for (const k of D.oy.values()) {
     if (!insanEkle(k))
       continue;
+    // ustanın adı büyük levhada yazılır (ustaAdi), küçük etiketi çıkmasın
+    if (D.usta && D.usta.k === k)
+      k.et = null;
+    // Minderdeki çömelenlerin adı ayaklarının altına yazılır: başlarının üstü ekranın alt kenarıdır.
+    else if (k.et && k.tur === 'comel' && !k.is && k.yer > 0.5 && k !== D.lider) {
+      const a = pr([k.x, 0, k.z - 0.16]);
+      if (a.ok)
+        k.et.y = Math.min(a.y + 30, ALAN_ALT - 4);
+    }
     if (k.el) {
       const ha = k.p[k.el.yan < 0 ? 'haR' : 'haL'], dr = k.p[k.el.yan < 0 ? 'drR' : 'drL'];
       if (ha && ha.ok && dr && dr.ok)
@@ -166,6 +178,8 @@ function dugmeUcan(p) {
 function oyunUst() {
   if (D.usta)
     spot();
+  if (D.gol)
+    golIsigi();
   hizIzi(D.ist);
   hizIzi(D.kuleIs);
   tozCiz();
@@ -173,19 +187,86 @@ function oyunUst() {
     carpma(e);
   seslenis();
   basamakYazisi();
+  if (D.usta)
+    ustaAdi();
 }
-// Usta işinde oda kararır; televizyon ve usta aydınlıkta kalır.
+// Usta işinde oda kararır; televizyon ve usta aydınlıkta kalır. Gol olunca karanlık kalkar.
 function spot() {
-  const a = clamp((B - D.usta.b0) / 1.5, 0, 1) * 0.5, t = tvP([0, 1.0, 0]), k = pr([D.usta.k.x, 0.6 + D.usta.k.y0, D.usta.k.z]);
-  if (!t.ok || !k.ok)
+  const a = D.gol ? 0 : clamp((B - D.usta.b0) / 1.5, 0, 1) * 0.45;
+  const t = tvP([0, 1.0, 0]), k = pr([D.usta.k.x, 0.6 * D.usta.k.g.boy + D.usta.k.y0, D.usta.k.z]);
+  if (a <= 0.01 || !t.ok || !k.ok)
     return;
+  // iki delik: önce televizyonun dışına kırp, sonra ustanın dışını boya (çakışan delikler kararmasın)
   c.save();
-  c.fillStyle = 'rgba(12,6,4,' + a.toFixed(3) + ')';
   c.beginPath();
   c.rect(0, 0, GW, GH);
-  c.ellipse(t.x, t.y, 1.55 * t.s, 1.3 * t.s, 0, 0, TAU, true);
-  c.ellipse(k.x, k.y, 1.0 * k.s, 1.1 * k.s, 0, 0, TAU, true);
+  c.ellipse(t.x, t.y, 1.55 * t.s, 1.35 * t.s, 0, 0, TAU);
+  c.clip('evenodd');
+  c.beginPath();
+  c.rect(0, 0, GW, GH);
+  c.ellipse(k.x, k.y, 0.85 * k.s, 1.05 * k.s, 0, 0, TAU);
+  c.fillStyle = 'rgba(12,6,4,' + a.toFixed(3) + ')';
   c.fill('evenodd');
+  c.restore();
+}
+// Ustanın adı: başının üstünde büyük levha.
+function ustaAdi() {
+  const k = D.usta.k, p = pr([k.x, k.y0 + 1.12 * k.g.boy, k.z]);
+  if (!p.ok)
+    return;
+  const al = clamp((B - D.usta.b0) * 2, 0, 1);
+  c.save();
+  c.globalAlpha = al;
+  c.font = '30px "Lilita One", Rubik, system-ui, sans-serif';
+  c.textAlign = 'center';
+  c.textBaseline = 'middle';
+  const w = Math.min(330, c.measureText(k.ad).width + 44), x = clamp(p.x + 30, w / 2 + 8, GW - w / 2 - 8), y = Math.max(ALAN_UST - 10, p.y - 40);
+  c.fillStyle = RENK.vurgu;
+  c.strokeStyle = MUREKKEP;
+  c.lineWidth = 3;
+  c.beginPath();
+  c.roundRect(x - w / 2, y - 24, w, 48, 24);
+  c.fill();
+  c.stroke();
+  c.fillStyle = MUREKKEP;
+  c.fillText(k.ad, x, y + 1, w - 24);
+  c.font = '20px "Lilita One", Rubik, system-ui, sans-serif';
+  c.lineWidth = 5;
+  c.strokeText('USTA İŞ BAŞINDA!', x, y - 36);
+  c.fillStyle = RENK.sicak;
+  c.fillText('USTA İŞ BAŞINDA!', x, y - 36);
+  c.restore();
+}
+// Gol anı: ekranın ışığı odaya taşar; sahnenin en parlak anı.
+function golIsigi() {
+  const a = B - D.gol.b0;
+  if (a > 8)
+    return;
+  const o = tvP([(EKRAN.x0 + EKRAN.x1) / 2, TV_UST - (EKRAN.y0 + EKRAN.y1) / 2, TV_ON]);
+  if (!o.ok)
+    return;
+  const g = clamp(1 - a / 8, 0, 1) * (0.85 + 0.15 * Math.sin(a * Math.PI * 4));
+  c.save();
+  c.globalCompositeOperation = 'lighter';
+  const r = 4.2 * o.s, gr = c.createRadialGradient(o.x, o.y, 0.3 * o.s, o.x, o.y, r);
+  gr.addColorStop(0, 'rgba(255,250,215,' + (0.55 * g).toFixed(3) + ')');
+  gr.addColorStop(0.35, 'rgba(190,255,170,' + (0.28 * g).toFixed(3) + ')');
+  gr.addColorStop(1, 'rgba(120,200,120,0)');
+  c.fillStyle = gr;
+  c.fillRect(0, 0, GW, GH);
+  // ışın demetleri
+  c.translate(o.x, o.y);
+  c.rotate(a * 0.4);
+  c.fillStyle = 'rgba(255,240,180,' + (0.16 * g).toFixed(3) + ')';
+  for (let i = 0; i < 10; i++) {
+    c.rotate(TAU / 10);
+    c.beginPath();
+    c.moveTo(0, 0);
+    c.lineTo(r, -0.35 * o.s);
+    c.lineTo(r, 0.35 * o.s);
+    c.closePath();
+    c.fill();
+  }
   c.restore();
 }
 // Vuran uzvun arkasında beyaz, incelen hız izi.
@@ -223,11 +304,11 @@ function carpma(e) {
   const p = pr(e.p), a = B - e.b0;
   if (!p.ok || a < 0)
     return;
-  const v = VURUS[e.tip], buyuk = e.tip === 'ucan' ? 1.5 : e.tip === 'tekme' ? 1.2 : 1;
+  const v = VURUS[e.tip], buyuk = e.tip === 'ucan' ? 1.25 : e.tip === 'tekme' ? 1.1 : 1;
   const ol = (a < 0.25 ? yumusak(a / 0.25) * 1.25 : 1.25 - 0.25 * yumusak((a - 0.25) / 0.3)) * buyuk, al = clamp((2.2 - a) / 0.8, 0, 1);
-  const r = 0.24 * p.s * ol, yon = e.sol ? 1 : -1;
+  const elle = e.tip === 'tokat' || e.tip === 'yumruk', r = (elle ? 0.19 : 0.24) * p.s * ol, yon = e.sol ? 1 : -1;
   // yıldız vurulan yüzün üstüne kayar: vuranın elini, yüzünü örtmesin
-  const cx = p.x + yon * r * 1.05, cy = p.y - r * 0.35;
+  const cx = p.x + yon * r * (elle ? 1.0 : 0.35), cy = p.y + (elle ? r * 0.25 : -r * 0.2);
   c.save();
   c.globalAlpha = al;
   c.translate(cx, cy);
@@ -311,7 +392,8 @@ function seslenis() {
 const BASAMAK_YAZI = [['Yine karlandı…', ''], ['Bir şey görünüyor!', 'Kayıyor…'], ['Görüntü geliyor!', 'Çift görüntü…'], ['Siyah beyaz geldi!', 'Renk gitti…'], ['RENKLİ! MAÇ BAŞLADI!', '']];
 function basamakYazisi() {
   const a = B - D.asamaB;
-  if (a < 0 || a > 3.5 || !D.asamaYon)
+  // golde ve ustanın gösterisinde ekranın kendi yazısı (GOOOL, usta bandı) konuşur
+  if (a < 0 || a > 3.5 || !D.asamaYon || D.gol || D.usta)
     return;
   const yazi = BASAMAK_YAZI[D.asama][D.asamaYon > 0 ? 0 : 1] || BASAMAK_YAZI[D.asama][0];
   if (!yazi)

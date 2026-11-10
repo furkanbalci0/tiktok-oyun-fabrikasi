@@ -101,7 +101,9 @@ function temas(is) {
     const yl = tvYerel(yer);
     D.izler.push({ z: clamp(yl[2], TV_ON + 0.12, TV_ARKA - 0.12), y: clamp(yl[1], TV_ALT + 0.12, TV_UST - 0.12), tip: is.tip, b0: B });
   }
-  tozAt(yer, is.tip === 'ucan' ? 14 : is.tip === 'tekme' ? 9 : 5);
+  // toz kasanın yüzünden kalkar (vuranın yüzünü örtmesin diye kasaya doğru kaydırılır)
+  const ic = tvDunya(tvYerel(yer).map((v, i) => i === 0 ? v * 0.9 : v));
+  tozAt(ic, is.tip === 'ucan' ? 12 : is.tip === 'tekme' ? 7 : 2);
   if ((is.tip === 'tekme' || is.tip === 'ucan') && !D.dugme)
     dugmeFirlat(kule ? 1 : -1);
   if (is.tip === 'ucan' || is.seq) {
@@ -299,6 +301,13 @@ function oyunGuncelle(dt) {
 
 function kisiGuncelle(k, dt) {
   const is = k.is, ist = is && is.yer === 'ist', lider = k === D.lider && !k.cikiyor;
+  const usta = D.usta && D.usta.k === k;
+  // Usta işinde gösteriyi yapan iri görünür: boyu bir vuruşta büyür, gösteri bitince eski hâline döner.
+  if (k.asilBoy === undefined)
+    k.asilBoy = k.g.boy;
+  // vuruş yerine çıkan da biraz irileşir: televizyonla aynı karede okunsun
+  const sahnede = usta ? 1.4 : ist ? 1.2 : 1;
+  k.g.boy += (k.asilBoy * sahnede - k.g.boy) * Math.min(1, dt * 5);
   // hedef yer
   let hx = k.hedefX, hz = k.hedefZ;
   if (k.cikiyor) {
@@ -309,6 +318,19 @@ function kisiGuncelle(k, dt) {
     const kos = is.tip === 'ucan' && is.faz === 'git';
     hx = kos ? ISTASYON.kosX : ISTASYON.x;
     hz = kos ? ISTASYON.kosZ : ISTASYON.z;
+  }
+  else if (D.usta && !lider) {
+    // usta iş başındayken kalabalık bir adım geri çekilir: televizyondan ve ustanın yanından uzaklaşır
+    const ox = hx - 0.1, oz = hz - TVZ, d = Math.hypot(ox, oz) || 1;
+    hx += ox / d * 0.3;
+    hz += oz / d * 0.2;
+    const ux = hx - ISTASYON.x, uzz = hz - ISTASYON.z, du = Math.hypot(ux, uzz) || 1;
+    if (du < 1.5) {
+      hx += ux / du * (1.5 - du) * 0.6;
+      hz += uzz / du * (1.5 - du) * 0.6;
+    }
+    // ön sıra kameraya doğru inmez: adları yorum alanına düşmesin
+    hz = Math.max(hz, Math.min(k.hedefZ, -0.4));
   }
   const ucanVur = ist && is.faz === 'vur' && is.tip === 'ucan';
   const dx = hx - k.x, dz = hz - k.z, uz = Math.hypot(dx, dz);
@@ -325,10 +347,12 @@ function kisiGuncelle(k, dt) {
   k.yer += ((uz < 0.16 && !k.cikiyor ? 1 : 0) - k.yer) * Math.min(1, dt * 7);
   if (k.cikiyor)
     k.gitti = Math.abs(k.x) > 4;
-  // Yığına çıkma / inme
+  // yerinde mi: yığın, sedir, minder
+  const yerinde = !ist && !k.cikiyor && uz < 0.12;
   const kulede = lider && Math.hypot(k.x - KULE.x, k.z - KULE.z) < 0.3 && !ist;
-  k.y0 += ((kulede ? KULE.h : 0) - k.y0) * Math.min(1, dt * 7);
-  // bakış
+  const oturur = yerinde && !lider && k.tur === 'sedir', comel = yerinde && !lider && k.tur === 'comel';
+  k.y0 += ((kulede ? KULE.h : oturur ? SEDIR.h + 0.06 - KALCA * k.g.boy : 0) - k.y0) * Math.min(1, dt * 7);
+  // bakış: televizyona dönük ama yüz kameraya açık (iki yönün ortası); öndekiler kameraya bakar
   let bak;
   if (ist && is.faz === 'vur')
     bak = ISTASYON.yon;
@@ -336,8 +360,10 @@ function kisiGuncelle(k, dt) {
     bak = KULE.yon;
   else if (uz > 0.25)
     bak = Math.atan2(dx / uz + (kam.C[0] - k.x) * 0.02, dz / uz - 0.3);
-  else
-    bak = Math.atan2(kam.C[0] - k.x, kam.C[2] - k.z) - (k.x - 0.1) * 0.16;
+  else {
+    const kamBak = Math.atan2(kam.C[0] - k.x, kam.C[2] - k.z), tvBak = Math.atan2(0.1 - k.x, TVZ - k.z);
+    bak = comel ? kamBak - (k.x - 0.1) * 0.35 : kamBak + aciFark(kamBak, tvBak) * 0.42;
+  }
   k.yon += aciFark(k.yon, bak) * Math.min(1, dt * (is && is.faz === 'vur' ? 30 : 8));
   // poz
   k.el = null;
@@ -353,11 +379,28 @@ function kisiGuncelle(k, dt) {
     poz.aL[1] = -Math.sin(w) * 0.06;
     poz.egim = 0.06;
   }
+  if (comel) {
+    // minderde çömelmiş: kalça yere yakın, dizler önde
+    poz.hipY = 0.14 + 0.012 * Math.cos(TAU * B);
+    poz.aS = [-0.1, 0.07, 0];
+    poz.aL = [0.1, 0.07, 0];
+    poz.egim = 0.1;
+  }
+  else if (oturur) {
+    // sedirde oturuyor: ayaklar sedirin önünden sarkar, vuruşla sallanır
+    poz.hipY = KALCA;
+    const s = Math.sin(TAU * B / 2 + k.g.salin * 5) * 0.03;
+    poz.aS = [-0.08, 0.15 + s, -0.02];
+    poz.aL = [0.08, 0.15 - s, -0.02];
+    poz.egim = -0.04;
+  }
   const sevinc = B < D.sevincB || (D.gol && B - D.gol.b0 < 6), uzgun = B < D.uzuntuB;
-  const zip = B >= k.zip0 && B < k.zip1 ? 0.22 * Math.abs(Math.sin(Math.PI * (B - k.zip0))) : sevinc && !kulede ? 0.12 * Math.abs(Math.sin(Math.PI * B)) : 0;
+  const zip = B >= k.zip0 && B < k.zip1 ? 0.22 * Math.abs(Math.sin(Math.PI * (B - k.zip0))) : sevinc && !kulede && !oturur ? 0.12 * Math.abs(Math.sin(Math.PI * B)) : 0;
   poz.hipY += zip;
-  poz.aS[2] += zip * 0.8;
-  poz.aL[2] += zip * 0.8;
+  if (!oturur) {
+    poz.aS[2] += zip * 0.8;
+    poz.aL[2] += zip * 0.8;
+  }
   if (kulede) {
     // Yığın sarsılır, anteni tutan da onunla sallanır.
     poz.yat += D.tv.kule * 0.12;
@@ -379,6 +422,11 @@ function kisiGuncelle(k, dt) {
     k.j.haR = W(-0.15, poz.hipY + 0.52, 0.04);
     k.j.haL = W(0.15, poz.hipY + 0.52, 0.04);
   }
+  else if (comel || oturur) {
+    // eller dizlerde
+    k.j.haR = W(-0.12, poz.hipY + 0.04, 0.16);
+    k.j.haL = W(0.12, poz.hipY + 0.04, 0.16);
+  }
   else {
     const sal = Math.sin(TAU * B / 2 + k.g.salin * 6) * 0.03;
     k.j.haR = W(-0.21, poz.hipY + 0.07 + sal, 0.04);
@@ -391,7 +439,7 @@ function kisiGuncelle(k, dt) {
 // Vurulacak nokta (dünya): istasyonda sol yan yüz, kulede sağ yanın üstü (el) ya da ortası (ayak).
 function vurusHedef(is) {
   const ayakla = is.tip === 'tekme' || is.tip === 'ucan';
-  return is.yer === 'kule' ? tvDunya([TV_W + 0.02, ayakla ? TV_ALT + 0.82 : TV_UST - 0.32, -0.3]) : tvDunya([-TV_W - 0.02, VURUS[is.tip].y, -0.1]);
+  return is.yer === 'kule' ? tvDunya([TV_W + 0.02, ayakla ? TV_ALT + 0.82 : TV_UST - 0.32, -0.3]) : tvDunya([-TV_W - 0.02, VURUS[is.tip].y, 0.08]);
 }
 // is.u boyunca: hazırlık (geri çekil, kur), vuruş (hızlanarak hedefe), değme (kısa bekleme), geri çekilme.
 // el: yakın kol / bacak (istasyonda sağ, a < 0; kulede sol, a > 0). Hedef dünyada sabit, yerele çevrilir.
@@ -560,15 +608,7 @@ function izKaydet(k, is, p, acik) {
 }
 
 /* ---- kamera ---- */
-// Kadraja girmesi gerekenler: televizyon (anteni ve sehpasıyla), vuruş yeri, yığın ve dolu yerler.
-// Çekirdek her noktaya 0,55 m pay ekler; televizyonun kenarları için bu pay düşülerek verilir.
+// Kadraj sabit (KADRAJ, 10-oyun.js): kalabalık büyüyünce televizyon küçülmesin. Yerler bu kadraja göre seçildi.
 function oyunKamera() {
-  const n = [[ISTASYON.x - 0.1, ISTASYON.z], [KULE.x, KULE.z], [0, TVZ + 0.62], [0, TVZ - 0.5]];
-  // uçan tekmenin koşu yeri: koşu boyunca kamera biraz açılır
-  if (D.ist && D.ist.tip === 'ucan')
-    n.push([ISTASYON.kosX + 0.2, ISTASYON.kosZ]);
-  for (const k of D.sira)
-    if (k !== D.lider)
-      n.push([k.hedefX, k.hedefZ]);
-  return n;
+  return KADRAJ;
 }
