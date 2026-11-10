@@ -17,7 +17,7 @@ const adlar = process.argv.slice(2).filter(a => !a.startsWith('--'));
 const OYUNLAR = adlar.length ? adlar : fs.readdirSync(path.join(KOK, 'oyunlar')).filter(a => fs.existsSync(path.join(KOK, 'oyunlar', a, 'oyun.html'))).sort();
 // duzeyDb: davul zurnaya göre en çok ± bu kadar dB · ezgiBant / ezgiHarm / davulBant: iki oyunun ortalama dB farkı
 // (oktav bantları ya da harmonikler üzerinden) bu eşiklerin altındaysa o yönden "aynı" sayılır.
-const ESIK = { duzeyDb: 2.5, ezgiBant: 4, ezgiHarm: 4, davulBant: 3 };
+const ESIK = { duzeyDb: 2.5, ezgiBant: 4, ezgiHarm: 4, davulBant: 3.5 };
 
 // Sayfanın içinde çalışır. Oyunun her havasını üretir ve ölçer; önizlemeyi WAV olarak döndürür.
 async function olc(onizlemeSn) {

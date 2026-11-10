@@ -161,7 +161,7 @@ Kulak yerine ölçüm. Hepsi sesi dosyaya yazan bir bağlamda (OfflineAudioConte
   - **denge**: davul, ezgi ve eşlik ayrı ayrı üretilir; davul ezgiden en çok 3 dB yüksek, en çok 8 dB alçak
     (davul zurnada 4–7 dB alçak); eşlik ezgiden en az 4 dB alçak;
   - **fark**: takımı farklı her iki oyun arasında ezginin tınısı (oktav bantlarındaki tayf zarfı ya da ilk on
-    harmoniğin dizilişi, ortalama dB farkı ≥ 4) ve davulun tınısı (oktav bantları, ortalama dB farkı ≥ 3) ayrışmalı.
+    harmoniğin dizilişi, ortalama dB farkı ≥ 4) ve davulun tınısı (oktav bantları, ortalama dB farkı ≥ 3,5) ayrışmalı.
     Eşikler, aynı oyunun kendi havaları arasındaki farkın (ölçünün takım içi oynaması: ezgi ≤ 0,9 / 1,9 dB,
     davul ≤ 3,1 dB) üstündedir; aynı müziği çalan iki oyunda (halay ↔ dolmuş) fark 0'dır. Aynı takımı seçen iki
     oyunun havaları da aynıysa test uyarı yazar.
