@@ -3,15 +3,19 @@
  * ağaçlar derinlikleri olduğu için çizim listesine girer (yolKenariEkle, oyunCiz'den çağrılır).
  * arkaHazirla: gök ve siluet bir kez çizilir · Kanca: oyunZemin().
  */
-// Kamera yüksekten baktığı için gerçek ufuk görüntünün dışında kalır; gök sahnenin üstünde sabit bir perde gibi
-// durur, UFUK o perdenin bittiği satırdır.
-const UFUK = 440;
+// UFUK: gerçek ufuk çizgisinin ekrandaki satırı. Kamera kalabalığa göre yaklaşıp uzaklaştıkça her karede
+// yeniden hesaplanır (ufukDuzelt); gök perdesi o satıra oturur. UFUK_ARKA: perdenin içindeki ufuk satırı.
+let UFUK = 440;
+const UFUK_ARKA = 560;
+function ufukDuzelt() { UFUK = clamp(kam.cy - kam.F * Math.tan(kam.egim), 220, 640); }
+// Yol kenarındaki şeyler bu satırın altında kalır: üstü sıralama kutusu ve gösterge (stil.css .sira, .cosku).
+const KENAR_UST = 492;
 let arkaKatman = null;
 function arkaHazirla() {
   const t = document.createElement('canvas');
   t.width = 1100;
-  t.height = 600;
-  const a = t.getContext('2d'), r = rastgeleUret(77), H = UFUK + 2;
+  t.height = UFUK_ARKA + 160;
+  const a = t.getContext('2d'), r = rastgeleUret(77), H = UFUK_ARKA + 2;
   const gr = a.createLinearGradient(0, 0, 0, H);
   gr.addColorStop(0, '#22184a');
   gr.addColorStop(0.42, '#5a3272');
@@ -95,7 +99,7 @@ function arkaHazirla() {
 
 // Yolun ve çevresinin renkleri: tek akşamüstü paleti.
 const YOL = { tarlaUzak: '#8a5a6e', tarlaYakin: '#3b2d4a', asfalt: '#2e2542', asfaltKenar: '#3b3052', cizgi: '#fbefdc', bordur: '#ef5a3c', bordur2: '#fbefdc', pus: '#f2a06a' };
-let tarlaBoya = null, pusBoya = null;
+
 // Yerde bir dörtgen: köşeleri [x, z]; yükseklik 0.
 function yerDortgen(noktalar, renk) {
   const p = noktalar.map(n => pr([n[0], 0, n[1]]));
@@ -110,18 +114,20 @@ function yerDortgen(noktalar, renk) {
   c.fill();
 }
 function yolCiz() {
-  c.drawImage(arkaKatman, -190 - kam.yaw * 520, 0);
+  c.fillStyle = '#22184a';
+  c.fillRect(0, 0, GW, Math.max(0, UFUK - UFUK_ARKA) + 2);
+  c.drawImage(arkaKatman, -190 - kam.yaw * 520, UFUK - UFUK_ARKA);
   c.save();
   c.beginPath();
   c.rect(0, UFUK, GW, GH - UFUK);
   c.clip();
-  if (!tarlaBoya) {
-    tarlaBoya = c.createLinearGradient(0, UFUK, 0, GH);
+  {
+    const tarlaBoya = c.createLinearGradient(0, UFUK, 0, GH);
     tarlaBoya.addColorStop(0, YOL.tarlaUzak);
     tarlaBoya.addColorStop(0.35, '#5a3f58');
     tarlaBoya.addColorStop(1, YOL.tarlaYakin);
+    c.fillStyle = tarlaBoya;
   }
-  c.fillStyle = tarlaBoya;
   c.fillRect(0, UFUK, GW, GH - UFUK);
   const W = D.yolW, z0 = kam.C[2] + 1.5, z1 = kam.tz + 60;
   // tarla sürülmüş gibi: yola paralel koyu çizgiler, yol akarken onlar da akar
@@ -137,10 +143,12 @@ function yolCiz() {
   yerDortgen([[-W, z0], [W, z0], [W, z1], [-W, z1]], YOL.asfalt);
   // akan çizgiler: kesik şerit çizgileri ve kırmızı-beyaz bordür. Konvoy kameraya doğru gittiği için yol
   // ekranda yukarı akar.
-  const kay = D.kayma, zBas = kam.tz - 12, zSon = kam.tz + 34;
+  const kay = D.kayma, zBas = kam.C[2] + 1, zSon = kam.tz + 50;
   const kol = D.kolon, ayrac = [];
   if (kol === 1)
     ayrac.push(-0.5 * ARA_X, 0.5 * ARA_X);
+  else if (kol === 2)
+    ayrac.push(0);
   else
     for (let i = 0; i < kol - 1; i++)
       ayrac.push((i + 1 - kol / 2) * ARA_X);
@@ -155,11 +163,9 @@ function yolCiz() {
       yerDortgen([[s * W, z], [s * (W + 0.22), z], [s * (W + 0.22), z + PB], [s * W, z + PB]], say % 2 ? YOL.bordur : YOL.bordur2);
   c.restore();
   // ufuk pusu: yolun ucu kasabanın önünde ışığa karışır
-  if (!pusBoya) {
-    pusBoya = c.createLinearGradient(0, UFUK - 4, 0, UFUK + 110);
-    pusBoya.addColorStop(0, renkSaydam(YOL.pus, 0.95));
-    pusBoya.addColorStop(1, renkSaydam(YOL.pus, 0));
-  }
+  const pusBoya = c.createLinearGradient(0, UFUK - 4, 0, UFUK + 110);
+  pusBoya.addColorStop(0, renkSaydam(YOL.pus, 0.95));
+  pusBoya.addColorStop(1, renkSaydam(YOL.pus, 0));
   c.fillStyle = pusBoya;
   c.fillRect(0, UFUK - 4, GW, 114);
 }
@@ -167,7 +173,7 @@ function yolCiz() {
 // Yol kenarı: iki yanda direkler (aralarında üçgen bayraklı ip) ve ağaçlar, yol akarken onlar da akar.
 const DIREK_ARA = 4.2;
 function yolKenariEkle() {
-  const kay = D.kayma, zBas = kam.tz - kam.son.hd - 6, zSon = kam.tz + kam.son.hd + 16;
+  const kay = D.kayma, zBas = kam.C[2] + 1.5, zSon = kam.tz + kam.son.hd + 24;
   const ilk = Math.floor((zBas - kay) / DIREK_ARA) * DIREK_ARA + kay;
   for (const s of [-1, 1]) {
     const xd = s * (D.yolW + 0.75), xa = s * (D.yolW + 2.1);
@@ -175,7 +181,7 @@ function yolKenariEkle() {
     for (let z = ilk, i = Math.round((ilk - kay) / DIREK_ARA); z < zSon; z += DIREK_ARA, i++) {
       // Tepesi gök perdesine taşan uzaktaki direk ve ağaç çizilmez: üstteki yazıların arkası temiz kalsın.
       const alt = pr([xd, 0, z]), ust = pr([xd, 1.9, z]);
-      if (alt.ok && ust.ok && ust.y > UFUK + 8) {
+      if (alt.ok && ust.ok && ust.y > KENAR_UST) {
         ozel(alt.d, () => direkCiz(alt, ust));
         if (onceki)
           ipEkle(onceki, [xd, 1.8, z], i);
@@ -186,9 +192,46 @@ function yolKenariEkle() {
       // ağaçlar direklerin dışında, yarım aralık kaydırılmış
       const za = z + DIREK_ARA / 2, tr = rastgeleUret(i * 2 + (s > 0 ? 1 : 0))(), boy = 0.8 + tr * 0.5, xt = xa + s * tr * 0.6;
       const ag = pr([xt, 0, za]), tepe = pr([xt, 1.9 * boy, za]);
-      if (ag.ok && tepe.ok && tepe.y > UFUK + 8)
+      if (ag.ok && tepe.ok && tepe.y > KENAR_UST)
         ozel(ag.d, () => agacCiz(xt, za, boy));
     }
+  }
+  seyirciEkle(zBas, zSon);
+}
+// Yol kenarında konvoyu karşılayan köylüler: el sallar, yol akarken geride kalır. İzleyici değildirler: D.oy'da
+// durmazlar, adları yazılmaz. Kim olduğu yerinden (sıra numarası) türer, her geçişte aynı kişi aynı yerde durur.
+const SEYIRCI_ARA = 6.3, seyirciler = new Map();
+function seyirciEkle(zBas, zSon) {
+  const kay = D.kayma * 1.0, ilk = Math.floor((zBas - kay) / SEYIRCI_ARA) * SEYIRCI_ARA + kay;
+  for (let z = ilk, i = Math.round((ilk - kay) / SEYIRCI_ARA); z < zSon; z += SEYIRCI_ARA, i++) {
+    const r = rastgeleUret(i * 7 + 3), s = (i & 1) ? 1 : -1, var_ = r();
+    if (var_ < 0.25)
+      continue;
+    const x = s * (D.yolW + 1.25 + r() * 0.5), tepe = pr([x, 1.25, z]);
+    if (!tepe.ok || tepe.y < KENAR_UST)
+      continue;
+    let k = seyirciler.get(i);
+    if (!k) {
+      k = karakterYap('__seyirci' + i, '');
+      k.guler = true;
+      k.mod = 'seyirci';
+      seyirciler.set(i, k);
+      // Bellek şişmesin: en eski kayıt bırakılır (Map'ten çıkarmak, yalnız bellekteki kaydı unutmaktır).
+      if (seyirciler.size > 30)
+        seyirciler.delete(seyirciler.keys().next().value);
+    }
+    k.x = x;
+    k.z = z;
+    k.y0 = 0;
+    // Kameraya dönük, biraz yola doğru kırılmış; konvoya el sallar.
+    k.yon = Math.atan2(kam.C[0] - x, kam.C[2] - z) - s * 0.45;
+    const poz = pozBekle(k), W = iskeletKur(k, poz), sal = Math.sin(TAU * B + var_ * 6);
+    const sallayanSag = var_ > 0.6;
+    k.j.haR = sallayanSag ? W(-0.3 - 0.06 * sal, poz.hipY + 0.62, 0.05) : W(-0.2, poz.hipY + 0.06, 0.05);
+    k.j.haL = !sallayanSag ? W(0.3 + 0.06 * sal, poz.hipY + 0.62, 0.05) : W(0.2, poz.hipY + 0.06, 0.05);
+    kolKur(k);
+    golge(k.x, k.z, 0.25 * k.g.boy, 0.13 * k.g.boy);
+    insanEkle(k);
   }
 }
 function direkCiz(alt, ust) {
@@ -279,7 +322,7 @@ function fisekCiz() {
       continue;
     if (u < 0.8) {
       // yükselen iz
-      const y = lerp(UFUK, f.y, yumusak(u / 0.8));
+      const y = lerp(UFUK, UFUK - f.y, yumusak(u / 0.8));
       c.strokeStyle = renkSaydam('#ffe2a0', 0.8);
       c.lineWidth = 2.5;
       c.beginPath();
@@ -291,17 +334,17 @@ function fisekCiz() {
     const t = (u - 0.8) / 2.6;
     if (t > 1)
       continue;
-    const r = 125 * Math.sqrt(t), dus = 40 * t * t, al = 1 - t;
+    const r = 125 * Math.sqrt(t), dus = 40 * t * t, al = 1 - t, fy = UFUK - f.y;
     if (t < 0.15) {
       c.globalAlpha = (0.15 - t) / 0.15 * 0.5;
       c.fillStyle = '#ffe2a0';
       c.beginPath();
-      c.arc(f.x, f.y, r * 1.4 + 20, 0, TAU);
+      c.arc(f.x, fy, r * 1.4 + 20, 0, TAU);
       c.fill();
     }
     c.globalAlpha = al;
     for (let i = 0; i < f.n; i++) {
-      const a = f.aci + i / f.n * TAU, x = f.x + Math.cos(a) * r, y = f.y + Math.sin(a) * r + dus;
+      const a = f.aci + i / f.n * TAU, x = f.x + Math.cos(a) * r, y = fy + Math.sin(a) * r + dus;
       c.fillStyle = i % 2 ? f.renk : f.renk2;
       c.beginPath();
       c.arc(x, y, 4.5 * (1 - t * 0.6), 0, TAU);
@@ -310,7 +353,7 @@ function fisekCiz() {
       c.lineWidth = 2.5;
       c.beginPath();
       c.moveTo(x, y);
-      c.lineTo(f.x + Math.cos(a) * r * 0.75, f.y + Math.sin(a) * r * 0.75 + dus * 0.8);
+      c.lineTo(f.x + Math.cos(a) * r * 0.75, fy + Math.sin(a) * r * 0.75 + dus * 0.8);
       c.stroke();
     }
     c.globalAlpha = 1;
@@ -318,6 +361,7 @@ function fisekCiz() {
 }
 
 function oyunZemin() {
+  ufukDuzelt();
   yolCiz();
   fisekCiz();
   // gelin arabasının altında vuruşla atan altın ışık

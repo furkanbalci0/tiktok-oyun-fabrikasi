@@ -121,7 +121,8 @@ function arabaDonusum(k) {
 }
 function arabaCiz(k, T) {
   const ar = k.ar, kb = KABIN[ar.kasa], cw = Math.max(1, pr([T.x, 0, T.z]).s * 0.012), renk = ar.renk;
-  const gelin = k === D.lider && !D.kurdeleUcus;
+  // Gelin süsü liderin arabasındadır; taç (çekirdeğin ad etiketi) ile aynı anda el değiştirir.
+  const gelin = k === D.lider;
   // tekerlekler gövdenin içinde kalır, altından görünür; dönüşü jant çizgisiyle görünür
   for (const sa of [-1, 1])
     for (const sc of [-1, 1])
@@ -179,12 +180,16 @@ function arabaCiz(k, T) {
       cokgen([an1, u1, u2], ar.kurdele, Math.max(1, an0.s * 0.008));
   }
   if (gelin)
-    gelinSusu(T, kb, cw);
+    gelinSusu(k, T, kb, cw);
   // tavan penceresinden çıkan sürücü
   surucuCiz(k, T, kb, cw);
 }
 // Gelin arabası: kaputta kocaman kırmızı fiyonk, köşelerden tavana tül kurdeleler, ön camın dibinde çiçekler.
-function gelinSusu(T, kb, cw) {
+function gelinSusu(k, T, kb, cw) {
+  // Lider yeni değiştiyse süs kaputta büyüyerek açılır (yaklaşık bir vuruş), tül ve çiçekler belirir.
+  const ku = D.kurdeleUcus, u = ku && ku.kime === k ? clamp((B - ku.b0) / 1.1, 0, 1) : 1;
+  const acil = u < 1 ? yumusak(u) * (1 + 0.45 * Math.sin(Math.PI * u)) : 1;
+  c.globalAlpha = Math.min(1, u * 2);
   for (const s of [-1, 1]) {
     const a = pr(yerel(T, s * 0.42, GOVDE.y1, GOVDE.c - 0.02)), b = pr(yerel(T, s * kb.a, kb.y1, kb.c1)), o = pr(yerel(T, s * 0.5, GOVDE.y1 + 0.16, (GOVDE.c + kb.c1) / 2));
     if (!a.ok || !b.ok || !o.ok)
@@ -203,7 +208,8 @@ function gelinSusu(T, kb, cw) {
     daire(p, 0.06, i % 2 ? '#e86a9a' : '#fbefdc', cw * 0.7);
     daire(p, 0.022, '#ffd166');
   }
-  fiyonkCiz(pr(yerel(T, 0, GOVDE.y1 + 0.03, GOVDE.c - 0.16)), 1, Math.sin(TAU * B) * 0.06);
+  c.globalAlpha = 1;
+  fiyonkCiz(pr(yerel(T, 0, GOVDE.y1 + 0.03, GOVDE.c - 0.16)), acil * T.k, Math.sin(TAU * B) * 0.06);
 }
 // Fiyonk: iki ilmek, düğüm ve iki kuyruk. p ekrandaki merkez, b büyüklük çarpanı, aci hafif sallanma.
 function fiyonkCiz(p, b, aci) {
@@ -292,11 +298,16 @@ function oyunCiz() {
       et.y = ph.y - KAFA_R * boy * T.k * ph.s;
       et.s = ph.s;
       et.d = ph.d;
-      k.et = et;
+      // Ad sıralama kutusuna ve göstergeye girmesin: kadrajın üst kenarındaki arkadaki arabaların adı yazılmaz
+      // (gelin arabası hariç). Drift atanın adını oyunUst büyük yazar.
+      const yildiz = D.drift && D.drift.k === k;
+      if (!yildiz && (et.y >= ETIKET_UST || k === D.lider))
+        k.et = et;
     }
   }
 }
-// Listenin üstüne: korna yazıları ve uçan gelin kurdelesi.
+const ETIKET_UST = 560;
+// Listenin üstüne: korna yazıları, el değiştiren gelin süsünün ışık izi, drift atanın büyük adı.
 function oyunUst() {
   c.textAlign = 'center';
   c.textBaseline = 'middle';
@@ -318,10 +329,50 @@ function oyunUst() {
   }
   c.globalAlpha = 1;
   c.textBaseline = 'alphabetic';
+  // Gelin süsü el değiştirince eski arabadan yenisine bir ışık izi akar (süs yeni arabada hemen açılır).
   const ku = D.kurdeleUcus;
   if (ku && ku.kime.ar) {
-    const t = clamp((B - ku.b0) / ku.sure, 0, 1), y = yumusak(t), h = ku.kime;
-    const p = pr([lerp(ku.x, h.x + h.ox, y), 0.5 + Math.sin(t * Math.PI) * 2.2, lerp(ku.z, h.z + h.oz + 0.5, y)]);
-    fiyonkCiz(p, 1.6, t * 9);
+    const h2 = ku.kime, bas = B - ku.b0;
+    for (let i = 0; i < 9; i++) {
+      const t = clamp(bas / 0.9 - i * 0.07, 0, 1);
+      if (t <= 0 || bas > 1.6)
+        continue;
+      const y = yumusak(t), p = pr([lerp(ku.x, h2.x + h2.ox, y), 0.6 + Math.sin(t * Math.PI) * 1.8, lerp(ku.z, h2.z + h2.oz + 0.5, y)]);
+      if (!p.ok)
+        continue;
+      c.globalAlpha = (1 - i / 9) * clamp(2 - bas, 0, 1);
+      c.fillStyle = i % 2 ? '#ffd166' : '#e23d2f';
+      c.beginPath();
+      c.arc(p.x, p.y, p.s * (0.13 - i * 0.01), 0, TAU);
+      c.fill();
+    }
+    c.globalAlpha = 1;
+  }
+  // Drift atanın adı: sahnenin yıldızı, büyük ve vurgu renginde. Arabanın önüne, yola yazılır: üstündeki öteki
+  // adlar onu örtmesin.
+  if (D.drift && D.drift.k.ar && D.drift.k.yer > 0.3) {
+    const k = D.drift.k, T = arabaDonusum(k), kb = KABIN[k.ar.kasa], boy = clamp(k.g.boy, 0.98, 1.1);
+    const p = pr([T.x, 0, T.z - GOVDE.c * T.k - 0.35]);
+    if (p.ok) {
+      c.font = '30px "Lilita One", Rubik, system-ui, sans-serif';
+      c.textAlign = 'center';
+      c.textBaseline = 'middle';
+      const w = Math.min(420, c.measureText(k.ad).width + 40), x = clamp(p.x, w / 2 + 8, GW - w / 2 - 8), y = Math.min(ALAN_ALT - 30, p.y + 24);
+      c.fillStyle = RENK.vurgu;
+      c.strokeStyle = MUREKKEP;
+      c.lineWidth = 3;
+      c.beginPath();
+      c.roundRect(x - w / 2, y - 24, w, 48, 24);
+      c.fill();
+      c.stroke();
+      c.fillStyle = MUREKKEP;
+      c.fillText(k.ad, x, y + 1, w - 24);
+      c.font = '20px "Lilita One", Rubik, system-ui, sans-serif';
+      c.lineWidth = 4;
+      c.strokeText('DRIFT ŞOV!', x, y - 36);
+      c.fillStyle = RENK.sicak;
+      c.fillText('DRIFT ŞOV!', x, y - 36);
+      c.textBaseline = 'alphabetic';
+    }
   }
 }

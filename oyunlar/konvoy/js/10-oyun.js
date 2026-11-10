@@ -1,30 +1,33 @@
 /* KONVOY DURUMU — diziliş, hediye etkileri, gelin kurdelesinin el değiştirmesi, drift kuyruğu.
- * Konvoy kameraya doğru gider (yerel ileri = -z). En önde gelin arabası (lider), arkasında ok ucu biçiminde
- * sıralar: öndeki sıralar daha çok hediye atanlardır, bir sıranın ortası kenarından öndedir.
- * D'ye eklenenler: kolon (sıradaki araba sayısı), zigzag ({ bas, sure }: bütün konvoyun kıvrılması),
+ * Konvoy kameraya doğru gider (yerel ileri = -z). En önde gelin arabası (lider, diğerlerinden büyük), arkasında
+ * en çok dört şeritte uzayan konvoy: öndeki sıralar daha çok hediye atanlardır, komşu şeritler yarım sıra
+ * kaydırılır ki arkadakinin yüzü öndekinin arkasında kalmasın.
+ * D'ye eklenenler: kolon (şerit sayısı), zigzag ({ bas, sure }: bütün konvoyun kıvrılması),
  * fisekler (gökteki havai fişekler), fisekBit / sovBit (fişek ve davul şovu hangi vuruşa dek sürer),
- * driftKuyruk + drift ({ k, bas }: en öne çıkıp dönen), kurdeleUcus (el değiştiren gelin kurdelesi),
+ * driftKuyruk + drift ({ k, bas }: en öne çıkıp dönen), kurdeleUcus (gelin süsünün yeni arabada açılışı),
  * yolW (yolun yarı genişliği), kayma (yolun akan mesafesi, metre), duman (drift dumanı), sonB.
- * Süreler vuruşla (B) ölçülür: korna 1,5 vuruş, kurdele uçuşu 2 vuruş, drift 16 vuruş.
+ * Süreler vuruşla (B) ölçülür: korna 1,5 vuruş, kurdele geçişi 2 vuruş, drift 16 vuruş.
  * Kancalar: oyunYerlesim, oyunGiris, oyunHediye, oyunLiderDegisti, oyunBaslat, oyunBosalt, oyunDurum.
  */
-const ARA_X = 1.12;    // yan yana iki araba arası (metre)
-const ARA_Z = 1.55;    // iki sıra arası
-const OK_UCU = 0.2;    // kenardaki araba ortadakinden bu kadar (× ARA_Z) geride: ok ucu
+const ARA_X = 1.25;    // yan yana iki şerit arası (metre); iki şeritte daha açık (ARA_X2): arkadakiler gelin arabasının
+const ARA_X2 = 2.0;    // iki yanından görünsün
+const ARA_Z = 2.4;     // aynı şeritte iki araba arası
+const ILK_SIRA = 3.0;  // gelin arabası ile ilk sıra arası (gelin arabası büyük)
 const LIDER_Z = -1.3;  // gelin arabasının yeri
-const DRIFT_Z = -4.2;  // drift atanın yeri: gelin arabasının önündeki boş yol
+const DRIFT_Z = -4.9;  // drift atanın yeri: gelin arabasının önündeki boş yol
 const KORNA_V = 1.5;   // bir kornanın süresi (vuruş)
 const DRIFT_V = 16;    // drift şovunun süresi (vuruş)
+const LIDER_OLCEK = 1.3, DRIFT_OLCEK = 2.1; // gelin arabası ve drift atan araba bu kadar büyük çizilir
 Object.assign(D, { kolon: 1, zigzag: null, fisekler: [], fisekBit: -1, sovBit: -1, driftKuyruk: [], drift: null, kurdeleUcus: null, yolW: 2.4, kayma: 0, duman: [], sonB: 0 });
 
-// Konvoyun genişliği kalabalıkla artar: 3 araba V biçiminde, 36 araba altı şerit.
-function kolonSayisi(m) { return m <= 1 ? 1 : m <= 4 ? 2 : m <= 9 ? 3 : m <= 16 ? 4 : m <= 25 ? 5 : 6; }
+// Konvoy önce uzar, sonra genişler: 2 araba tek sıra, 9 araba iki şerit, 36 araba dört şerit.
+function kolonSayisi(m) { return m <= 1 ? 1 : m <= 8 ? 2 : m <= 20 ? 3 : 4; }
 function oyunYerlesim() {
   const m = D.sira.length - 1, kol = kolonSayisi(m), yerler = [];
   D.kolon = kol;
   for (let i = 0; i < kol; i++)
     yerler.push(i - (kol - 1) / 2);
-  // Sıranın içi ortadan kenara dolar: sıradaki en yüksek jeton ortaya, yani en öne gelir.
+  // Sıranın içi ortadan kenara dolar: sıradaki en yüksek jeton ortaya gelir.
   yerler.sort((a, b) => Math.abs(a) - Math.abs(b) || a - b);
   D.sira.forEach((k, i) => {
     arabaHazir(k);
@@ -34,8 +37,9 @@ function oyunYerlesim() {
       return;
     }
     const s = Math.floor((i - 1) / kol), o = yerler[(i - 1) % kol];
-    k.hedefX = o * ARA_X;
-    k.hedefZ = LIDER_Z + ARA_Z * (s + 1) + Math.abs(o) * ARA_Z * OK_UCU;
+    const kay = kol === 2 ? (o > 0 ? 0.5 : 0) : Math.abs(o) >= 1 ? 0.5 : 0;
+    k.hedefX = o * (kol === 2 ? ARA_X2 : ARA_X);
+    k.hedefZ = LIDER_Z + ILK_SIRA + ARA_Z * (s + kay);
   });
 }
 // Yeni gelen arkadan, kendi şeridinin biraz dışından hızla gelip yerine girer (sollar gibi).
@@ -111,6 +115,7 @@ function oyunBosalt() {
 }
 function oyunDurum(d) {
   d.gelinArabasi = d.lider;
+  d.etiketUst = ETIKET_UST;
   d.drift = D.drift ? D.drift.k.ad : null;
   d.driftKuyruk = D.driftKuyruk.length;
   d.zigzag = !!D.zigzag;

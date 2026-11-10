@@ -27,6 +27,7 @@ const OYUN = {
   // Akşamüstü: mor gök, sıcak turuncu ışık. Mürekkep ve açık ton çekirdeğinkiyle aynı kalır (stil dosyasındaki
   // yarı saydam tonlar onlardan türetildi; docs/KANCALAR.md).
   renk: { zemin: '#1a1233', zemin2: '#2a1b4a', zemin3: '#3d2862', cizgi: '#55407e', vurgu: '#ffd166', sicak: '#ef5a3c', serin: '#2fc4b2', soluk: '#c4b3dc' },
-  // Araba + tavandan çıkan kişi insan boyundan uzun: arkadakinin adının üstüne daha çok pay.
-  kamera: { egim: 0.55, ustPay: 1.9, altPay: 0.3 }
+  // Alçak ve geniş açılı kamera: konvoy ufka doğru küçülerek uzar, gün batımı kadraja girer. Araba + tavandan
+  // çıkan kişi insan boyundan uzun: arkadakinin adının üstüne daha çok pay.
+  kamera: { egim: 0.5, F: 700, enYakin: 3.5, ustPay: 2.2, altPay: 0.25 }
 };

@@ -26,10 +26,10 @@ const { sonuc, kontrol } = kontrolcu();
   let d = await durum();
   kontrol('Durumda gelin arabasının sahibi de var', d.gelinArabasi === 'Ali' && d.lider === 'Ali', d.gelinArabasi);
   await O({ tip: 'hediye', kullanici: { id: 'b', ad: 'Bora' }, jeton: 5 });
-  const pk = await p.evaluate(() => ({ pankart: document.getElementById('pankart-yeri').textContent, ucus: !!CanliOyun._test.D.kurdeleUcus }));
-  kontrol('Gelin arabası el değiştirince pankart yeni sahibini yazar, kurdele uçar', /Gelin arabası el değiştirdi/.test(pk.pankart) && pk.pankart.includes('Bora') && pk.ucus, pk);
+  const pk = await p.evaluate(() => ({ pankart: document.getElementById('pankart-yeri').textContent, ucus: !!CanliOyun._test.D.kurdeleUcus, ayniAraba: CanliOyun._test.D.kurdeleUcus && CanliOyun._test.D.kurdeleUcus.kime === CanliOyun._test.D.lider }));
+  kontrol('Gelin arabası el değiştirince pankart yeni sahibini yazar, süs taçla aynı anda yeni arabaya geçer', /Gelin arabası el değiştirdi/.test(pk.pankart) && pk.pankart.includes('Bora') && pk.ucus && pk.ayniAraba, pk);
   await p.waitForTimeout(2200);
-  kontrol('Uçan kurdele iki vuruşta yerine varır', await p.evaluate(() => !CanliOyun._test.D.kurdeleUcus));
+  kontrol('Süsün açılış geçişi iki vuruşta biter', await p.evaluate(() => !CanliOyun._test.D.kurdeleUcus));
 
   // diziliş: gelin arabası en önde ve ortada; hediye atan öne geçer; herkesin adı var
   await bosalt();
@@ -41,12 +41,12 @@ const { sonuc, kontrol } = kontrolcu();
     CanliOyun.olay({ tip: 'hediye', kullanici: { id: 'd11', ad: 'dizi11' }, jeton: 1 });
     const sonra = D.oy.get('d11').hedefZ;
     return { liderX, liderZ, enOnde, once, sonra,
-      etiket: D.sira.filter(k => k.et).length, kisi: D.sira.length, ayni: new Set(D.sira.map(k => k.hedefX.toFixed(2) + ',' + k.hedefZ.toFixed(2))).size };
+      etiket: D.sira.filter(k => k.et || (k._et && k._et.y < CanliOyun.durum().etiketUst)).length, ustte: D.sira.filter(k => k.et && k.et.y < CanliOyun.durum().etiketUst && k !== D.lider).length, kisi: D.sira.length, ayni: new Set(D.sira.map(k => k.hedefX.toFixed(2) + ',' + k.hedefZ.toFixed(2))).size };
   });
   kontrol('Gelin arabası ortada, herkesin önünde', diz.liderX === 0 && diz.enOnde, diz);
   kontrol('İki araba aynı yere konmaz', diz.ayni === diz.kisi, diz.ayni + '/' + diz.kisi);
   kontrol('Hediye atan arka sıradan öne geçer', diz.sonra < diz.once, [diz.once, diz.sonra]);
-  kontrol('Yerine oturan her arabanın sürücüsünün adı var', diz.etiket === diz.kisi, diz.etiket + '/' + diz.kisi);
+  kontrol('Her arabanın adı var; yalnız kadrajın üst kenarındakilerin adı sıralama kutusuna girmesin diye yazılmaz', diz.etiket === diz.kisi && diz.ustte === 0, diz.etiket + '/' + diz.kisi + ', üstte yazılan ' + diz.ustte);
 
   // her kademe kendi etkisini başlatır
   await bosalt();
@@ -87,6 +87,28 @@ const { sonuc, kontrol } = kontrolcu();
     const D = CanliOyun._test.D; return { kuyruk: D.driftKuyruk.length, fisek: D.fisekler.length };
   });
   kontrol('Selde drift kuyruğu en çok 4, gökte en çok 14 fişek', sel.kuyruk <= 4 && sel.fisek <= 14, sel);
+
+  // hareket: yarım saniye arayla üç kare; yol çizgileri akar, arabalar vuruşla yaylanır, zigzagda kıvrılır
+  await bosalt();
+  await p.evaluate(() => { for (let i = 0; i < 9; i++) CanliOyun.olay({ tip: 'yorum', kullanici: { id: 'h' + i, ad: 'hareket' + i }, metin: 'x' }); });
+  await p.waitForTimeout(3000);
+  await O({ tip: 'hediye', kullanici: { id: 'h8', ad: 'hareket8' }, jeton: 50 });
+  await p.waitForTimeout(1200);
+  const anlar = [];
+  for (let i = 0; i < 3; i++) {
+    if (i) await p.waitForTimeout(500);
+    await p.locator('#sahne').screenshot({ path: CIKTI + '/hareket-' + (i + 1) + '.png' });
+    anlar.push(await p.evaluate(() => {
+      const D = CanliOyun._test.D, t = document.getElementById('tuval'), g = t.getContext('2d');
+      // tuvalin alt kısmı (öndeki yol) ve orta şerit (arabalar): her karede ham pikseller
+      const al = (y0, y1) => Array.from(g.getImageData(0, Math.round(t.height * y0), t.width, Math.round(t.height * (y1 - y0))).data.filter((_, i) => i % 16 === 0));
+      return { vurus: CanliOyun.durum().vurus, kayma: D.kayma, oy: D.sira.map(k => +k.oy0.toFixed(4)), ox: D.sira.map(k => +k.ox.toFixed(4)), yol: al(0.82, 0.98), araba: al(0.45, 0.8) };
+    }));
+  }
+  const fark = (a, b) => { let n = 0; for (let i = 0; i < a.length; i++) if (Math.abs(a[i] - b[i]) > 12) n++; return +(n / a.length).toFixed(3); };
+  const hr = [0, 1].map(i => ({ vurus: +(anlar[i + 1].vurus - anlar[i].vurus).toFixed(2), kayma: +(anlar[i + 1].kayma - anlar[i].kayma).toFixed(2), yolPiksel: fark(anlar[i].yol, anlar[i + 1].yol), arabaPiksel: fark(anlar[i].araba, anlar[i + 1].araba), zipla: anlar[i].oy.filter((v, j) => Math.abs(v - anlar[i + 1].oy[j]) > 0.002).length, kivril: anlar[i].ox.filter((v, j) => Math.abs(v - anlar[i + 1].ox[j]) > 0.02).length }));
+  kontrol('Yarım saniyede yol akar: çizgilerin pikselleri değişir', hr.every(h => h.kayma > 0.3 && h.yolPiksel > 0.01), hr.map(h => ({ kayma: h.kayma, yolPiksel: h.yolPiksel })));
+  kontrol('Yarım saniyede arabalar yaylanır ve zigzagda kıvrılır', hr.every(h => h.zipla >= 5 && h.kivril >= 5 && h.arabaPiksel > 0.02), hr);
 
   // çıkan araba yoldan çekilir ve silinir
   await bosalt();

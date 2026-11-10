@@ -42,7 +42,10 @@ function arabaHareket(k, dt) {
       egimYon = -0.5 * zarf * Math.cos(ev);
     }
   }
-  k.ox += (ox - k.ox) * Math.min(1, dt * 10);
+  // Drift şovunda öteki arabalar iki yana açılır: ortada yıldızın koridoru kalır.
+  if (D.drift && !yildiz && !k.cikiyor)
+    ox += (k.hedefX > 0.01 ? 1 : k.hedefX < -0.01 ? -1 : k.sn % 2 ? 1 : -1) * 1.1;
+  k.ox += (ox - k.ox) * Math.min(1, dt * (D.drift ? 4 : 10));
   k.oz = 0;
   // Yön: kameraya doğru (π); yer değiştirirken gittiği yana kırılır, zigzagda kıvrımın yönüne bakar.
   let yon = Math.PI + egimYon + (uz > 0.25 && !k.cikiyor ? clamp(-dx * 0.35, -0.5, 0.5) : 0) + (k.cikiyor ? -Math.sign(k.cikX) * 0.35 : 0);
@@ -73,8 +76,8 @@ function arabaHareket(k, dt) {
   if (B >= k.zip0 && B < k.zip1)
     zip = (yildiz ? 0.12 : 0.22) * Math.abs(Math.sin(Math.PI * (B - k.zip0)));
   k.oy0 = 0.025 * yay + zip;
-  // Drift atan araba sahneyi alır: birkaç saniyeliğine bir buçuk kat büyür.
-  k.olcek = lerp(k.olcek || 1, yildiz ? 1.5 : 1, Math.min(1, dt * 4));
+  // Gelin arabası hep büyüktür; drift atan araba şov boyunca iki katı büyür ve sahneyi alır.
+  k.olcek = lerp(k.olcek || 1, yildiz ? DRIFT_OLCEK : k === D.lider && !k.cikiyor ? LIDER_OLCEK : 1, Math.min(1, dt * 4));
 }
 
 function oyunGuncelle(dt) {
@@ -117,20 +120,26 @@ function oyunGuncelle(dt) {
     arabaHareket(k, dt);
   }
 }
-// Gökte bir havai fişek: önce yükselir, sonra açılır. Göğün sağ yarısında patlar: sol üstte sıralama kutusu var. Görünümü süs olduğu için Math.random kullanır.
+// Gökte bir havai fişek: önce yükselir, sonra açılır. Göğün sağ yarısında patlar (sol üstte sıralama kutusu var);
+// y ufkun kaç piksel üstünde açılacağıdır. Görünümü süs olduğu için Math.random kullanır.
 function fisekAt(n) {
   for (let i = 0; i < n && D.fisekler.length < 14; i++)
-    D.fisekler.push({ x: 280 + Math.random() * 380, y: 250 + Math.random() * 140, b0: B + i * 0.35, renk: KUMAS[Math.floor(Math.random() * KUMAS.length)], renk2: Math.random() < 0.5 ? '#ffd166' : '#f6ecd9', n: 22 + Math.floor(Math.random() * 10), aci: Math.random() * TAU });
+    D.fisekler.push({ x: 280 + Math.random() * 380, y: 70 + Math.random() * 150, b0: B + i * 0.35, renk: KUMAS[Math.floor(Math.random() * KUMAS.length)], renk2: Math.random() < 0.5 ? '#ffd166' : '#f6ecd9', n: 22 + Math.floor(Math.random() * 10), aci: Math.random() * TAU });
 }
 
 // Kadraja girmesi gerekenler: her arabanın önü ve arkası (yanlarından pay bırakarak), drift yeri.
+// Büyük çizilen gelin ve drift arabası ölçekleriyle girer. Kamera konvoyun yalnız ön KADRAJ_Z metresini sığdırır;
+// kuyruk ufka doğru küçülerek uzar (sığdırılsaydı kamera uzaklaşır, öndeki arabalar karıncaya dönerdi).
+const KADRAJ_Z = 8.5;
 function oyunKamera() {
-  const zz = D.zigzag ? 0.5 : 0, n = [[0.9, LIDER_Z - 0.75], [0.9, LIDER_Z + 0.75]];
+  const zz = D.zigzag ? 0.5 : 0, ac = D.drift ? 1.1 : 0, n = [[0.95 * LIDER_OLCEK, LIDER_Z - 0.8 * LIDER_OLCEK], [0.95 * LIDER_OLCEK, LIDER_Z + 0.8 * LIDER_OLCEK]];
   for (const k of D.sira) {
-    const x = Math.abs(k.hedefX) + 0.15 + zz;
-    n.push([x, k.hedefZ - 0.75], [x, k.hedefZ + 0.75]);
+    if (k === D.lider)
+      continue;
+    const x = Math.abs(k.hedefX) + 0.15 + zz + ac, z = Math.min(k.hedefZ, LIDER_Z + KADRAJ_Z);
+    n.push(k.hedefZ < LIDER_Z + KADRAJ_Z ? [x, z - 0.75] : [0, z], [k.hedefZ < LIDER_Z + KADRAJ_Z ? x : 0, z + 0.75]);
   }
   if (D.drift)
-    n.push([1.5, DRIFT_Z - 1.3], [1.5, DRIFT_Z + 0.6]);
+    n.push([1.1 * DRIFT_OLCEK, DRIFT_Z - 0.85 * DRIFT_OLCEK], [1.1 * DRIFT_OLCEK, DRIFT_Z + 0.5]);
   return n;
 }
