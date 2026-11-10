@@ -38,7 +38,8 @@ Yazmadan önce şunlara karar ver:
   hediye atanlardır; bunu dizilişte görünür kıl.
 - **Sahnenin ortasında ne var?** Boş orta zayıf durur.
 - **Lider nasıl ayrılır?** Yer, işaret, renk; bir bakışta.
-- **Renk dünyası.** Zemin, ışık ve yazılar tek paletten (`OYUN.renk`).
+- **Renk dünyası.** Zemin, ışık ve yazılar tek paletten (`OYUN.renk`). Sahne gündüz / açık renkliyse
+  `panelRenk: {}` ekle: yayın masası çekirdeğin koyu temasında kalır, okunur.
 
 ## 3. Kur
 
@@ -46,9 +47,14 @@ Yazmadan önce şunlara karar ver:
 node araclar/yeni-oyun.js <ad> "<Görünen Ad>"
 ```
 
-Şablon `js/10-oyun.js` içinde bütün kancaların en yalın hâlini getirir. O dosyayı kendi oyununa göre yeniden
-yaz; büyüdükçe konuya göre yeni dosyalara böl (`20-hareket.js`, `30-dekor.js`, `40-cizim.js` gibi). Aynı kanca
-iki dosyada tanımlı kalmasın.
+Şablon `js/10-oyun.js` içinde bütün kancaların en yalın hâlini getirir. **Bu dosya artık senin oyununun
+dosyasıdır**: kancaları yerinde değiştir ya da dosyayı silip baştan yaz (asıl şablon `sablon/` altında kalır,
+bozulmaz). Büyüdükçe konuya göre yeni dosyalara böl (`20-hareket.js`, `30-dekor.js`, `40-cizim.js` gibi). Aynı
+kanca iki dosyada tanımlı kalmasın.
+
+`js/00-ayar.js` önerilen ayarlarla gelir; silme: `etiket: { ustSinir: true, altSinir: true, disari: 'gizle' }`
+(adlar sıralama kutusuna ve yorum alanına girmez, ekran dışındakinin adı kenarda yığılmaz), `sahneYazi: { pankart:
+'alt' }` (pankart sıralama kutusunun üstünden geçmez).
 
 Sonra şu sırayla ilerle; her adımdan sonra derleyip kareye bak:
 
@@ -66,8 +72,14 @@ Sonra şu sırayla ilerle; her adımdan sonra derleyip kareye bak:
   çizilirler. Zemin ve arka plan `oyunZemin` içinde doğrudan `c` ile çizilir; orada listeye eklenen şey
   çizilmez (liste sonradan boşaltılır).
 - Araç gibi tek parça nesneyi bir `ozel(derinlik, fn)` ile ekle ve `fn` içinde yalnız `c` ile çiz; `fn`
-  içinden `kap` / `top` çağırma. Tam örnek: `oyunlar/konvoy/js/40-araba.js` (dönebilen kutu, kameraya bakan
-  yüzler, pencereden çıkan sürücü).
+  içinden `kap` / `top` çağırma. Kutu, yüzey, renk tonu için çekirdeğin yardımcılarını kullan: `donusum`,
+  `kutuCiz`, `yuzCiz`, `yerelNokta`, `renkKat`, `daireCiz`, `kapsulCiz` (docs/KANCALAR.md, "Çizim yardımcıları").
+  Tam örnek: `oyunlar/konvoy/js/40-araba.js` (dönebilen kutu, kameraya bakan yüzler, pencereden çıkan sürücü).
+- Gök ve ufuk: `oyunZemin` başında `gokCiz({ gok, zemin, pus, gunes })`; döndürdüğü ufuk satırının altına yol,
+  tarla çiz. Ufkun görünmesi için alçak, geniş açılı kamera (`kamera: { egim: 0.5, F: 700 }`).
+- İnsan takımının ekleri: oturan izleyici `pozOtur(k, oturakY)`, başını çeviren `k.basYon`, iri başlı
+  `k.basOlcek` (ya da `kafaCiz(k, ph, olcek)`), açık el / yumruk `k.elSekil = { R: 'yumruk' }`, uzun kol
+  `k.kolBoy = 1.5`. Bunları kendin yazma; örnekler docs/KANCALAR.md'de.
 - Dış çizgi rengi `MUREKKEP`; renkler `RENK` içinden.
 - Hareketi `B` (vuruş) ile sür: `Math.sin(TAU * B)` vuruşta bir tur atar. `calgi.dumP` her güçlü vuruşta 1'e
   çıkıp söner; ışık ve zıplama için kullan.
@@ -77,8 +89,10 @@ Sonra şu sırayla ilerle; her adımdan sonra derleyip kareye bak:
 Sık takılınan yerler:
 
 - Kancalar `function oyunX() {}` biçiminde işlev bildirimi olmalı; ok işlevi yazarsan derleme durur.
-- Kamera hep `x = 0` çevresine bakar: sahneyi `x = 0` etrafında ortala. `oyunKamera()` yalnız kadraja girmesi
-  gereken yer noktalarını döndürür; yakınlaşmayı çekirdek yapar.
+- `oyunKamera()` kadraja girmesi gereken yer noktalarını döndürür; yakınlaşmayı çekirdek yapar. Öntanımda kamera
+  `x = 0`'a bakar. Gerekirse nesne döndür: `{ noktalar, x: 'orta' }` (yana kaymış sahne), `odak` (ortadaki büyük
+  nesne kalabalık yüzünden küçülmesin), `on: 6` (uzayan dizinin önü sığsın, kuyruğu ufka aksın), nokta başına pay
+  `[x, z, 1.1]` (geniş nesne), `ustPx: 36` (ad için piksel payı). Kendi kamera hilesini yazma.
 - İnsan çizmiyorsan (araç, hayvan, top) her izleyicinin etiket yerini kendin yaz:
   `k.et = { x, y, s, d }` (`pr()` sonucundan: adın duracağı tepe noktası, ölçek, derinlik). Çekirdek `k.et`
   alanını her karede boşaltır; yazmazsan ad görünmez.
@@ -90,6 +104,12 @@ Sık takılınan yerler:
   kendi parçasını ekleyebileceğini söyle (`docs/MUZIK.md`).
 - `gorunumUret(id)` yöresel kıyafet verir (yazma, kasket, önlük). Başka kılık gerekiyorsa gövdeyi kendin çiz,
   başı `kafaCiz` ile al.
+- Adın yeri: ön sıradakinin adı arkadakinin yüzünü örtüyorsa `k.et.asagi = true` (çenenin altına asılır);
+  balonun yerini `k.et.bx / k.et.by` ile ver. Etiketi kendin çizme; çekirdeğinki sınırlara ve çakışmaya bakar.
+- Çekirdekteki bir adla (`kutuCiz`, `renkKat`, `ETIKET` …) işlev ya da `const` yazma. Derleme `UYARI` verirse
+  kendi adını değiştir; `const` çakışmasında derleme durur.
+- `00-ayar.js` çekirdekten önce çalışır: orada `ALAN_UST`, `ETIKET_PAY` gibi çekirdek adları kullanılamaz
+  (`ustSinir: true`, `ustPx: 36` gibi değer yaz).
 
 ## 4. Kareye bak, düzelt, yine bak
 
@@ -97,7 +117,10 @@ Sık takılınan yerler:
 node araclar/derle.js <ad> && node araclar/kare-cek.js <ad>
 ```
 
-`test/cikti/<ad>/kare-hepsi.png` dosyasını aç ve **kendi gözünle** şunları denetle. En az iki tur yap; ilk
+`test/cikti/<ad>/kare-hepsi.png` dosyasını aç ve **kendi gözünle** şunları denetle. Komut ayrıca
+`kare-hareket.png` (9 kişi, çeyrek vuruş arayla 8 kare: hareketin ritmi) ve her kare için `kare-<etiket>.json`
+(yüz yarıçapları, ad kutuları) yazar; sıralama kutusuna giren ad, yorum alanına taşan ad ya da 9 pikselden küçük
+yüz varsa sonunda `DİKKAT` diye söyler. En az iki tur yap; ilk
 karede her zaman düzeltilecek bir şey çıkar.
 
 - Yüzler ya da izleyicinin karşılığı net görünüyor mu, adlar okunuyor mu?
@@ -109,7 +132,7 @@ karede her zaman düzeltilecek bir şey çıkar.
 - En büyük hediye karesi diğerlerinden açıkça farklı mı?
 - Renkler tek bir dünyadan mı, yoksa her şey ayrı telden mi çalıyor?
 
-Kare hareketsizdir; hareketi görmek için oyunu aç (`node kopru.js --deneme --oyun <ad> --ac`).
+Hareketin ritmini `kare-hareket.png` gösterir; akıcılığı görmek için oyunu aç (`node kopru.js --deneme --oyun <ad> --ac`).
 
 ## 5. Sına
 
@@ -134,7 +157,8 @@ Kullanıcıya kısa ve dürüst bir özet ver:
 
 ## Yapma
 
-- `cekirdek/` altını değiştirme. Eksik bir şey varsa oyunda çöz, raporda öner.
+- `cekirdek/` altını değiştirme. Eksik bir şey varsa oyunda çöz, raporda öner. (Çekirdeği değiştiren, var olan
+  oyunların görüntüsünün değişmediğini `node araclar/esitlik.js <ad>` ile kanıtlar.)
 - Başka bir yayının çizimini, adını, müziğini kopyalama. Mekanik alınır, görünüş senin olur.
 - Depoya görsel ya da ses dosyası ekleme.
 - "Testler geçti" diyerek bitirme; kareye bakmadan teslim etme.

@@ -30,9 +30,10 @@ girer. Oyun `D`'yi başka yoldan değiştirmez.
 | `10-muzik.js` | `HAVALAR` (üç üretilen ezgi), `Muzik` sınıfı ve tek örneği `muzik`: zamanlayıcı, ses zinciri, vuruş saati, hazır parça kipi. |
 | `20-oyuncular.js` | `OYUN` eksiklerini doldurur; `KADEME`, `MAKS`, `D`, `karakterYap`, `gorunumUret`, `katil`, `cikar`, `siraGuncelle`, `olay`. |
 | `25-yazilar.js` | Sıra kutusu, bildirim satırı, pankart, paneldeki olay akışı (`gunluk`, en yenisi üstte). Hepsi `textContent`. |
-| `30-sahne.js` | Tuval, `RENK`, kamera (`kam`, `kamKur`, `pr`), `ik`, çizim listesi (`kap`, `top`, `ozel`, `listeCiz`), `kameraSigdir`, `golge`, `etiketCiz`, `kenarKarart`. |
-| `31-insan.js` | İnsan takımı: `iskeletKur`, `kolKur`, `pozBekle`, `insanEkle`, `kafaCiz`. |
+| `30-sahne.js` | Tuval, `RENK` / `PANEL_RENK`, kamera (`kam`, `kamKur`, `pr`), `ik`, çizim listesi (`kap`, `top`, `ozel`, `listeCiz`), `kadrajHesap`, `kameraSigdir`, `golge`, `ETIKET`, `etiketCiz`, `kenarKarart`. |
+| `31-insan.js` | İnsan takımı: `iskeletKur`, `kolKur`, `pozBekle`, `pozOtur`, `insanEkle`, `elSekilCiz`, `kafaCiz`. |
 | `32-parcacik.js` | `konfeti`, `kalpAt`, `parcaCiz`: ekran koordinatında uçan parçacıklar. |
+| `33-cizim.js` | Tek parça nesneler için çizim yardımcıları: `renkKat`, `donusum`, `yerelNokta`, `kutuCiz`, `yuzCiz`, `cokgenCiz`, `daireCiz`, `kapsulCiz`; gök ve ufuk: `ufukY`, `gokCiz`. |
 | `35-kare.js` | `kare()`: her karenin sırası ve ölçümü. |
 | `40-sahte-izleyici.js` | Deneme için uydurma ad, yorum, beğeni, hediye üreten otomatik izleyici. |
 | `50-yayin.js` | `Yayin`: köprüye WebSocket bağlantısı, dış iletiyi olaya çevirme, sıra ve ayar saklama. |
@@ -70,7 +71,9 @@ yerinden edemez; hediye atan edebilir. Atılacak kimse yoksa yeni gelen girmez.
 
 Oyundaki her hareket ve süre `B`'ye bağlıdır. `muzik.beatAt()` öncekinden küçük değer döndürmez. Ses kapalıyken
 saat `performance.now()`'dan, açıkken `AudioContext.currentTime`'dan okunur; geçişte (`tabanDegistir`) vuruş
-korunur. Üretilen müzik adım adım zamanlanır, her adımın vuruş kaydı `iz` dizisinde durur. Davul vuruşları ve
+korunur. Üretilen müzik adım adım zamanlanır, her adımın vuruş kaydı `iz` dizisinde durur. Sayfa 0,4 sn'den
+uzun kilitlenirse (olay seli, ağır kare) kaçan adımlar çalınmaz ama vuruş sayacı onlar kadar ileri alınır
+(`atla`); saat donmadan sürer. Davul vuruşları ve
 zurna notaları `olaylar` kuyruğuna yazılır; kare bunları `calgi.dumP`, `calgi.tekP` nabzına ve `calgi.perde`ye
 çevirir. Hazır parçada vuruş, parçanın önceden ölçülmüş vuruş listesinden okunur (`hazirVurus`); çalgıcı
 olayları o zaman vuruşa bakılarak yapay üretilir.
@@ -91,8 +94,10 @@ derinlik; kameradan 0,35 m'den yakın nokta görünmez sayılır). Oyun `OYUN.ka
 `ustPay`, `altPay` değerlerini ezebilir.
 
 **Sığdırma.** `kameraSigdir`, oyunun verdiği `[x, z]` noktalarını `ALAN_UST`–`ALAN_ALT` (505–1006) şeridine
-sığacak kadar uzaklaşır; genişlikte her nokta kendi derinliğiyle sayılır. Sonuç yumuşakça yaklaşır. Kamera
-x = 0'a bakar, yalnız `|x|` önemlidir. Yatay açı çok hafif salınır; hediye sarsıntısı (`D.sarsinti`) her karede
+sığacak kadar uzaklaşır; genişlikte her nokta kendi derinliğiyle ve kendi payıyla (öntanım 0,55 m) sayılır. Sonuç
+yumuşakça yaklaşır. Kamera öntanımda x = 0'a bakar; oyun seçenekli nesneyle bakılacak x'i, hep büyük kalacak
+odağı, kuyruğu taşabilen ön sığdırmayı ve piksel paylarını verebilir (`docs/KANCALAR.md`, "Kamera"). Hesap
+`kadrajHesap`'tadır. Yatay açı çok hafif salınır; hediye sarsıntısı (`D.sarsinti`) her karede
 söner. `kam.son` (`enX`, `hd`) oyunun zemini kalabalığa göre büyütmesi içindir.
 
 **Çizim listesi.** `kap` (iki ucu farklı yarıçaplı kapsül), `top` (daire) ve `ozel` (serbest çizim) parçaları
@@ -102,7 +107,9 @@ listeye ekler. `listeCiz` listeyi derinliğe göre uzaktan yakına sıralar; eş
 **Ad etiketleri.** `insanEkle` her oyuncunun `k.et`'ini kurar (başın tepesi, ölçek, derinlik). `etiketCiz`
 önceliğe göre sıralar: lider, `k.yildiz`, `k.ozel`, son 6 sn içinde konuşan, ilk beş, sonra öne yakın olanlar.
 Punto ölçekten gelir (13–18, lider +4). Çakışan etiket en çok iki kat yukarı kayar; sığmayan ve önceliği düşük
-olan çizilmez. Yorum balonu 3,4 sn görünür. Lider vurgu renginde ve tacıyla yazılır.
+olan çizilmez. Yorum balonu 3,4 sn görünür. Lider vurgu renginde ve tacıyla yazılır. `OYUN.etiket` üst / alt
+sınır, ekran dışındakini gizleme ve balon sırası ekler; `k.et.asagi` adı bağlantı noktasının altına asar
+(`docs/KANCALAR.md`, "Ad etiketleri").
 
 **İnsan takımı.** Oyun izleyiciyi insan çizecekse kullanır. `gorunumUret(id)` görünümü kimlikten türetir: aynı
 izleyici her yayında aynı kıyafetle gelir. `iskeletKur(k, poz)` pozdan eklemleri kurar, `kolKur` kolları ellere
@@ -112,7 +119,8 @@ okunsun (`31-insan.js` başındaki sabitler). Alanlar ve poz biçimi için `docs
 
 ## Bir karenin sırası (`35-kare.js`)
 
-1. `dt` (en çok 0,05 sn) ve `zaman` ilerler. Müzik planlanır, `B` ve çalgı nabızları okunur.
+1. `dt` (en çok 0,05 sn) ve `zaman` ilerler. Müzik planlanır, `B` ve çalgı nabızları okunur (testin
+   `vurusDondur` kancası doluysa `B` o değerde durur).
 2. Coşku söner (saniyede 0,022), boşta kalan çıkarılır.
 3. `oyunGuncelle(dt)`; çıkışı bitenler `D.oy`'dan silinir.
 4. `kameraSigdir(oyunKamera(), dt)`; tuval ölçeği ayarlanır.
@@ -176,7 +184,7 @@ olaya indirger, bağlantı koparsa artan aralıkla yeniden dener. `--deneme` kü
 
 ## Testler
 
-`node araclar/test.js [ad]` her oyun için üç şey çalıştırır: `derle.js --denetle`, `cekirdek/test/cekirdek.test.js`
+`node araclar/test.js [ad]` her oyun için üç şey çalıştırır (sonda bir kez köprü ve araç testleri): `derle.js --denetle`, `cekirdek/test/cekirdek.test.js`
 (olay kuralları, kapasite, bozuk girdi ve HTML, olay seli, vuruş saatinin geri gitmemesi, ses ölçümü, hazır
 parça, yayın görünümü, kare süresi, uzun çalışma) ve varsa oyunun kendi `test.js`'i. Çekirdek testleri her
 oyuna uygulanır; oyuna özgü sayılar sayfadaki `OYUN`dan okunur. En sonda köprü testi bir kez çalışır. Testler
@@ -188,8 +196,9 @@ Tarayıcı `CHROME_PATH` ile ya da Playwright'ın Chromium'uyla bulunur.
 - Müzik havaları, davul ve zurna sentezi ile kıyafet, ten ve saç paleti çekirdektedir ve halay havasındadır
   (Harman Yeri, Toz Duman, Çifte Mendil; yazma, kasket, önlük). Başka havada bir oyun bunları çekirdekten
   değiştirmeden uyarlayamaz.
-- Kamera sağa sola dönmez, x = 0 çevresine bakar; yanlara yayılan sahne yalnızca uzaklaşarak sığar.
-- Sahne yazıları (sıra, bildirim, pankart) sayfa iskeletinde sabit yerdedir; oyun taşıyamaz.
+- Kamera sağa sola dönmez (yaw yalnız hafif salınım); bakılan x kayar ama perspektif hep önden bakar.
+- Sahne yazıları (sıra, bildirim, pankart) sayfa iskeletinde sabit yerdedir; oyun yalnız pankartı sıralama
+  kutusunun altına alabilir (`OYUN.sahneYazi.pankart = 'alt'`).
 - Sahte izleyici adları için genel liste Türkçe sabittir; yalnız `OYUN.sahteAd` ile değişir.
 - Konfeti ve sahte olaylar `Math.random` kullanır, tekrarlanamaz. Görünüm ise kimlikten türetilir.
 - Sıra kaydı yalnız köprü kipinde tutulur ve 3 saatte eskir.
