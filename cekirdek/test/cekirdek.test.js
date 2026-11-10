@@ -371,6 +371,26 @@ const { sonuc, kontrol } = kontrolcu();
   const gizli = await u.evaluate(async () => { const v0 = CanliOyun.durum().vurus; Object.defineProperty(document, 'hidden', { value: true, configurable: true }); await new Promise(r => setTimeout(r, 2500)); Object.defineProperty(document, 'hidden', { value: false, configurable: true }); await new Promise(r => setTimeout(r, 800)); const v1 = CanliOyun.durum().vurus; return { v0, v1 }; });
   kontrol('Sekme arkaya gidip gelince saat ilerlemeye devam eder', gizli.v1 > gizli.v0 + 3 && gizli.v1 < gizli.v0 + 14, gizli);
 
+  // Oyun kodunda hata: döngü donmaz, hata bir kez bildirilir (ayrı sayfa; bilerek çıkarılan hata yukarıdaki
+  // "sayfada hata çıkmadı" sayımına girmesin).
+  const hs = await b.newPage({ viewport: { width: 720, height: 800 } }), hsHata = [];
+  hs.on('pageerror', e => hsHata.push(e.message));
+  await hs.goto(OYUN_URL);
+  await hs.waitForTimeout(600);
+  const kirik = await hs.evaluate(async () => {
+    const D = CanliOyun._test.D, oy = D.oy;
+    D.oy = null;
+    await new Promise(r => setTimeout(r, 500));
+    D.oy = oy;
+    D.kareMs = 0;
+    await new Promise(r => setTimeout(r, 600));
+    return { kareMs: CanliOyun.durum().kareMs, kisi: CanliOyun.durum().kisi };
+  });
+  // Yarım saniyede ~30 kare bozuk çizilir; hata her karede değil bir kez düşmeli (panelin kendi zamanlayıcısı
+  // da aynı bozuk durumu okuyup bir iki hata verebilir, o yüzden üst sınır 4).
+  kontrol('Oyun kodunda hata olsa da kare döngüsü sürer, hata her karede yinelenmez', kirik.kareMs > 0 && hsHata.length >= 1 && hsHata.length <= 4, { kareMs: kirik.kareMs, hata: hsHata.length, ilk: (hsHata[0] || '').slice(0, 60) });
+  await hs.close();
+
   kontrol('Tüm testler boyunca sayfada hata çıkmadı', hatalar.length === 0, hatalar.slice(0, 5).join(' | '));
   await b.close();
   process.exit(raporla(sonuc) ? 1 : 0);

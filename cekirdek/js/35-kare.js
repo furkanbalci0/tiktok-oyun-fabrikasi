@@ -7,7 +7,35 @@
 const KANCA_UST = typeof oyunUst === 'function' ? oyunUst : null;
 const KANCA_EK_ADLAR = typeof oyunEkAdlar === 'function' ? oyunEkAdlar : null;
 let sonKare = 0, kareSay = 0;
+// Döngü: bir kare hata verse de sonraki kare istenir. Yoksa oyun kodundaki tek bir hata sahneyi sessizce
+// dondurur ve neden donduğu görünmez. Hata konsola ve sayfaya (pageerror) bir kez düşer; deneme görünümünde
+// sahnenin ortasına da yazılır ki kareye bakan hemen görsün. Yayın görünümünde (#yayin) ekrana yazılmaz.
 function kare(simdiMs) {
+  try {
+    kareIc(simdiMs);
+  } catch (e) {
+    const ileti = String(e && e.message || e);
+    if (kare.hata !== ileti) {
+      kare.hata = ileti;
+      setTimeout(() => { throw e; });
+    }
+    if (!document.body.classList.contains('yayin')) {
+      c.setTransform(tuval.width / GW, 0, 0, tuval.height / GH, 0, 0);
+      c.fillStyle = '#b3261e';
+      c.fillRect(0, 560, GW, 150);
+      c.fillStyle = '#fff';
+      c.textAlign = 'center';
+      c.textBaseline = 'middle';
+      c.font = '700 30px Rubik, sans-serif';
+      c.fillText('Oyun kodunda hata (bu kare çizilemedi)', GW / 2, 605);
+      c.font = '500 22px Rubik, sans-serif';
+      c.fillText(ileti.slice(0, 58), GW / 2, 648);
+      c.fillText(ileti.slice(58, 116), GW / 2, 680);
+    }
+  }
+  requestAnimationFrame(kare);
+}
+function kareIc(simdiMs) {
   const olcBas = performance.now(), dt = Math.min(0.05, (simdiMs - sonKare) / 1000 || 0.016);
   sonKare = simdiMs;
   zaman += dt;
@@ -87,5 +115,4 @@ function kare(simdiMs) {
     }
   }
   D.kareMs = D.kareMs ? D.kareMs * 0.95 + (performance.now() - olcBas) * 0.05 : performance.now() - olcBas;
-  requestAnimationFrame(kare);
 }

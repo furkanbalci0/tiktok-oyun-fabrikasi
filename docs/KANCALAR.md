@@ -129,6 +129,10 @@ Ayrıntılar:
   kendi alanlarını ekliyorsan (araç rengi, binek) bunu tek bir "hazır mı" işlevinde yap ve `oyunYerlesim`,
   `oyunGiris`, `oyunBaslat` üçünden de çağır.
 - Derlenen kod katı kipte çalışır (`'use strict'`): bildirilmemiş değişkene atama hata verir.
+- Bir kancan hata verirse o kare yarım kalır ama döngü sürer: deneme görünümünde sahnenin ortasında kırmızı
+  bir şerit hatanın iletisini yazar, hata konsola bir kez düşer. Karede kırmızı şerit görüyorsan önce onu
+  düzelt; adların çıkmaması ya da kameranın yaklaşmaması çoğu zaman bunun sonucudur. Sık neden: bir alanın
+  tanımsız kalıp hesabı `NaN` yapması. Yayın görünümünde (`#yayin`) şerit çizilmez.
 - `kameraSigdir` her noktanın yanına 0,55 m pay ekler (bir insanın yarı genişliği). Daha geniş nesnede (araba)
   `oyunKamera`'dan nesnenin kenar noktalarını da döndür.
 - `muzik.sov`'u çekirdek değiştirmez; oyun açıp kapatır (halay: `oyunHediye` ve `oyunGuncelle` içinde
