@@ -21,8 +21,10 @@ const tarayici = (ek = []) => playwright.chromium.launch({
   executablePath: process.env.CHROME_PATH || undefined,
   args: ['--no-sandbox', '--autoplay-policy=no-user-gesture-required', ...ek]
 });
-// Her sayfada bu bilgisayardaki muzik/ klasörü yok sayılır: testler hep üretilen müzikle çalışır.
-const muzikKapat = p => p.addInitScript(() => { window.OYUN_MUZIK_KAPALI = true; });
+// Her sayfada bu bilgisayardaki muzik/ klasörü yok sayılır: testler hep üretilen müzikle çalışır. Web yazı tipi
+// (Google Fonts) istenmez: bağlantı yavaşsa ya da yoksa sayfanın load olayı 30 sn bekleyip testi düşürüyordu;
+// testler yazı tipine bakmaz, yedek yazı tipiyle çalışır.
+const muzikKapat = async p => { await p.route(/fonts\.(googleapis|gstatic)\.com/, r => r.abort()); await p.addInitScript(() => { window.OYUN_MUZIK_KAPALI = true; }); };
 async function tarayiciAc(ek = []) {
   const b = await tarayici(ek), ac = b.newPage.bind(b), bag = b.newContext.bind(b);
   b.newPage = async (...a) => { const p = await ac(...a); await muzikKapat(p); return p; };
