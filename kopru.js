@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* Mendil Kimde? — TikTok köprüsü
+/* TikTok köprüsü — depodaki her oyun için aynı program
  *
  * Ne yapar:
  *   1. Oyunu bu bilgisayarda bir adresten açar:  http://localhost:8787
@@ -10,10 +10,13 @@
  *   Hesabına giriş yapmaz, şifre ya da oturum bilgisi istemez, yayına mesaj yazmaz, hiçbir ayarı değiştirmez.
  *
  * Kullanım:
- *   node kopru.js kullanici_adin          gerçek yayın (önce: npm install)
- *   node kopru.js --deneme                TikTok olmadan sahte olaylarla dener
+ *   node kopru.js kullanici_adin --oyun halay   gerçek yayın (önce: npm install)
+ *   node kopru.js --deneme --oyun halay         TikTok olmadan sahte olaylarla dener
  *   node kopru.js kullanici_adin --port 9000
- *   node kopru.js kullanici_adin --ac          oyunu tarayıcıda kendisi açar
+ *   node kopru.js kullanici_adin --ac           oyunu tarayıcıda kendisi açar
+ *
+ * Hangi oyun: --oyun <ad> verilirse oyunlar/<ad>/oyun.html. Verilmezse önce bu dosyanın yanındaki oyun.html
+ * (yayıncı paketi böyle gelir), o da yoksa depoda tek oyun varsa o açılır.
  */
 'use strict';
 const http = require('http'), crypto = require('crypto'), fs = require('fs'), path = require('path');
@@ -22,8 +25,20 @@ const args = process.argv.slice(2);
 const DENEME = args.includes('--deneme');
 const pi = args.indexOf('--port');
 const PORT = pi >= 0 ? parseInt(args[pi + 1], 10) || 8787 : 8787;
-const KULLANICI = (args.find((a, i) => !a.startsWith('--') && args[i - 1] !== '--port') || '').replace(/^@/, '').trim();
-const OYUN = path.join(__dirname, 'mendil-kimde.html');
+const oi = args.indexOf('--oyun');
+const KULLANICI = (args.find((a, i) => !a.startsWith('--') && args[i - 1] !== '--port' && args[i - 1] !== '--oyun') || '').replace(/^@/, '').trim();
+function oyunlariBul() {
+  const kl = path.join(__dirname, 'oyunlar');
+  try { return fs.readdirSync(kl).filter(a => fs.existsSync(path.join(kl, a, 'oyun.html'))); } catch (e) { return []; }
+}
+function oyunKlasoru() {
+  if (oi >= 0) { const ad = args[oi + 1] || ''; return /^[\w-]+$/.test(ad) ? path.join(__dirname, 'oyunlar', ad) : null; }
+  if (fs.existsSync(path.join(__dirname, 'oyun.html'))) return __dirname;
+  const adlar = oyunlariBul();
+  return adlar.length === 1 ? path.join(__dirname, 'oyunlar', adlar[0]) : null;
+}
+const KLASOR = oyunKlasoru();
+const OYUN = KLASOR ? path.join(KLASOR, 'oyun.html') : null;
 
 const yaz = (...a) => console.log(new Date().toTimeString().slice(0, 8), ...a);
 
@@ -50,9 +65,9 @@ const sunucu = http.createServer((req, res) => {
   const yol = (req.url || '/').split('?')[0];
   if (yol === '/' || yol === '/index.html') {
     fs.readFile(OYUN, 'utf8', (hata, html) => {
-      if (hata) { res.writeHead(500, { 'content-type': 'text/plain; charset=utf-8' }); res.end('mendil-kimde.html bulunamadı. kopru.js ile aynı klasörde olmalı.'); return; }
+      if (hata) { res.writeHead(500, { 'content-type': 'text/plain; charset=utf-8' }); res.end('oyun.html bulunamadı. Önce derle: node araclar/derle.js <ad>'); return; }
       // Oyuna "seni köprü açtı, şu adrese bağlan" bilgisini ver.
-      const ek = '<script>window.MENDIL_KOPRU = (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/olay";</script>';
+      const ek = '<script>window.OYUN_KOPRU = (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/olay";</script>';
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
       res.end(html.replace('<body>', '<body>\n' + ek));
     });
@@ -68,7 +83,7 @@ const MUZIK_TUR = { '.js': 'text/javascript; charset=utf-8', '.mp3': 'audio/mpeg
 function muzikSun(ad, req, res) {
   const tur = MUZIK_TUR[path.extname(ad).toLowerCase()];
   if (!tur || !/^[\w.-]+$/.test(ad) || ad.includes('..')) { res.writeHead(404); res.end(); return; }
-  const dosya = path.join(__dirname, 'muzik', ad);
+  const dosya = path.join(KLASOR, 'muzik', ad);
   fs.stat(dosya, (hata, bilgi) => {
     if (hata || !bilgi.isFile()) { res.writeHead(404); res.end(); return; }
     // Ses öğesi parçanın içinde gezinebilsin diye aralık isteği desteklenir.
@@ -117,12 +132,17 @@ sunucu.on('error', e => {
 });
 function calistir() {
   if (!DENEME && !KULLANICI) {
-    console.log('\nKullanım:\n  node kopru.js tiktok_kullanici_adin\n  node kopru.js --deneme     (TikTok olmadan dener)\n');
+    console.log('\nKullanım:\n  node kopru.js tiktok_kullanici_adin --oyun <ad>\n  node kopru.js --deneme --oyun <ad>     (TikTok olmadan dener)\n');
+    process.exit(1);
+  }
+  if (!OYUN || !fs.existsSync(OYUN)) {
+    const adlar = oyunlariBul();
+    console.log('\nHangi oyun açılacak? --oyun <ad> ekle.' + (adlar.length ? ' Derlenmiş oyunlar: ' + adlar.join(', ') : ' Henüz derlenmiş oyun yok: node araclar/derle.js <ad>') + '\n');
     process.exit(1);
   }
   // Yalnızca bu bilgisayardan erişilir (127.0.0.1); ağdaki başka cihazlar bağlanamaz.
   sunucu.listen(PORT, '127.0.0.1', () => {
-    console.log('\n  Mendil Kimde? köprüsü çalışıyor.');
+    console.log('\n  Köprü çalışıyor. Oyun: ' + path.relative(__dirname, OYUN));
     console.log('  Oyun (panelli):      http://localhost:' + PORT + '/');
     console.log('  Yalnızca sahne:      http://localhost:' + PORT + '/#yayin');
     console.log('  Kapatmak için bu pencerede Ctrl+C.\n');
@@ -212,7 +232,7 @@ function tiktokBaslat() {
 /* ------------------------------------------------------------------ deneme kipi: TikTok yerine sahte olay */
 function denemeBaslat() {
   const adlar = ['deneme_ayse', 'deneme_memo', 'deneme_zeyno', 'deneme_bekir', 'deneme_elif', 'deneme_cano', 'deneme_sude', 'deneme_baran'];
-  const sozler = ['halay!', 'ben de geldim', 'çek çek çek', 'selamlar', 'mendil bende kalsın'];
+  const sozler = ['selam!', 'ben de geldim', 'haydi haydi', 'selamlar', 'buradayım'];
   const sec = a => a[Math.floor(Math.random() * a.length)];
   durumBildir('Deneme kipi: olaylar sahte, TikTok\'a bağlanılmadı.');
   let n = 0;

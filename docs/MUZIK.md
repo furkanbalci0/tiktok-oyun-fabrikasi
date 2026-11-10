@@ -1,6 +1,6 @@
 # Müzik: nota yazımı, yeni hava ekleme, kendi parçalarını çaldırma
 
-Oyunun kendi müziği `src/js/10-muzik.js` içinde üretilir. Depoda ses dosyası yoktur ve olmamalıdır.
+Oyunun kendi müziği `cekirdek/js/10-muzik.js` içinde üretilir. Depoda ses dosyası yoktur ve olmamalıdır.
 İsteyen, kendi bilgisayarındaki parçaları da çaldırabilir; bunlar depoya girmez (aşağıda, "Hazır parçalar").
 
 ## Bir havanın tanımı
@@ -42,21 +42,21 @@ Her bölümün toplam süresi `bar`'ın tam katı olmalıdır; değilse konsola 
 
 1. `HAVALAR` dizisine ekle. `id` benzersiz ve ASCII olsun.
 2. Ezgi **özgün** olmalı. Var olan bir türkünün ya da şarkının notalarını yazma.
-3. `npm test` çalıştır. Şunlar ölçülür: bölümler ölçüye oturuyor mu, zurna notaları hedef perdede mi,
+3. `node araclar/test.js` çalıştır. Şunlar ölçülür: bölümler ölçüye oturuyor mu, zurna notaları hedef perdede mi,
    davul vuruşları zamanında mı, kırpılma var mı, davul / zurna / dem dengesi, soloda zurna susuyor mu.
-   Yeni hava bu döngülere kendiliğinden girmez: `test/oyun.test.js` içindeki `hi < 3` sınırlarını ve
+   Yeni hava bu döngülere kendiliğinden girmez: `cekirdek/test/` altındaki testlerdeki `hi < 3` sınırlarını ve
    `Havalar kendiliğinden sırayla döner` kontrolünü güncelle.
 4. Dinle. Ölçümler perdeyi ve dengeyi doğrular, kulağa hoş gelip gelmediğini doğrulamaz.
 
 ## Hazır parçalar (isteğe bağlı)
 
 Üretilen davul zurna yerine kendi kayıtlarını çaldırabilirsin: kendi yaptığın ya da kullanma hakkın olan
-parçalar. Oyun bunları `mendil-kimde.html` dosyasının yanındaki `muzik/` klasöründe arar. Klasör yoksa hiçbir
+parçalar. Oyun bunları oyunun `oyunlar/<ad>/muzik/` klasöründe arar (paketlenince `dist/<ad>/muzik/`). Klasör yoksa hiçbir
 şey değişmez: üretilen davul zurna çalar, deneme panelinde parça bölümü görünmez.
 
 ```bash
 pip install librosa                                  # bir kez; mp3 için ffmpeg de kurulu olmalı
-python araclar/muzik-hazirla.py "parçaların klasörü"
+python araclar/muzik-hazirla.py "parçaların klasörü" oyunlar/<ad>
 ```
 
 Betik her parçanın vuruşlarını ölçer, dosyayı `muzik/` altına Türkçe harfsiz bir adla kopyalar ve
@@ -82,3 +82,10 @@ Dikkat edilecekler:
 - Baştan sona aynı tempoda, girişi kısa, sözsüz parçalar en iyi sonucu verir.
 - Vuruş ölçümü kulakla doğrulanmaz. Dans yarı ya da çift hızda görünürse `liste.js` yeniden üretilmeden
   düzelmez; betikteki 75–150 aralığını o parça için değiştir.
+
+## Adlar
+
+| Ad | Ne |
+| --- | --- |
+| `window.OYUN_MUZIK` | `muzik/liste.js` içinde `muzik-hazirla.py` tarafından yazılan parça listesi |
+| `window.OYUN_MUZIK_KAPALI` | Doğruysa `muzik/` klasörü yok sayılır; testler üretilen müziği sınamak için bunu kullanır |

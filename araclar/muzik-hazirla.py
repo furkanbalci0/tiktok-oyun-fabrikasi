@@ -5,7 +5,7 @@ Oyun kendi davul zurnasını üretir; bu betik isteğe bağlıdır. Kendi parça
 kullanma hakkın olan kayıtlar) çalmak istersen bir kez çalıştırırsın, oynayanlar o parçanın vuruşuna adım atar.
 
 Kullanım:
-    python araclar/muzik-hazirla.py "parçaların durduğu klasör"
+    python araclar/muzik-hazirla.py "parçaların durduğu klasör" oyunlar/<ad>
 
 Gerekenler: Python 3.9+, `pip install librosa` (mp3 okumak için ffmpeg kurulu olmalı).
 muzik/ klasörü depoya girmez (.gitignore); parçaların hakları sende kalır.
@@ -19,8 +19,8 @@ import sys
 import librosa
 import numpy as np
 
-KOK = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
-HEDEF = os.path.join(KOK, 'muzik')
+KOK = os.path.abspath(sys.argv[2]) if len(sys.argv) > 2 else None  # oyun klasörü: oyunlar/<ad>
+HEDEF = os.path.join(KOK, 'muzik') if KOK else None
 HARF = str.maketrans('çğıöşüÇĞİÖŞÜâîûÂÎÛ', 'cgiosuCGIOSUaiuAIU')
 
 
@@ -66,7 +66,7 @@ def olc(yol):
 
 
 def main():
-    if len(sys.argv) < 2:
+    if len(sys.argv) < 3:
         print(__doc__)
         sys.exit(2)
     kaynak = sys.argv[1]
@@ -87,7 +87,7 @@ def main():
         print('%-28s -> muzik/%-24s %6.1f vuruş/dk, %d vuruş, %.0f sn, ölçü başı %d' % (ad, yeni, o['bpm'], len(o['vurus']), o['sure'], o['kayma']))
     with open(os.path.join(HEDEF, 'liste.js'), 'w', encoding='utf-8', newline='\n') as d:
         d.write('// araclar/muzik-hazirla.py üretir; elle düzenleme. vurus: adım atılan vuruşların saniyeleri.\n')
-        d.write('window.MENDIL_MUZIK = ' + json.dumps(liste, ensure_ascii=False, separators=(',', ':')) + ';\n')
+        d.write('window.OYUN_MUZIK = ' + json.dumps(liste, ensure_ascii=False, separators=(',', ':')) + ';\n')
     print(len(liste), 'parça hazır: muzik/liste.js')
 
 

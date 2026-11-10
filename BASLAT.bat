@@ -1,6 +1,6 @@
 @echo off
 chcp 65001 >nul
-title Mendil Kimde - Kopru
+title Canli Oyun - Kopru
 cd /d "%~dp0"
 
 where node >nul 2>nul

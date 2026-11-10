@@ -1,7 +1,7 @@
 # Olaylar ve dış arayüz
 
 Oyuna dışarıdan gelen her şey tek bir işlevden girer: `olay(o)`. Sahte izleyici, köprü ve testler aynı
-işlevi çağırır. Sayfada `window.MendilKimde.olay(o)` olarak erişilir.
+işlevi çağırır. Sayfada `window.CanliOyun.olay(o)` olarak erişilir. Aşağıdaki etkiler ve kademeler halay oyununa aittir; başka oyunlar kendi kademelerini `OYUN.kademe` ile tanımlar (bkz. KANCALAR.md).
 
 ## Oyunun kendi olay biçimi
 
@@ -32,13 +32,13 @@ Her olayın etkisi:
 | `paylasim` | Coşku biraz artar. |
 | `hediye` | Kişi girer (yer doluysa jetonu en az olanı yerinden eder), `jeton × adet` puan alır, sıra yeniden dizilir, kademesine göre hareket tetiklenir. |
 
-Hediye kademeleri (`KADEME`, toplam jetona göre): 1+ zıpla · 10+ omuz · 50+ çök · 200+ davulcu coşar ·
+Halaydaki hediye kademeleri (`KADEME`, toplam jetona göre): 1+ zıpla · 10+ omuz · 50+ çök · 200+ davulcu coşar ·
 1000+ gönderen tek başına oynar.
 
 ## Köprüden kabul edilen ileti biçimleri
 
 Oyun köprüye WebSocket ile bağlanır ve her iletiyi JSON olarak okur (tek nesne ya da dizi).
-`Yayin.cevir` şu biçimleri oyun olayına çevirir:
+`CanliOyun.cevir` şu biçimleri oyun olayına çevirir:
 
 ```js
 // 1. Oyunun kendi biçimi: olduğu gibi geçer (depodaki kopru.js bunu yollar)
@@ -65,21 +65,21 @@ Köprü ayrıca durum iletisi yollar; oyun bunu panelde gösterir, olay saymaz:
 { "tip": "kopru", "ileti": "@ayse yayınına bağlandı. Yorum ve hediyeler oyuna akıyor." }
 ```
 
-## `window.MendilKimde`
+## `window.CanliOyun`
 
 | Üye | Açıklama |
 | --- | --- |
 | `olay(o)` | Bir olayı işler. |
 | `baglan(adres)` / `kes()` | Köprüye bağlanır / bağlantıyı keser. |
 | `cevir(ileti)` | Dış iletiyi oyun olayına çevirir (işlemez); tanımazsa `null`. |
-| `durum()` | `{ kisi, halayBasi, cosku, vurus, sira, kareMs, parca, bagli, alinan, hava, ses }` |
+| `durum()` | Çekirdeğin alanları (kişi sayısı, lider, coşku, vuruş, sıra, bağlantı durumu vb.) ve oyunun `oyunDurum(d)` kancasıyla eklediği alanlar. Tam liste için `cekirdek/js` altındaki `durum` işlevine bak. |
 | `_test` | Testler için iç durum (`D`, `muzik`, `Muzik`, `HAVALAR`, `ayar`, `zamanEkle`). Kararlı arayüz değildir. |
 
 ## Köprünün adresleri
 
 | Adres | Yanıt |
 | --- | --- |
-| `GET /` | Oyun. Köprü sayfaya `window.MENDIL_KOPRU` yazar; oyun bunu görünce kendiliğinden bağlanır. |
+| `GET /` | Oyun. Köprü sayfaya `window.OYUN_KOPRU` yazar; oyun bunu görünce kendiliğinden bağlanır. |
 | `GET /#yayin` | Yalnız sahne (panel gizli). |
 | `GET /durum` | `{ durum, bagliSayfa, sayac }` JSON. |
 | WebSocket (herhangi bir yol) | Olay akışı. Köprü yalnız yollar; istemciden veri beklemez. |
