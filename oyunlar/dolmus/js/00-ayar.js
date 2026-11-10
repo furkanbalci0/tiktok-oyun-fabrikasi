@@ -1,8 +1,8 @@
 /* AYAR — Müsait Bir Yerde oyununun bütün yazıları, hediye kademeleri, açılış kalabalığı ve sahte yorumları.
  * Derlemede HER ZAMAN İLK dosyadır; çekirdek OYUN'u buradan okur (docs/KANCALAR.md).
  * Oyun: yorum yazan izleyici dolmuşa biner. Hediye atanın parası elden ele şoföre uzatılır. En çok hediye atan
- * şoförün yanındaki ön koltuğa oturur. Dolmuş kesit olarak çizilir: yan duvarı ve tavanı açık, oyuncak ev gibi.
- * Kapasite 15: "14+1" dolmuşun 14 yolcu koltuğu ve ön koltuk (şoför izleyici değildir).
+ * şoförün yanındaki ön koltuğa oturur. Dolmuş kameraya doğru gelir ve kesit olarak çizilir: tavanı yok, yan
+ * duvarları alçak, içi oyuncak ev gibi görünür. Kapasite 15 yolcu (ön koltuk dahil); şoför izleyici değildir.
  */
 const OYUN = {
   id: 'dolmus',
@@ -28,7 +28,7 @@ const OYUN = {
   // Öğle sonu, dar bir mahalle sokağı: hardal sarısı dolmuş, turkuaz şerit, pastel apartmanlar. Panel ve sahne
   // üstü yazılar koyu petrol mavisinden gelir; mürekkep ve açık ton çekirdeğinkiyle aynı kalır (KANCALAR.md).
   renk: { zemin: '#0f2a36', zemin2: '#163b4a', zemin3: '#1f5063', cizgi: '#2d6a7e', vurgu: '#ffc63a', sicak: '#e8553b', serin: '#2ec4b6', soluk: '#9cc4cc' },
-  // Yukarıdan bakan kamera: dolmuşun içi (tavanı yok) ve iki koltuk sırası üst üste görünür. ustPay arka duvarın
-  // tepesini, altPay yakın tekerlerin altını kadraja alır.
-  kamera: { egim: 0.85, ustPay: 1.6, altPay: 0.1 }
+  // Önden ve yukarıdan bakan dar açılı kamera: kademeli koltuk sıraları üst üste görünür, arka sıra öndekinden pek
+  // küçülmez. ustPay en arka sıranın adını, altPay tamponun altını kadraja alır.
+  kamera: { egim: 0.85, F: 2000, ustPay: 2.25, altPay: 0 }
 };

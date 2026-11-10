@@ -1,39 +1,49 @@
 /* DOLMUŞ DURUMU — koltuklar, şoför, elden ele giden paralar, hediye etkileri, ön koltuğun el değiştirmesi.
  *
- * Dolmuş +x yönüne gider (ekranda sağa). Yerleri dolmuşun kendi ekseninde tutulur: u = ön tamponun kaç metre
- * gerisi, w = dünyadaki z (yakın yan -1, uzak yan +1). Dünyadaki yer: x = D.otoX - u. Kamera hep x = 0'a baktığı
- * için oyun dolmuşu kaydırır (D.otoX): kadraja girmesi gereken bölgenin ortası x = 0'a gelir.
- * Şoför uzak yanda (sol direksiyon), ön koltuk yakın yanda; ikisi aynı sırada. Arkada iki koltuk şeridi yarım
- * koltuk kaydırılmıştır: arkadakinin yüzü öndekinin başının arasından görünür.
+ * Dolmuş kameraya doğru gelir (-z yönüne): burnu ekranın altında, arkası yukarıda. Tavanı kesik, içi yukarıdan
+ * önden görünür; yolcular zaten kameraya bakar. Dolmuşun kendi ekseni: bx sağa, bz önden arkaya (ön sıra 0).
+ * Dünyadaki yer: x = bx - D.otoX, z = bz. Kamera hep x = 0'a baktığı için gösteride dolmuş yana kayar (D.otoX),
+ * sahneyi alan yolcu ortaya gelir.
  *
- * D'ye eklenenler: otoX (dolmuşun dünyadaki yeri), bolge0 / bolge1 (kadraja girecek u aralığı), kayma (yolun akan
- * mesafesi), hiz (metre / vuruş), bob (gövdenin yaylanması), sonB, paralar (elden ele giden banknotlar), kasa
- * (şoföre ulaşan toplam jeton), teyp / kasis / sollama ({ bas, sure }: vuruş aralığı), durak + durakKuyruk
- * (müsait bir yerde: duran dolmuş ve sahneyi alan yolcu), sovBit, parla (ön koltuk el değiştirdiği vuruş).
+ * Koltuklar dört sıradır ve kademelidir: sıralar 3-4-5-4 koltuklu, her sıra öndekinin boşluğuna oturur; taban
+ * sıra sıra yükselir (BASAMAK). Böylece arkadaki her yüz öndekilerin başlarının arasından görünür.
+ * Ön sıra: solda kapı yanı koltuk, ortada ÖN KOLTUK (lider), sağda şoför (sol direksiyon; kameraya bakan
+ * dolmuşun solu ekranın sağıdır).
+ *
+ * Koltuk değiştirme: sıra değişince herkesin yeni koltuğu (k.yeniKoltuk) hemen belli olur, ama yer değiştirme
+ * hediyenin parası şoföre varınca (D.yerDegis) toplu yapılır. Değiştiren kısa bir sıçramayla başların
+ * üstünden yeni koltuğuna konar (k.atla); kimse kimsenin içinden geçmez. Eski lider arkaya sıçrarken yenisi öne
+ * sıçrar; pankart yeni lider ön koltuğa konunca çıkar.
+ *
+ * D'ye eklenenler: otoX, kayma (yolun akan mesafesi), hiz (metre / vuruş), bob, sonB, paralar, kasa, teyp / kasis /
+ * sollama ({ bas, sure }), durak + durakKuyruk, sovBit, parla, yerDegis, liderPankart, sofor.
  * Kancalar: oyunYerlesim, oyunGiris, oyunHediye, oyunLiderDegisti, oyunBaslat, oyunBosalt, oyunDurum.
  */
-const ZEMIN_Y = 0.34;          // dolmuşun tabanı (tekerlerin üstü)
-const TAVAN_Y = ZEMIN_Y + 1.32; // kesilen tavanın yüksekliği
-const ON_U = 1.3;              // şoför ve ön koltuk sırası
-const ILK_U = 2.05;            // ilk yolcu sırası
-const ARA_U = 0.72;            // aynı şeritte iki koltuk arası
-const YAKIN_Z = -0.6, UZAK_Z = 0.6;
-const SIRA_YER = 7;            // her şeritte koltuk: 7 + 7 = 14 yolcu, ön koltukla 15
-const ARKA_U = ILK_U + (SIRA_YER - 1) * ARA_U + ARA_U / 2 + 0.5;
-const OTUR_YON = Math.PI - 0.62; // oturan yolcu kameraya dönük, biraz da yola bakar
-const DURAK_V = 16;            // "müsait bir yerde" gösterisinin süresi (vuruş)
-const ON_KOLTUK = { u: ON_U, z: YAKIN_Z };
-const KOLTUK = [];
-for (let i = 0; i < SIRA_YER; i++) {
-  KOLTUK.push({ u: ILK_U + i * ARA_U, z: YAKIN_Z });
-  KOLTUK.push({ u: ILK_U + i * ARA_U + ARA_U / 2, z: UZAK_Z });
-}
-Object.assign(D, { otoX: 0, bolge0: -0.35, bolge1: 3, kayma: 0, hiz: 1.5, bob: 0, sonB: 0, paralar: [], kasa: 0, teyp: null, kasis: null, sollama: null, durak: null, durakKuyruk: [], sovBit: -1, parla: -9 });
+const ZEMIN_Y = 0.3;            // ön sıranın tabanı (tekerlerin üstü)
+const SIRA_Z = 0.75;            // iki koltuk sırası arası
+const BASAMAK = 0.15;           // her sıranın tabanı öndekinden bu kadar yüksek
+// Sıra sıra koltukların x'i (koltuk arası 0,85 m; komşu sıralar yarım koltuk kayık). Ön sıranın sağı şoförün.
+const IZGARA = [[-0.85, 0, 0.85], [-1.275, -0.425, 0.425, 1.275], [-1.7, -0.85, 0, 0.85, 1.7], [-1.275, -0.425, 0.425, 1.275]];
+const SIRA_SAY = IZGARA.length;
+const DUVAR_X = 2.3;            // yan duvarlar
+const ON_UC = -0.6;             // ön tampon
+const ARKA_Z = (SIRA_SAY - 1) * SIRA_Z + 0.42; // arka duvar
+const DURAK_V = 16;             // "müsait bir yerde" gösterisinin süresi (vuruş)
+const YOLCU_BOY = 1.25;         // yolcular genel insan ölçüsünden iri: yüz ve ad uzaktan okunsun
+const tabanY = r => ZEMIN_Y + r * BASAMAK;
+const ON_KOLTUK = { x: 0, z: 0, r: 0, on: true };
+const SOFOR_KOLTUK = { x: IZGARA[0][2], z: 0, r: 0, sofor: true };
+// Yolcu koltukları öncelik sırasıyla: önden arkaya, her sırada ortadan kenara.
+const KOLTUK = [{ x: IZGARA[0][0], z: 0, r: 0 }];
+for (let r = 1; r < SIRA_SAY; r++)
+  IZGARA[r].slice().sort((a, b) => Math.abs(a) - Math.abs(b) || a - b).forEach(x => KOLTUK.push({ x, z: r * SIRA_Z, r }));
+const TUM_KOLTUK = [ON_KOLTUK, SOFOR_KOLTUK, ...KOLTUK];
+Object.assign(D, { otoX: 0, kayma: 0, hiz: 1.5, bob: 0, sonB: 0, paralar: [], kasa: 0, teyp: null, kasis: null, sollama: null, durak: null, durakKuyruk: [], sovBit: -1, parla: -9, yerDegis: -1, yerDegisBas: -1, liderPankart: null, tesekkur: null });
 
 // Şoför izleyici değildir: D.oy'da durmaz, adı oyunEkAdlar'dan gelir (k.ozel).
 const sofor = karakterYap('__sofor', 'Şoför');
-Object.assign(sofor, { mod: 'sofor', ozel: true, du: ON_U, dw: UZAK_Z, otur: 1, dfaz: 0.3, basYon: Math.PI - 0.3, uzat: null });
-Object.assign(sofor.g, { kadin: false, ten: '#d39a6a', sac: '#2a2a35', boy: 1.12, gomlek: '#8fc3e6', yelek: '#8fc3e6', alt: '#2c2c38', kusak: '#3a2a2c', baslik: 'kasket', baslikRenk: '#3a3f4a', biyik: true, ayakkabi: '#2a1c16' });
+Object.assign(sofor, { mod: 'sofor', ozel: true, koltuk: SOFOR_KOLTUK, yeniKoltuk: SOFOR_KOLTUK, bx: SOFOR_KOLTUK.x, bz: 0, by: ZEMIN_Y, otur: 1, dfaz: 0.3, basYon: Math.PI, uzat: null, atla: null, olcek: 1 });
+Object.assign(sofor.g, { kadin: false, ten: '#d39a6a', sac: '#2a2a35', boy: 1.3, gomlek: '#8fc3e6', yelek: '#8fc3e6', alt: '#2c2c38', kusak: '#3a2a2c', baslik: 'kasket', baslikRenk: '#3a3f4a', biyik: true, ayakkabi: '#2a1c16' });
 sofor.asilBoy = sofor.g.boy;
 D.sofor = sofor; // testler şoförün eline bakabilsin (CanliOyun._test.D.sofor)
 
@@ -42,12 +52,16 @@ const etkin = e => !!e && B >= e.bas && B < e.bas + e.sure;
 function yolcuHazir(k) {
   if (k.asilBoy !== undefined)
     return;
-  // Yolcular sahnenin kahramanı: genel insan ölçüsünden biraz iri (yüz ve ad kalabalıkta da okunsun).
-  k.asilBoy = k.g.boy * 1.1;
+  // Çekirdeğin boy çeşitliliği (0,98–1,11) korunur ama alt ucu kırpılır: en arkadaki kısa biri de okunsun.
+  k.asilBoy = Math.max(k.g.boy, 1.04) * YOLCU_BOY;
   k.g.boy = k.asilBoy;
   k.dfaz = rastgeleUret(ozet('dolmus:' + k.id))();
-  k.du = k.hu !== undefined ? k.hu : ON_U;
-  k.dw = k.hw !== undefined ? k.hw : YAKIN_Z;
+  k.koltuk = null;
+  k.yeniKoltuk = null;
+  k.atla = null;
+  k.bx = 0;
+  k.bz = 0;
+  k.by = ZEMIN_Y;
   k.otur = 1;
   k.basYon = Math.PI;
   k.uzat = null;
@@ -55,39 +69,21 @@ function yolcuHazir(k) {
 }
 
 /* ---- yerleşim ---- */
-// Sıranın başı ön koltukta; gerisi önden arkaya, yakın ve uzak şerit sırayla. Jetonu çok olan şoföre yakındır.
+// Sıranın başı ön koltukta; gerisi önden arkaya. Jetonu çok olan şoföre yakındır.
 function oyunYerlesim() {
   D.sira.forEach((k, i) => {
     yolcuHazir(k);
-    const y = i === 0 ? ON_KOLTUK : KOLTUK[Math.min(i - 1, KOLTUK.length - 1)];
-    k.hu = y.u;
-    k.hw = y.z;
+    k.yeniKoltuk = i === 0 ? ON_KOLTUK : KOLTUK[Math.min(i - 1, KOLTUK.length - 1)];
   });
-  bolgeHesapla();
 }
-// Kadraja girecek u aralığı: ön tampondan en arkadaki dolu koltuğa. Tek yolcuda da bir sıra boş koltuk görünür.
-// Dolmuş dolunca kaput kadrajdan taşar (şoför ve direksiyon içeride kalır): yüzler daha iri görünür.
-function bolgeHesapla() {
-  let son = ILK_U + ARA_U / 2;
-  for (const k of D.sira)
-    son = Math.max(son, k.hu);
-  D.bolge0 = son > ILK_U + 2.5 * ARA_U ? 0.78 : -0.3;
-  D.bolge1 = son + 0.5;
-}
-// Gösteride kadraj sahneyi alan yolcuya daralır.
-function kadrajAraligi() {
-  const d = D.durak;
-  if (d && d.yakin)
-    return [d.k.du - 1.45, d.k.du + 1.45];
-  return [D.bolge0, D.bolge1];
-}
-// Yeni binen, dolmuşun arkasından kaldırım tarafında koşarak gelir ve kapıdan yerine geçer.
+// Yeni binen kaldırımdan, koltuğunun yanından sıçrayıp yan duvarın üstünden içeri girer.
 function oyunGiris(k) {
   yolcuHazir(k);
-  k.du = D.bolge1 + 1.6;
-  k.dw = -2.2;
+  const s = k.yeniKoltuk || KOLTUK[0], yan = s.x > 0.01 ? 1 : s.x < -0.01 ? -1 : (k.dfaz < 0.5 ? -1 : 1);
+  k.bx = yan * (DUVAR_X + 0.9);
+  k.bz = s.z + 0.8;
+  k.by = 0.14;
   k.otur = 0;
-  k.yon = Math.PI / 2;
 }
 
 /* ---- hediyeler ---- */
@@ -113,26 +109,39 @@ function oyunHediye(k, jeton, kd) {
   }
   muzik.sov = B < D.sovBit;
 }
-// Ön koltuk el değiştirir: eski sahibi arkaya geçer, yenisi şoförün yanına yürür; koltuk parlar.
+// Ön koltuk el değiştirir; pankart yeni lider koltuğa konunca çıkar (oyunGuncelle → liderPankartBak).
 function oyunLiderDegisti(eski, yeni) {
-  pankart('Ön koltuk el değiştirdi', yeni.ad + ' şoförün yanına geçti');
-  konfeti(90, 0.9);
-  D.sarsinti = Math.max(D.sarsinti, 0.6);
-  D.parla = B;
+  D.liderPankart = { yeni, b0: B };
+}
+function liderPankartBak() {
+  const lp = D.liderPankart;
+  if (!lp)
+    return;
+  const yeni = lp.yeni, kondu = yeni.koltuk === ON_KOLTUK && !yeni.atla;
+  if (yeni !== D.lider || yeni.cikiyor) {
+    D.liderPankart = null;
+    return;
+  }
+  if (kondu || B - lp.b0 > 8) {
+    pankart('Ön koltuk el değiştirdi', yeni.ad + ' şoförün yanına geçti');
+    konfeti(90, 0.9);
+    D.sarsinti = Math.max(D.sarsinti, 0.6);
+    D.parla = B;
+    D.liderPankart = null;
+  }
 }
 function oyunBaslat() {
   for (const k of D.sira) {
     yolcuHazir(k);
-    k.du = k.hu;
-    k.dw = k.hw;
+    k.koltuk = k.yeniKoltuk;
+    k.bx = k.koltuk.x;
+    k.bz = k.koltuk.z;
+    k.by = tabanY(k.koltuk.r);
     k.otur = 1;
     k.yer = 1;
-    k.yon = OTUR_YON;
+    k.yon = Math.PI;
     k.yeni = -9;
   }
-  bolgeHesapla();
-  const a = kadrajAraligi();
-  D.otoX = (a[0] + a[1]) / 2;
   D.sonB = B;
   sokakHazirla();
 }
@@ -143,8 +152,10 @@ function oyunBosalt() {
   D.teyp = D.kasis = D.sollama = null;
   D.sovBit = -1;
   D.kasa = 0;
+  D.liderPankart = null;
+  D.tesekkur = null;
+  D.yerDegis = -1;
   sofor.uzat = null;
-  bolgeHesapla();
   muzik.sov = false;
 }
 function oyunDurum(d) {
@@ -157,27 +168,58 @@ function oyunDurum(d) {
   d.durak = D.durak ? D.durak.k.ad : null;
   d.durakKuyruk = D.durakKuyruk.length;
   d.hiz = +D.hiz.toFixed(2);
+  // Dolmuşun ekrandaki sınırları (720×1280 sanal ölçekte): testler kadrajın dolu ve taşmasız olduğuna bakar.
+  const tampon = bp(0, 0.08, ON_UC - 0.1), tabela = bp(0, ARKA_UST, ARKA_Z), sol = bp(-DUVAR_X, ZEMIN_Y, 0), sag = bp(DUVAR_X, ZEMIN_Y, 0);
+  d.kadraj = { ust: Math.round(tabela.y), alt: Math.round(tampon.y), sol: Math.round(sol.x), sag: Math.round(sag.x) };
 }
 
 /* ---- elden ele para ----
- * Her hediye bir banknot demetidir. Önce gönderenin elinde yarım vuruş havada durur ("uzatır mısınız?"), sonra
- * önündeki her yolcunun elinden geçip şoföre varır.
- * Yol hediye anındaki koltuktan kurulur: oyunHediye sıra güncellenmeden önce çağrılır (docs/KANCALAR.md), D.sira ve
- * koltuklar o an eski hâlindedir. Hediye atan genelde öne geçer; ama parası şoföre varana dek eski koltuğunda
- * oturur (k.tut), yoksa en arkadaki öne fırlar ve para kimsenin elinden geçmezdi. O koltuğa geçecek olan bekler.
+ * Her hediye bir banknot demetidir. Önce gönderenin elinde yarım vuruş havada durur ("Uzatır mısınız?"), sonra
+ * öndeki her sıradan bir yolcunun eline (o sırada banknota en yakın olan), en son ön koltuktan şoföre iner.
+ * Yol hediye anındaki koltuklardan kurulur: oyunHediye sıra güncellenmeden önce çağrılır (docs/KANCALAR.md);
+ * yer değiştirmeler zaten ilk elden sonra yapılır. Yol kişilere bağlıdır: biri sıçrasa da banknot onun elindedir.
  * para = { k, yol: [gönderen, …, şoför], i (hangi el), t0 (o elin başladığı vuruş), v (bir el kaç vuruş),
- *          jeton, tip, p (dünyadaki yeri) }
+ *          jeton, tip, p (dünyadaki yeri), iz (ekrandaki izi) }
  */
 const PARA_SINIR = 10;
+function paraYolu(k) {
+  const yol = [k], s = k.koltuk || k.yeniKoltuk;
+  if (s && s !== ON_KOLTUK) {
+    let x = s.x;
+    for (let r = s.r - 1; r >= 0; r--) {
+      let en = null;
+      for (const a of D.sira)
+        if (a !== k && !a.cikiyor && a.koltuk && a.koltuk.r === r && a.koltuk !== ON_KOLTUK && (!en || Math.abs(a.koltuk.x - x) < Math.abs(en.koltuk.x - x)))
+          en = a;
+      if (en && r > 0) {
+        yol.push(en);
+        x = en.koltuk.x;
+      }
+    }
+    const on = D.sira.find(a => a !== k && !a.cikiyor && a.koltuk === ON_KOLTUK);
+    if (on)
+      yol.push(on);
+  }
+  yol.push(sofor);
+  return yol;
+}
+// Yer değiştirmeler para şoföre varınca toplu yapılır ("şoför parayı alınca yolcuyu öne alır"): banknot hep
+// oturan ellerden geçer. Para üstüne para gelirse bekleme uzar ama ilk hediyeden en çok 8 vuruş sonra herkes
+// yerleşir (selde de).
+function yerDegisErtele(b) {
+  if (D.yerDegis < B)
+    D.yerDegisBas = B;
+  D.yerDegis = Math.min(Math.max(D.yerDegis, b), D.yerDegisBas + 8);
+}
 function paraGonder(k, jeton, tip) {
-  if (D.paralar.length >= PARA_SINIR)
-    return;
   yolcuHazir(k);
-  if (!k.tut)
-    k.tut = { u: k.hu, w: k.hw };
-  const onde = D.sira.filter(x => x !== k && !x.cikiyor && x.hu < k.tut.u).sort((a, b) => b.hu - a.hu);
-  const yol = [k, ...onde, sofor];
-  D.paralar.push({ k, yol, i: 0, t0: Math.ceil(B * 2) / 2 + 0.5, v: clamp(4.5 / (yol.length - 1), 0.36, 0.7), jeton, tip, p: null });
+  if (D.paralar.length >= PARA_SINIR) {
+    yerDegisErtele(B + 1);
+    return;
+  }
+  const yol = paraYolu(k), t0 = Math.ceil(B * 2) / 2 + 0.5, v = clamp(4 / (yol.length - 1), 0.5, 0.8);
+  D.paralar.push({ k, yol, i: 0, t0, v, jeton, tip, p: null, iz: [] });
+  yerDegisErtele(t0 + v * (yol.length - 1) + 0.2);
 }
 const gecerli = x => x === sofor || (!x.cikiyor && D.oy.get(x.id) === x);
 // Paraları ilerletir ve elden ele geçişte iki tarafa da "uzat" hedefi verir (yolcuHareket elleri buna uzatır).
@@ -201,19 +243,13 @@ function paraIlerlet() {
       continue;
     }
     const a = n.yol[n.i], b = n.yol[n.i + 1];
-    if (B < n.t0) {
-      // havada tutar: el başın üstünde
-      a.uzat = { hedef: [a.x + 0.05, a.y0 + 1.25 * a.g.boy, a.z - 0.15], el: 'R', yukari: true };
-    }
+    if (B < n.t0)
+      a.uzat = { hedef: [a.x + 0.1, a.y0 + 1.3 * a.g.boy, a.z - 0.1], el: 'R', yukari: true };
     else {
       a.uzat = { hedef: gogusYeri(b), el: null };
       b.uzat = { hedef: gogusYeri(a), el: null };
     }
   }
-  // Havada parası kalmayan gönderen yeni koltuğuna geçebilir.
-  for (const k of D.oy.values())
-    if (k.tut && !D.paralar.some(n => n.k === k))
-      k.tut = null;
 }
 function gogusYeri(k) { return k.j.gogus ? k.j.gogus : [k.x, k.y0 + 0.5, k.z]; }
 // Para şoföre vardı: kasa dolar, şoför güler ve teşekkür eder.
@@ -221,16 +257,17 @@ function paraVardi(n) {
   D.kasa += n.jeton;
   sofor.zip0 = B;
   sofor.zip1 = B + 2.5;
-  sofor.balon = { m: n.jeton >= 200 ? 'Allah razı olsun!' : n.jeton >= 10 ? 'Eyvallah abla, abi!' : 'Sağ ol!', t0: zaman };
+  // teşekkür çekirdeğin balonuyla değil oyunUst'te yazılır: balon başın üstüne, yolcuların yüzlerine ve banknotun
+  // üstüne düşerdi (çekirdek balonları oyunUst'ten sonra çizer)
+  D.tesekkur = { m: n.jeton >= 200 ? 'Allah razı olsun!' : n.jeton >= 10 ? 'Eyvallah!' : 'Sağ ol!', b0: B };
 }
-// Elden ele geçerken banknotun dünyadaki yeri: verenin elinden alanın eline, küçük bir kavisle.
+// Banknotun dünyadaki yeri: verenin elinden alanın eline, başların üstünden geçen bir kavisle.
 function paraYeri(n) {
-  const a = n.yol[n.i], b = n.yol[n.i + 1];
-  const elA = elYeri(a);
+  const a = n.yol[n.i], b = n.yol[n.i + 1], elA = elYeri(a);
   if (B < n.t0)
     return elA;
   const t = yumusak((B - n.t0) / n.v), elB = elYeri(b);
-  return [lerp(elA[0], elB[0], t), lerp(elA[1], elB[1], t) + 0.4 * Math.sin(Math.PI * t), lerp(elA[2], elB[2], t)];
+  return [lerp(elA[0], elB[0], t), lerp(elA[1], elB[1], t) + 0.45 * Math.sin(Math.PI * t), lerp(elA[2], elB[2], t)];
 }
 function elYeri(k) {
   const el = k.uzat && k.uzat.el === 'L' ? k.j.haL : k.j.haR;

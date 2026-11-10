@@ -520,8 +520,8 @@ CanliOyun.olay({tip:"hediye", kullanici:{id:"ayse", ad:"Ayşe"}, jeton:50})</pre
 /* AYAR — Müsait Bir Yerde oyununun bütün yazıları, hediye kademeleri, açılış kalabalığı ve sahte yorumları.
  * Derlemede HER ZAMAN İLK dosyadır; çekirdek OYUN'u buradan okur (docs/KANCALAR.md).
  * Oyun: yorum yazan izleyici dolmuşa biner. Hediye atanın parası elden ele şoföre uzatılır. En çok hediye atan
- * şoförün yanındaki ön koltuğa oturur. Dolmuş kesit olarak çizilir: yan duvarı ve tavanı açık, oyuncak ev gibi.
- * Kapasite 15: "14+1" dolmuşun 14 yolcu koltuğu ve ön koltuk (şoför izleyici değildir).
+ * şoförün yanındaki ön koltuğa oturur. Dolmuş kameraya doğru gelir ve kesit olarak çizilir: tavanı yok, yan
+ * duvarları alçak, içi oyuncak ev gibi görünür. Kapasite 15 yolcu (ön koltuk dahil); şoför izleyici değildir.
  */
 const OYUN = {
   id: 'dolmus',
@@ -547,9 +547,9 @@ const OYUN = {
   // Öğle sonu, dar bir mahalle sokağı: hardal sarısı dolmuş, turkuaz şerit, pastel apartmanlar. Panel ve sahne
   // üstü yazılar koyu petrol mavisinden gelir; mürekkep ve açık ton çekirdeğinkiyle aynı kalır (KANCALAR.md).
   renk: { zemin: '#0f2a36', zemin2: '#163b4a', zemin3: '#1f5063', cizgi: '#2d6a7e', vurgu: '#ffc63a', sicak: '#e8553b', serin: '#2ec4b6', soluk: '#9cc4cc' },
-  // Yukarıdan bakan kamera: dolmuşun içi (tavanı yok) ve iki koltuk sırası üst üste görünür. ustPay arka duvarın
-  // tepesini, altPay yakın tekerlerin altını kadraja alır.
-  kamera: { egim: 0.85, ustPay: 1.6, altPay: 0.1 }
+  // Önden ve yukarıdan bakan dar açılı kamera: kademeli koltuk sıraları üst üste görünür, arka sıra öndekinden pek
+  // küçülmez. ustPay en arka sıranın adını, altPay tamponun altını kadraja alır.
+  kamera: { egim: 0.85, F: 2000, ustPay: 2.25, altPay: 0 }
 };
 
 /* ── cekirdek/js/00-yardimci.js ── */
@@ -2924,40 +2924,50 @@ queueMicrotask(() => {
 /* ── oyunlar/dolmus/js/10-oyun.js ── */
 /* DOLMUŞ DURUMU — koltuklar, şoför, elden ele giden paralar, hediye etkileri, ön koltuğun el değiştirmesi.
  *
- * Dolmuş +x yönüne gider (ekranda sağa). Yerleri dolmuşun kendi ekseninde tutulur: u = ön tamponun kaç metre
- * gerisi, w = dünyadaki z (yakın yan -1, uzak yan +1). Dünyadaki yer: x = D.otoX - u. Kamera hep x = 0'a baktığı
- * için oyun dolmuşu kaydırır (D.otoX): kadraja girmesi gereken bölgenin ortası x = 0'a gelir.
- * Şoför uzak yanda (sol direksiyon), ön koltuk yakın yanda; ikisi aynı sırada. Arkada iki koltuk şeridi yarım
- * koltuk kaydırılmıştır: arkadakinin yüzü öndekinin başının arasından görünür.
+ * Dolmuş kameraya doğru gelir (-z yönüne): burnu ekranın altında, arkası yukarıda. Tavanı kesik, içi yukarıdan
+ * önden görünür; yolcular zaten kameraya bakar. Dolmuşun kendi ekseni: bx sağa, bz önden arkaya (ön sıra 0).
+ * Dünyadaki yer: x = bx - D.otoX, z = bz. Kamera hep x = 0'a baktığı için gösteride dolmuş yana kayar (D.otoX),
+ * sahneyi alan yolcu ortaya gelir.
  *
- * D'ye eklenenler: otoX (dolmuşun dünyadaki yeri), bolge0 / bolge1 (kadraja girecek u aralığı), kayma (yolun akan
- * mesafesi), hiz (metre / vuruş), bob (gövdenin yaylanması), sonB, paralar (elden ele giden banknotlar), kasa
- * (şoföre ulaşan toplam jeton), teyp / kasis / sollama ({ bas, sure }: vuruş aralığı), durak + durakKuyruk
- * (müsait bir yerde: duran dolmuş ve sahneyi alan yolcu), sovBit, parla (ön koltuk el değiştirdiği vuruş).
+ * Koltuklar dört sıradır ve kademelidir: sıralar 3-4-5-4 koltuklu, her sıra öndekinin boşluğuna oturur; taban
+ * sıra sıra yükselir (BASAMAK). Böylece arkadaki her yüz öndekilerin başlarının arasından görünür.
+ * Ön sıra: solda kapı yanı koltuk, ortada ÖN KOLTUK (lider), sağda şoför (sol direksiyon; kameraya bakan
+ * dolmuşun solu ekranın sağıdır).
+ *
+ * Koltuk değiştirme: sıra değişince herkesin yeni koltuğu (k.yeniKoltuk) hemen belli olur, ama yer değiştirme
+ * hediyenin parası şoföre varınca (D.yerDegis) toplu yapılır. Değiştiren kısa bir sıçramayla başların
+ * üstünden yeni koltuğuna konar (k.atla); kimse kimsenin içinden geçmez. Eski lider arkaya sıçrarken yenisi öne
+ * sıçrar; pankart yeni lider ön koltuğa konunca çıkar.
+ *
+ * D'ye eklenenler: otoX, kayma (yolun akan mesafesi), hiz (metre / vuruş), bob, sonB, paralar, kasa, teyp / kasis /
+ * sollama ({ bas, sure }), durak + durakKuyruk, sovBit, parla, yerDegis, liderPankart, sofor.
  * Kancalar: oyunYerlesim, oyunGiris, oyunHediye, oyunLiderDegisti, oyunBaslat, oyunBosalt, oyunDurum.
  */
-const ZEMIN_Y = 0.34;          // dolmuşun tabanı (tekerlerin üstü)
-const TAVAN_Y = ZEMIN_Y + 1.32; // kesilen tavanın yüksekliği
-const ON_U = 1.3;              // şoför ve ön koltuk sırası
-const ILK_U = 2.05;            // ilk yolcu sırası
-const ARA_U = 0.72;            // aynı şeritte iki koltuk arası
-const YAKIN_Z = -0.6, UZAK_Z = 0.6;
-const SIRA_YER = 7;            // her şeritte koltuk: 7 + 7 = 14 yolcu, ön koltukla 15
-const ARKA_U = ILK_U + (SIRA_YER - 1) * ARA_U + ARA_U / 2 + 0.5;
-const OTUR_YON = Math.PI - 0.62; // oturan yolcu kameraya dönük, biraz da yola bakar
-const DURAK_V = 16;            // "müsait bir yerde" gösterisinin süresi (vuruş)
-const ON_KOLTUK = { u: ON_U, z: YAKIN_Z };
-const KOLTUK = [];
-for (let i = 0; i < SIRA_YER; i++) {
-  KOLTUK.push({ u: ILK_U + i * ARA_U, z: YAKIN_Z });
-  KOLTUK.push({ u: ILK_U + i * ARA_U + ARA_U / 2, z: UZAK_Z });
-}
-Object.assign(D, { otoX: 0, bolge0: -0.35, bolge1: 3, kayma: 0, hiz: 1.5, bob: 0, sonB: 0, paralar: [], kasa: 0, teyp: null, kasis: null, sollama: null, durak: null, durakKuyruk: [], sovBit: -1, parla: -9 });
+const ZEMIN_Y = 0.3;            // ön sıranın tabanı (tekerlerin üstü)
+const SIRA_Z = 0.75;            // iki koltuk sırası arası
+const BASAMAK = 0.15;           // her sıranın tabanı öndekinden bu kadar yüksek
+// Sıra sıra koltukların x'i (koltuk arası 0,85 m; komşu sıralar yarım koltuk kayık). Ön sıranın sağı şoförün.
+const IZGARA = [[-0.85, 0, 0.85], [-1.275, -0.425, 0.425, 1.275], [-1.7, -0.85, 0, 0.85, 1.7], [-1.275, -0.425, 0.425, 1.275]];
+const SIRA_SAY = IZGARA.length;
+const DUVAR_X = 2.3;            // yan duvarlar
+const ON_UC = -0.6;             // ön tampon
+const ARKA_Z = (SIRA_SAY - 1) * SIRA_Z + 0.42; // arka duvar
+const DURAK_V = 16;             // "müsait bir yerde" gösterisinin süresi (vuruş)
+const YOLCU_BOY = 1.25;         // yolcular genel insan ölçüsünden iri: yüz ve ad uzaktan okunsun
+const tabanY = r => ZEMIN_Y + r * BASAMAK;
+const ON_KOLTUK = { x: 0, z: 0, r: 0, on: true };
+const SOFOR_KOLTUK = { x: IZGARA[0][2], z: 0, r: 0, sofor: true };
+// Yolcu koltukları öncelik sırasıyla: önden arkaya, her sırada ortadan kenara.
+const KOLTUK = [{ x: IZGARA[0][0], z: 0, r: 0 }];
+for (let r = 1; r < SIRA_SAY; r++)
+  IZGARA[r].slice().sort((a, b) => Math.abs(a) - Math.abs(b) || a - b).forEach(x => KOLTUK.push({ x, z: r * SIRA_Z, r }));
+const TUM_KOLTUK = [ON_KOLTUK, SOFOR_KOLTUK, ...KOLTUK];
+Object.assign(D, { otoX: 0, kayma: 0, hiz: 1.5, bob: 0, sonB: 0, paralar: [], kasa: 0, teyp: null, kasis: null, sollama: null, durak: null, durakKuyruk: [], sovBit: -1, parla: -9, yerDegis: -1, yerDegisBas: -1, liderPankart: null, tesekkur: null });
 
 // Şoför izleyici değildir: D.oy'da durmaz, adı oyunEkAdlar'dan gelir (k.ozel).
 const sofor = karakterYap('__sofor', 'Şoför');
-Object.assign(sofor, { mod: 'sofor', ozel: true, du: ON_U, dw: UZAK_Z, otur: 1, dfaz: 0.3, basYon: Math.PI - 0.3, uzat: null });
-Object.assign(sofor.g, { kadin: false, ten: '#d39a6a', sac: '#2a2a35', boy: 1.12, gomlek: '#8fc3e6', yelek: '#8fc3e6', alt: '#2c2c38', kusak: '#3a2a2c', baslik: 'kasket', baslikRenk: '#3a3f4a', biyik: true, ayakkabi: '#2a1c16' });
+Object.assign(sofor, { mod: 'sofor', ozel: true, koltuk: SOFOR_KOLTUK, yeniKoltuk: SOFOR_KOLTUK, bx: SOFOR_KOLTUK.x, bz: 0, by: ZEMIN_Y, otur: 1, dfaz: 0.3, basYon: Math.PI, uzat: null, atla: null, olcek: 1 });
+Object.assign(sofor.g, { kadin: false, ten: '#d39a6a', sac: '#2a2a35', boy: 1.3, gomlek: '#8fc3e6', yelek: '#8fc3e6', alt: '#2c2c38', kusak: '#3a2a2c', baslik: 'kasket', baslikRenk: '#3a3f4a', biyik: true, ayakkabi: '#2a1c16' });
 sofor.asilBoy = sofor.g.boy;
 D.sofor = sofor; // testler şoförün eline bakabilsin (CanliOyun._test.D.sofor)
 
@@ -2966,12 +2976,16 @@ const etkin = e => !!e && B >= e.bas && B < e.bas + e.sure;
 function yolcuHazir(k) {
   if (k.asilBoy !== undefined)
     return;
-  // Yolcular sahnenin kahramanı: genel insan ölçüsünden biraz iri (yüz ve ad kalabalıkta da okunsun).
-  k.asilBoy = k.g.boy * 1.1;
+  // Çekirdeğin boy çeşitliliği (0,98–1,11) korunur ama alt ucu kırpılır: en arkadaki kısa biri de okunsun.
+  k.asilBoy = Math.max(k.g.boy, 1.04) * YOLCU_BOY;
   k.g.boy = k.asilBoy;
   k.dfaz = rastgeleUret(ozet('dolmus:' + k.id))();
-  k.du = k.hu !== undefined ? k.hu : ON_U;
-  k.dw = k.hw !== undefined ? k.hw : YAKIN_Z;
+  k.koltuk = null;
+  k.yeniKoltuk = null;
+  k.atla = null;
+  k.bx = 0;
+  k.bz = 0;
+  k.by = ZEMIN_Y;
   k.otur = 1;
   k.basYon = Math.PI;
   k.uzat = null;
@@ -2979,39 +2993,21 @@ function yolcuHazir(k) {
 }
 
 /* ---- yerleşim ---- */
-// Sıranın başı ön koltukta; gerisi önden arkaya, yakın ve uzak şerit sırayla. Jetonu çok olan şoföre yakındır.
+// Sıranın başı ön koltukta; gerisi önden arkaya. Jetonu çok olan şoföre yakındır.
 function oyunYerlesim() {
   D.sira.forEach((k, i) => {
     yolcuHazir(k);
-    const y = i === 0 ? ON_KOLTUK : KOLTUK[Math.min(i - 1, KOLTUK.length - 1)];
-    k.hu = y.u;
-    k.hw = y.z;
+    k.yeniKoltuk = i === 0 ? ON_KOLTUK : KOLTUK[Math.min(i - 1, KOLTUK.length - 1)];
   });
-  bolgeHesapla();
 }
-// Kadraja girecek u aralığı: ön tampondan en arkadaki dolu koltuğa. Tek yolcuda da bir sıra boş koltuk görünür.
-// Dolmuş dolunca kaput kadrajdan taşar (şoför ve direksiyon içeride kalır): yüzler daha iri görünür.
-function bolgeHesapla() {
-  let son = ILK_U + ARA_U / 2;
-  for (const k of D.sira)
-    son = Math.max(son, k.hu);
-  D.bolge0 = son > ILK_U + 2.5 * ARA_U ? 0.78 : -0.3;
-  D.bolge1 = son + 0.5;
-}
-// Gösteride kadraj sahneyi alan yolcuya daralır.
-function kadrajAraligi() {
-  const d = D.durak;
-  if (d && d.yakin)
-    return [d.k.du - 1.45, d.k.du + 1.45];
-  return [D.bolge0, D.bolge1];
-}
-// Yeni binen, dolmuşun arkasından kaldırım tarafında koşarak gelir ve kapıdan yerine geçer.
+// Yeni binen kaldırımdan, koltuğunun yanından sıçrayıp yan duvarın üstünden içeri girer.
 function oyunGiris(k) {
   yolcuHazir(k);
-  k.du = D.bolge1 + 1.6;
-  k.dw = -2.2;
+  const s = k.yeniKoltuk || KOLTUK[0], yan = s.x > 0.01 ? 1 : s.x < -0.01 ? -1 : (k.dfaz < 0.5 ? -1 : 1);
+  k.bx = yan * (DUVAR_X + 0.9);
+  k.bz = s.z + 0.8;
+  k.by = 0.14;
   k.otur = 0;
-  k.yon = Math.PI / 2;
 }
 
 /* ---- hediyeler ---- */
@@ -3037,26 +3033,39 @@ function oyunHediye(k, jeton, kd) {
   }
   muzik.sov = B < D.sovBit;
 }
-// Ön koltuk el değiştirir: eski sahibi arkaya geçer, yenisi şoförün yanına yürür; koltuk parlar.
+// Ön koltuk el değiştirir; pankart yeni lider koltuğa konunca çıkar (oyunGuncelle → liderPankartBak).
 function oyunLiderDegisti(eski, yeni) {
-  pankart('Ön koltuk el değiştirdi', yeni.ad + ' şoförün yanına geçti');
-  konfeti(90, 0.9);
-  D.sarsinti = Math.max(D.sarsinti, 0.6);
-  D.parla = B;
+  D.liderPankart = { yeni, b0: B };
+}
+function liderPankartBak() {
+  const lp = D.liderPankart;
+  if (!lp)
+    return;
+  const yeni = lp.yeni, kondu = yeni.koltuk === ON_KOLTUK && !yeni.atla;
+  if (yeni !== D.lider || yeni.cikiyor) {
+    D.liderPankart = null;
+    return;
+  }
+  if (kondu || B - lp.b0 > 8) {
+    pankart('Ön koltuk el değiştirdi', yeni.ad + ' şoförün yanına geçti');
+    konfeti(90, 0.9);
+    D.sarsinti = Math.max(D.sarsinti, 0.6);
+    D.parla = B;
+    D.liderPankart = null;
+  }
 }
 function oyunBaslat() {
   for (const k of D.sira) {
     yolcuHazir(k);
-    k.du = k.hu;
-    k.dw = k.hw;
+    k.koltuk = k.yeniKoltuk;
+    k.bx = k.koltuk.x;
+    k.bz = k.koltuk.z;
+    k.by = tabanY(k.koltuk.r);
     k.otur = 1;
     k.yer = 1;
-    k.yon = OTUR_YON;
+    k.yon = Math.PI;
     k.yeni = -9;
   }
-  bolgeHesapla();
-  const a = kadrajAraligi();
-  D.otoX = (a[0] + a[1]) / 2;
   D.sonB = B;
   sokakHazirla();
 }
@@ -3067,8 +3076,10 @@ function oyunBosalt() {
   D.teyp = D.kasis = D.sollama = null;
   D.sovBit = -1;
   D.kasa = 0;
+  D.liderPankart = null;
+  D.tesekkur = null;
+  D.yerDegis = -1;
   sofor.uzat = null;
-  bolgeHesapla();
   muzik.sov = false;
 }
 function oyunDurum(d) {
@@ -3081,27 +3092,58 @@ function oyunDurum(d) {
   d.durak = D.durak ? D.durak.k.ad : null;
   d.durakKuyruk = D.durakKuyruk.length;
   d.hiz = +D.hiz.toFixed(2);
+  // Dolmuşun ekrandaki sınırları (720×1280 sanal ölçekte): testler kadrajın dolu ve taşmasız olduğuna bakar.
+  const tampon = bp(0, 0.08, ON_UC - 0.1), tabela = bp(0, ARKA_UST, ARKA_Z), sol = bp(-DUVAR_X, ZEMIN_Y, 0), sag = bp(DUVAR_X, ZEMIN_Y, 0);
+  d.kadraj = { ust: Math.round(tabela.y), alt: Math.round(tampon.y), sol: Math.round(sol.x), sag: Math.round(sag.x) };
 }
 
 /* ---- elden ele para ----
- * Her hediye bir banknot demetidir. Önce gönderenin elinde yarım vuruş havada durur ("uzatır mısınız?"), sonra
- * önündeki her yolcunun elinden geçip şoföre varır.
- * Yol hediye anındaki koltuktan kurulur: oyunHediye sıra güncellenmeden önce çağrılır (docs/KANCALAR.md), D.sira ve
- * koltuklar o an eski hâlindedir. Hediye atan genelde öne geçer; ama parası şoföre varana dek eski koltuğunda
- * oturur (k.tut), yoksa en arkadaki öne fırlar ve para kimsenin elinden geçmezdi. O koltuğa geçecek olan bekler.
+ * Her hediye bir banknot demetidir. Önce gönderenin elinde yarım vuruş havada durur ("Uzatır mısınız?"), sonra
+ * öndeki her sıradan bir yolcunun eline (o sırada banknota en yakın olan), en son ön koltuktan şoföre iner.
+ * Yol hediye anındaki koltuklardan kurulur: oyunHediye sıra güncellenmeden önce çağrılır (docs/KANCALAR.md);
+ * yer değiştirmeler zaten ilk elden sonra yapılır. Yol kişilere bağlıdır: biri sıçrasa da banknot onun elindedir.
  * para = { k, yol: [gönderen, …, şoför], i (hangi el), t0 (o elin başladığı vuruş), v (bir el kaç vuruş),
- *          jeton, tip, p (dünyadaki yeri) }
+ *          jeton, tip, p (dünyadaki yeri), iz (ekrandaki izi) }
  */
 const PARA_SINIR = 10;
+function paraYolu(k) {
+  const yol = [k], s = k.koltuk || k.yeniKoltuk;
+  if (s && s !== ON_KOLTUK) {
+    let x = s.x;
+    for (let r = s.r - 1; r >= 0; r--) {
+      let en = null;
+      for (const a of D.sira)
+        if (a !== k && !a.cikiyor && a.koltuk && a.koltuk.r === r && a.koltuk !== ON_KOLTUK && (!en || Math.abs(a.koltuk.x - x) < Math.abs(en.koltuk.x - x)))
+          en = a;
+      if (en && r > 0) {
+        yol.push(en);
+        x = en.koltuk.x;
+      }
+    }
+    const on = D.sira.find(a => a !== k && !a.cikiyor && a.koltuk === ON_KOLTUK);
+    if (on)
+      yol.push(on);
+  }
+  yol.push(sofor);
+  return yol;
+}
+// Yer değiştirmeler para şoföre varınca toplu yapılır ("şoför parayı alınca yolcuyu öne alır"): banknot hep
+// oturan ellerden geçer. Para üstüne para gelirse bekleme uzar ama ilk hediyeden en çok 8 vuruş sonra herkes
+// yerleşir (selde de).
+function yerDegisErtele(b) {
+  if (D.yerDegis < B)
+    D.yerDegisBas = B;
+  D.yerDegis = Math.min(Math.max(D.yerDegis, b), D.yerDegisBas + 8);
+}
 function paraGonder(k, jeton, tip) {
-  if (D.paralar.length >= PARA_SINIR)
-    return;
   yolcuHazir(k);
-  if (!k.tut)
-    k.tut = { u: k.hu, w: k.hw };
-  const onde = D.sira.filter(x => x !== k && !x.cikiyor && x.hu < k.tut.u).sort((a, b) => b.hu - a.hu);
-  const yol = [k, ...onde, sofor];
-  D.paralar.push({ k, yol, i: 0, t0: Math.ceil(B * 2) / 2 + 0.5, v: clamp(4.5 / (yol.length - 1), 0.36, 0.7), jeton, tip, p: null });
+  if (D.paralar.length >= PARA_SINIR) {
+    yerDegisErtele(B + 1);
+    return;
+  }
+  const yol = paraYolu(k), t0 = Math.ceil(B * 2) / 2 + 0.5, v = clamp(4 / (yol.length - 1), 0.5, 0.8);
+  D.paralar.push({ k, yol, i: 0, t0, v, jeton, tip, p: null, iz: [] });
+  yerDegisErtele(t0 + v * (yol.length - 1) + 0.2);
 }
 const gecerli = x => x === sofor || (!x.cikiyor && D.oy.get(x.id) === x);
 // Paraları ilerletir ve elden ele geçişte iki tarafa da "uzat" hedefi verir (yolcuHareket elleri buna uzatır).
@@ -3125,19 +3167,13 @@ function paraIlerlet() {
       continue;
     }
     const a = n.yol[n.i], b = n.yol[n.i + 1];
-    if (B < n.t0) {
-      // havada tutar: el başın üstünde
-      a.uzat = { hedef: [a.x + 0.05, a.y0 + 1.25 * a.g.boy, a.z - 0.15], el: 'R', yukari: true };
-    }
+    if (B < n.t0)
+      a.uzat = { hedef: [a.x + 0.1, a.y0 + 1.3 * a.g.boy, a.z - 0.1], el: 'R', yukari: true };
     else {
       a.uzat = { hedef: gogusYeri(b), el: null };
       b.uzat = { hedef: gogusYeri(a), el: null };
     }
   }
-  // Havada parası kalmayan gönderen yeni koltuğuna geçebilir.
-  for (const k of D.oy.values())
-    if (k.tut && !D.paralar.some(n => n.k === k))
-      k.tut = null;
 }
 function gogusYeri(k) { return k.j.gogus ? k.j.gogus : [k.x, k.y0 + 0.5, k.z]; }
 // Para şoföre vardı: kasa dolar, şoför güler ve teşekkür eder.
@@ -3145,16 +3181,17 @@ function paraVardi(n) {
   D.kasa += n.jeton;
   sofor.zip0 = B;
   sofor.zip1 = B + 2.5;
-  sofor.balon = { m: n.jeton >= 200 ? 'Allah razı olsun!' : n.jeton >= 10 ? 'Eyvallah abla, abi!' : 'Sağ ol!', t0: zaman };
+  // teşekkür çekirdeğin balonuyla değil oyunUst'te yazılır: balon başın üstüne, yolcuların yüzlerine ve banknotun
+  // üstüne düşerdi (çekirdek balonları oyunUst'ten sonra çizer)
+  D.tesekkur = { m: n.jeton >= 200 ? 'Allah razı olsun!' : n.jeton >= 10 ? 'Eyvallah!' : 'Sağ ol!', b0: B };
 }
-// Elden ele geçerken banknotun dünyadaki yeri: verenin elinden alanın eline, küçük bir kavisle.
+// Banknotun dünyadaki yeri: verenin elinden alanın eline, başların üstünden geçen bir kavisle.
 function paraYeri(n) {
-  const a = n.yol[n.i], b = n.yol[n.i + 1];
-  const elA = elYeri(a);
+  const a = n.yol[n.i], b = n.yol[n.i + 1], elA = elYeri(a);
   if (B < n.t0)
     return elA;
   const t = yumusak((B - n.t0) / n.v), elB = elYeri(b);
-  return [lerp(elA[0], elB[0], t), lerp(elA[1], elB[1], t) + 0.4 * Math.sin(Math.PI * t), lerp(elA[2], elB[2], t)];
+  return [lerp(elA[0], elB[0], t), lerp(elA[1], elB[1], t) + 0.45 * Math.sin(Math.PI * t), lerp(elA[2], elB[2], t)];
 }
 function elYeri(k) {
   const el = k.uzat && k.uzat.el === 'L' ? k.j.haL : k.j.haR;
@@ -3162,12 +3199,12 @@ function elYeri(k) {
 }
 
 /* ── oyunlar/dolmus/js/20-hareket.js ── */
-/* DOLMUŞ HAREKETİ — yolun akması, gövdenin yaylanması, yolcuların oturup kalkması, el uzatma, gösteriler.
- * yolcuHareket(k, dt, db): yerine yürü / otur / in, pozu ve elleri kur · soforHareket: direksiyon, para alma
+/* DOLMUŞ HAREKETİ — yolun akması, gövdenin yaylanması, koltuk değiştirme sıçrayışı, el uzatma, gösteriler.
+ * yolcuHareket(k, dt, db): sıçra / otur / in, pozu ve elleri kur · soforHareket: direksiyon, para alma
  * Kancalar: oyunGuncelle(dt), oyunKamera().
- * Oturan yolcu: kalça koltuk yüksekliğinde (OTUR_KALCA), ayaklar önde yerde. Gövde kameraya dönük (OTUR_YON),
- * baş ayrıca döner (k.basYon): çizimde insanEkle'den sonra k.f / k.l başın yönüne çevrilir (40-dolmus.js).
- * Gövdenin sol yanı (poz.yat +) dünyada yaklaşık +x, yani yolun ileri yönüdür: fren öne, sollama arkaya yatırır.
+ * Oturan yolcu: kalça koltuk yüksekliğinde (OTUR_KALCA), ayaklar önde. Hepsi kameraya dönük (yön π); baş ayrıca
+ * döner (k.basYon): çizimde insanEkle'den sonra k.f / k.l başın yönüne çevrilir (40-dolmus.js).
+ * Kameraya bakan birinin sol yanı ekranın sağıdır: poz.yat + gövdeyi ekranda sağa yatırır.
  */
 const OTUR_KALCA = 0.2;
 
@@ -3197,12 +3234,12 @@ function oyunGuncelle(dt) {
   if (D.kasis && !azHareket) {
     const u = B - D.kasis.bas;
     if (u >= 0 && u < 2)
-      bob += (u < 1 ? 0.2 : 0.11) * Math.sin(Math.PI * (u % 1));
+      bob += (u < 1 ? 0.18 : 0.1) * Math.sin(Math.PI * (u % 1));
   }
   D.bob = bob;
-  // Dolmuş kadrajın ortasına kayar (kamera x = 0'a bakar).
-  const a = kadrajAraligi();
-  D.otoX += ((a[0] + a[1]) / 2 - D.otoX) * Math.min(1, dt * 1.6);
+  // Gösteride dolmuş yana kayar: sahneyi alan yolcu kadrajın ortasına gelir.
+  const ox = dr && dr.yakin ? dr.k.bx : 0;
+  D.otoX += (ox - D.otoX) * Math.min(1, dt * 1.6);
 
   paraIlerlet();
   for (const k of D.oy.values())
@@ -3210,6 +3247,7 @@ function oyunGuncelle(dt) {
   soforHareket(dt);
   for (const n of D.paralar)
     n.p = paraYeri(n);
+  liderPankartBak();
 }
 
 /* ---- müsait bir yerde: dolmuş durur, gönderen ayağa kalkar ---- */
@@ -3229,60 +3267,65 @@ function durakIlerlet() {
     return;
   const su = B - g.bas;
   g.yakin = su > 0.5 && su < DURAK_V - 0.8;
-  g.ayakta = su > 1 && su < DURAK_V - 1.2;
+  g.ayakta = su > 1 && su < DURAK_V - 1.2 && !g.k.atla;
   g.k.yildiz = g.k.guler = su > -1;
-  // Durak tabelası dolmuş durduğu yerde, karşı kaldırımda belirir; dolmuş kalkınca geride kalır.
+  // Durak tabelası dolmuş durduğu yerde, kaldırımda belirir; dolmuş kalkınca geride kalır.
   if (g.isaret === null && su > 0.6)
-    g.isaret = D.kayma + (D.otoX - g.k.du);
+    g.isaret = D.kayma;
+}
+
+/* ---- koltuk değiştirme: başların üstünden kısa bir sıçrayış ---- */
+function atlaBaslat(k, s, disari) {
+  const hx = s.x, hz = s.z, hy = disari ? s.y : tabanY(s.r), uz = Math.hypot(hx - k.bx, hz - k.bz);
+  k.atla = { x0: k.bx, y0: k.by, z0: k.bz, x1: hx, y1: hy, z1: hz, b0: B, sure: clamp(0.8 + uz * 0.22, 0.8, 1.5), h: 0.55 + Math.min(0.6, uz * 0.25) };
+  if (!disari)
+    k.koltuk = s;
+}
+
+function koltukDolu(k, s) {
+  for (const a of D.oy.values())
+    if (a !== k && !a.cikiyor && a.koltuk === s)
+      return true;
+  return false;
 }
 
 /* ---- yolcu ---- */
 function yolcuHareket(k, dt, db) {
   yolcuHazir(k);
   const d = D.durak, yildiz = !!(d && d.k === k && d.ayakta);
-  let hu = k.hu, hw = k.hw;
-  if (k.tut) {
-    // parası şoföre varana dek eski koltuğunda oturur
-    hu = k.tut.u;
-    hw = k.tut.w;
+  // yeni koltuk: binen hemen, koltuk değiştiren para elden çıkınca sıçrar
+  // (yeni binen, koltuğu henüz boşalmadıysa kaldırımda bekler)
+  if (!k.cikiyor && !k.atla && k.yeniKoltuk && k.koltuk !== k.yeniKoltuk && (k.koltuk ? B >= D.yerDegis : !koltukDolu(k, k.yeniKoltuk)))
+    atlaBaslat(k, k.yeniKoltuk);
+  if (k.cikiyor && !k.indi) {
+    // "Müsait bir yerde": en yakın yan duvarın üstünden kaldırıma sıçrar
+    k.indi = true;
+    atlaBaslat(k, { x: (k.bx >= 0 ? 1 : -1) * (DUVAR_X + 0.9), z: k.bz, y: 0.14 }, true);
   }
-  else if (D.paralar.length && koltukTutulu(k, hu, hw)) {
-    // yeni koltuğu henüz boşalmadı: olduğu yerde bekler
-    hu = k.du;
-    hw = k.dw;
+  let havada = 0;
+  if (k.atla) {
+    const a = k.atla, t = clamp((B - a.b0) / a.sure, 0, 1), e = yumusak(t);
+    k.bx = lerp(a.x0, a.x1, e);
+    k.bz = lerp(a.z0, a.z1, e);
+    havada = a.h * Math.sin(Math.PI * t);
+    k.by = lerp(a.y0, a.y1, e);
+    if (t >= 1)
+      k.atla = null;
   }
-  if (k.cikiyor) {
-    // "Müsait bir yerde": kaldırıma iner, dolmuş giderken geride kalır.
-    hu = k.du;
-    hw = -2.4;
-    k.du += db * D.hiz;
-  }
-  const du = hu - k.du, dw = hw - k.dw, uz = Math.hypot(du, dw);
-  if (uz > 0.002) {
-    const adim = Math.min(uz, (2.4 + uz * 1.6) * dt);
-    k.du += du / uz * adim;
-    k.dw += dw / uz * adim;
-  }
-  const yerinde = uz < 0.12 && !k.cikiyor;
-  k.yer += ((yerinde ? 1 : 0) - k.yer) * Math.min(1, dt * 6);
-  k.otur += ((yerinde && !yildiz ? 1 : 0) - k.otur) * Math.min(1, dt * (yerinde && !yildiz ? 5 : 9));
+  else if (k.cikiyor)
+    k.bz += db * D.hiz; // kaldırımda kalır, dolmuş uzaklaşır
+  const oturacak = !k.atla && !k.cikiyor && !yildiz && !!k.koltuk;
+  k.otur += ((oturacak ? 1 : 0) - k.otur) * Math.min(1, dt * (oturacak ? 6 : 10));
+  k.yer = oturacak ? 1 : 0;
   if (k.cikiyor)
-    k.gitti = k.dw < -2.1 && D.otoX - k.du < -(D.bolge1 - D.bolge0) / 2 - 1.6;
-  // Gösterideki yolcu büyür: sahne onun.
-  k.olcek += ((yildiz ? 1.3 : 1) - k.olcek) * Math.min(1, dt * 4);
+    k.gitti = !k.atla && k.bz > ARKA_Z + 2.5;
+  k.olcek += ((yildiz ? 1.35 : 1) - k.olcek) * Math.min(1, dt * 4);
   k.g.boy = k.asilBoy * k.olcek;
-  // dünyadaki yer: kapıdan içeri girerken basamağa çıkar
-  k.x = D.otoX - k.du;
-  k.z = k.dw;
-  const ic = clamp((k.dw + 1.6) / 0.5, 0, 1);
-  k.y0 = ic * (ZEMIN_Y + D.bob);
-  // yön: yürürken gittiği yere, otururken kameraya dönük
-  let yon = OTUR_YON + (k.dfaz - 0.5) * 0.2;
-  if (uz > 0.2 || k.cikiyor)
-    yon = Math.atan2(-du || -0.001, k.cikiyor ? -1 : dw);
-  if (yildiz)
-    yon = Math.PI;
-  k.yon += aciFark(k.yon, yon) * Math.min(1, dt * 8);
+  // dünyadaki yer: içerideyken dolmuşla yaylanır
+  k.x = k.bx - D.otoX;
+  k.z = k.bz;
+  k.y0 = k.by + havada + (Math.abs(k.bx) < DUVAR_X ? D.bob : 0);
+  k.yon += aciFark(k.yon, Math.PI) * Math.min(1, dt * 8);
 
   const poz = pozBekle(k), o = k.otur, vurus = 0.5 + 0.5 * Math.cos(TAU * B);
   poz.hipY = lerp(poz.hipY, OTUR_KALCA + 0.01 * vurus, o);
@@ -3291,13 +3334,12 @@ function yolcuHareket(k, dt, db) {
   poz.aS[2] *= 1 - o;
   poz.aL[2] *= 1 - o;
   poz.yat += yatEk(k);
-  // kasis: önden arkaya dalga halinde hoplarlar (öndeki önce)
-  const hop = kasisHop(k.du);
+  poz.egim += egimEk() * o;
+  const hop = kasisHop(k.bz);
   poz.hipY += hop;
   if (azHareket)
     poz.yat = 0;
-  const W = iskeletKur(k, poz);
-  const j = k.j, hy = poz.hipY;
+  const W = iskeletKur(k, poz), j = k.j, hy = poz.hipY;
   // eller: oturan dizlerinde, ayaktaki yanlarında
   let hR = o > 0.5 ? W(-0.11, hy + 0.05, 0.16) : W(-0.2, hy + 0.06, 0.05);
   let hL = o > 0.5 ? W(0.11, hy + 0.05, 0.16) : W(0.2, hy + 0.06, 0.05);
@@ -3306,40 +3348,31 @@ function yolcuHareket(k, dt, db) {
     hR = W(-0.3 - 0.05 * sal, hy + 0.62, 0.06);
     hL = W(0.3 + 0.05 * sal, hy + 0.58 + 0.06 * Math.cos(TAU * B), 0.06);
   }
+  else if (k.atla || hop > 0.03) {
+    // sıçrarken ve kasiste kollar havada
+    hR = W(-0.25, hy + 0.5, 0.04);
+    hL = W(0.25, hy + 0.5, 0.04);
+  }
   else if (d && d.ayakta && !k.cikiyor) {
     // gösteride herkes alkışlar
     const ac = Math.abs(Math.sin(Math.PI * 2 * B + k.dfaz * 3));
     hR = W(-0.03 - 0.07 * ac, hy + 0.27, 0.19);
     hL = W(0.03 + 0.07 * ac, hy + 0.27, 0.19);
   }
-  else if (hop > 0.03) {
-    hR = W(-0.24, hy + 0.5, 0.04);
-    hL = W(0.24, hy + 0.5, 0.04);
-  }
-  else if (B >= k.zip0 && B < k.zip1 && !k.uzat) {
-    // hediye sevinci: el sallar
-    hL = W(0.26 + 0.05 * sal, hy + 0.5, 0.06);
-  }
-  if (k.uzat)
+  else if (B >= k.zip0 && B < k.zip1 && !k.uzat)
+    hL = W(0.26 + 0.05 * sal, hy + 0.5, 0.06); // hediye sevinci: el sallar
+  if (k.uzat && !k.atla)
     [hR, hL] = elUzat(k, k.uzat, hR, hL);
   j.haR = hR;
   j.haL = hL;
   kolKur(k);
   // baş: kameraya, para geçerken karşısındakine, gösteride yıldıza bakar
-  let bas = Math.PI - 0.12 + (k.dfaz - 0.5) * 0.3;
+  let bas = Math.PI + (k.dfaz - 0.5) * 0.3;
   if (k.uzat && !k.uzat.yukari)
-    bas = Math.PI + aciFark(Math.PI, Math.atan2(k.uzat.hedef[0] - k.x, k.uzat.hedef[2] - k.z)) * 0.55;
+    bas = Math.PI + aciFark(Math.PI, Math.atan2(k.uzat.hedef[0] - k.x, k.uzat.hedef[2] - k.z)) * 0.5;
   else if (d && d.ayakta && !yildiz)
     bas = Math.PI + clamp(d.k.x - k.x, -1, 1) * 0.6;
-  if (uz > 0.2 || k.cikiyor)
-    bas = k.yon;
-  k.basYon = k.basYon === undefined ? bas : k.basYon + aciFark(k.basYon, bas) * Math.min(1, dt * 7);
-}
-function koltukTutulu(k, u, w) {
-  for (const x of D.sira)
-    if (x !== k && x.tut && Math.abs(x.tut.u - u) < 0.01 && Math.abs(x.tut.w - w) < 0.01)
-      return true;
-  return false;
+  k.basYon += aciFark(k.basYon, bas) * Math.min(1, dt * 7);
 }
 // Bir eli dünyadaki hedefe uzatır (kol boyunca); hangi elin uzanacağını hedefin yanı seçer.
 function elUzat(k, u, hR, hL) {
@@ -3351,101 +3384,157 @@ function elUzat(k, u, hR, hL) {
   const el = [om[0] + dx / uz * r, om[1] + dy / uz * r, om[2] + dz / uz * r];
   return u.el === 'L' ? [hR, el] : [el, hL];
 }
-// Fren öne, sollama arkaya, teyp sağa sola yatırır (poz.yat + : gövdenin solu, yani yolun ilerisi).
+// Fren öne (kameraya), sollama geriye yaslar; teyp sağa sola sallar. Öne / geriye eğilme poz.egim'dir.
 function yatEk(k) {
-  let y = 0;
+  if (etkin(D.teyp))
+    return 0.035 * Math.sin(Math.PI * B + k.dfaz * 2);
+  return 0;
+}
+function egimEk() {
+  let e = 0;
   const d = D.durak;
   if (d) {
     const su = B - d.bas;
     if (su > -0.5 && su < 1.5)
-      y += 0.07 * Math.sin(Math.PI * clamp((su + 0.5) / 2, 0, 1));
+      e += 0.12 * Math.sin(Math.PI * clamp((su + 0.5) / 2, 0, 1));
   }
   if (etkin(D.sollama))
-    y -= 0.045 * Math.sin(Math.PI * clamp((B - D.sollama.bas) / D.sollama.sure, 0, 1));
-  if (etkin(D.teyp))
-    y += 0.035 * Math.sin(Math.PI * B + k.dfaz * 2);
-  return y;
+    e -= 0.08 * Math.sin(Math.PI * clamp((B - D.sollama.bas) / D.sollama.sure, 0, 1));
+  return azHareket ? 0 : e;
 }
-function kasisHop(u) {
+function kasisHop(z) {
   if (!D.kasis || azHareket)
     return 0;
-  const t = B - D.kasis.bas - u * 0.08;
+  const t = B - D.kasis.bas - z * 0.12;
   return t > 0 && t < 1 ? 0.16 * Math.sin(Math.PI * t) : 0;
 }
 
-/* ---- şoför: direksiyonda, para gelince arkaya uzanır ---- */
+/* ---- şoför: direksiyonda, para gelince yana uzanır ---- */
 function soforHareket(dt) {
   const k = sofor;
-  k.x = D.otoX - ON_U;
-  k.z = UZAK_Z;
+  k.x = SOFOR_KOLTUK.x - D.otoX;
+  k.z = 0;
   k.y0 = ZEMIN_Y + D.bob;
-  k.yon = Math.PI - 0.95;
+  k.yon = Math.PI;
   const poz = pozBekle(k);
   poz.hipY = OTUR_KALCA + 0.01 * (0.5 + 0.5 * Math.cos(TAU * B));
-  poz.aS[1] = poz.aL[1] = 0.19;
+  poz.aS[1] = poz.aL[1] = 0.17;
   poz.aS[2] = poz.aL[2] = 0;
   poz.yat = azHareket ? 0 : yatEk(k) * 0.6;
-  poz.hipY += kasisHop(ON_U);
+  poz.egim = egimEk();
+  poz.hipY += kasisHop(0);
   const W = iskeletKur(k, poz), dk = direksiyonYeri();
-  // eller direksiyonun iki yanında; viraj yokken direksiyon vuruşla hafifçe oynar
+  // eller direksiyonun iki yanında; direksiyon vuruşla hafifçe oynar
   const oyna = azHareket ? 0 : 0.03 * Math.sin(TAU * B / 4);
-  let hR = [dk[0] - 0.02, dk[1] + 0.06 + oyna, dk[2] - 0.13], hL = [dk[0] + 0.02, dk[1] + 0.06 - oyna, dk[2] + 0.11];
+  let hR = [dk[0] - 0.15, dk[1] + 0.05 + oyna, dk[2]], hL = [dk[0] + 0.15, dk[1] + 0.05 - oyna, dk[2]];
   if (k.uzat)
     [hR, hL] = elUzat(k, k.uzat, hR, hL);
   k.j.haR = hR;
   k.j.haL = hL;
   kolKur(k);
-  let bas = Math.PI - 0.35;
+  let bas = Math.PI;
   if (k.uzat)
     bas = Math.PI + aciFark(Math.PI, Math.atan2(k.uzat.hedef[0] - k.x, k.uzat.hedef[2] - k.z)) * 0.6;
   k.basYon += aciFark(k.basYon, bas) * Math.min(1, dt * 7);
 }
-function direksiyonYeri() { return [D.otoX - (ON_U - 0.4), ZEMIN_Y + D.bob + 0.47, UZAK_Z]; }
+function direksiyonYeri() { return [SOFOR_KOLTUK.x - D.otoX, ZEMIN_Y + D.bob + 0.5, -0.17]; }
 
 /* ---- kamera ---- */
-// Kadraja girecek u aralığı, dolmuşun ortası x = 0'a gelecek biçimde; derinlikte yakın tekerlerden arka duvara.
-// Yarı genişlik hedef aralıktan hesaplanır (D.otoX ona doğru kayarken kamera da aynı hızla yaklaşır).
+// Bütün dolmuş: yan duvardan yan duvara, ön tampondan arka duvara. Gösteride sahneyi alan yolcuya daralır.
+// kameraSigdir her noktaya bir insanın yarı genişliği kadar (0,55 m) pay ekler; dolmuşun kenarı zaten kenardır,
+// o pay sokağa kalsın diye kenar noktası KAMERA_PAY kadar içeriden verilir.
+const KAMERA_PAY = 0.4;
 function oyunKamera() {
-  const a = kadrajAraligi(), y = (a[1] - a[0]) / 2;
-  return [[y, -1.2], [y, 1.08], [0, -1.2], [0, 1.08]];
+  const d = D.durak;
+  if (d && d.yakin)
+    return [[1.05, d.k.bz - 0.75], [1.05, d.k.bz + 0.3], [0, d.k.bz]];
+  return [[DUVAR_X - KAMERA_PAY, ON_UC - 0.12], [DUVAR_X - KAMERA_PAY, ARKA_Z + 0.05]];
 }
 
 /* ── oyunlar/dolmus/js/30-sokak.js ── */
-/* SOKAK — öğle sonu bir mahalle sokağı: asfalt, kesik orta çizgi, kaldırımlar, karşı kaldırımda pastel
- * apartmanlar (altlarında tenteli dükkânlar), arkada daha yüksek bloklar, sokak lambaları ve ağaçlar.
- * Hepsi dünyada durur ve yol akınca (D.kayma) sola kayar; derinliğe göre kendiliğinden yavaşlar.
- * Dolmuşun arkasında kaldıkları için hepsi oyunZemin içinde doğrudan c ile çizilir. Yakın kaldırımda uzun bir şey
- * yoktur: yolcuların önünü kapatmasın.
- * sokakHazirla: binaları kimlikten bağımsız, sabit bir tohumla bir kez üretir · Kanca: oyunZemin().
+/* SOKAK — öğle sonu dar bir mahalle sokağı. Dolmuş kameraya doğru gelir; sokak onun iki yanından geriye (yukarı)
+ * akar: asfalt, yaya geçitleri, rögar kapakları, bordür, karo kaldırım, tenteli dükkânlar, çınarlar.
+ * Üstteki sahne yazılarının arkasında sakin bir gök ve uzak tepe silueti durur (arkaPerde): yazılar okunsun.
+ * Hepsi dolmuşun arkasında kaldığı için oyunZemin içinde doğrudan c ile çizilir.
+ * sokakHazirla: dükkânları sabit bir tohumla bir kez üretir, gök perdesini bir kez çizer · Kanca: oyunZemin().
  */
 const SOKAK = {
-  asfalt: '#5b656e', asfaltKoyu: '#4e5760', cizgi: '#f1e7cf', bordur: '#ece4d2', bordurKoyu: '#c9bfa8',
-  kaldirim: '#dca783', kaldirimCizgi: '#c48e68', golge: 'rgba(28,40,52,.3)', gok: '#9fd6dc',
-  pencere: '#4f7f95', pencereAcik: '#cdeef3', panjur: '#3f6b5e'
+  asfalt: '#5b656e', cizgi: '#f1e7cf', bordur: '#ece4d2', bordurKoyu: '#c9bfa8', kaldirim: '#dca783',
+  kaldirimCizgi: '#c48e68', golge: 'rgba(28,40,52,.32)', rogar: '#3f474f'
 };
 const BINA_RENK = ['#f2b8a0', '#a8d8c8', '#f3d48a', '#e9a3b0', '#9cc6e6', '#f6e3c4', '#c9b6e4', '#f0c27a'];
 const DUKKAN = ['BAKKAL', 'BERBER', 'SİMİT', 'ECZANE', 'TERZİ', 'KIRTASİYE', 'LOKANTA', 'ÇAY OCAĞI', 'NALBUR', 'MANAV', 'FIRIN', 'KUAFÖR'];
 const TENTE = ['#e8553b', '#2ec4b6', '#ffc63a', '#3d5bd0', '#e86a9a', '#4fae6c'];
-const BINA_Z = 3.7, ARKA_Z = 10.5;
-let binalar = [], binaDonem = 0, arkaBinalar = [], arkaDonem = 0;
+const YOL_X = 2.35, KALDIRIM_X = 3.9;
+// Gök perdesinin alt çizgisi: sıralama kutusu ve göstergenin hemen altı (stil.css .sira, .cosku).
+const UFUK = 488;
+let dukkanlar = [], dukkanDonem = 0, perde = null;
 function sokakHazirla() {
-  if (binalar.length)
+  if (dukkanlar.length)
     return;
   const r = rastgeleUret(4242);
-  let x = 0;
+  let z = 0;
   for (let i = 0; i < 12; i++) {
-    const w = 3.3 + r() * 2.2, kat = 2 + Math.floor(r() * 3);
-    binalar.push({ x0: x, w, kat, h: 2.7 + kat * 1.5 + 0.35, renk: BINA_RENK[Math.floor(r() * BINA_RENK.length)], dukkan: DUKKAN[i % DUKKAN.length], tente: TENTE[Math.floor(r() * TENTE.length)], balkon: r() < 0.65, cati: r() < 0.5 ? '#b5523b' : '#8a5a48' });
-    x += w + 0.3 + r() * 0.5;
+    const uz = 3.4 + r() * 2.4;
+    dukkanlar.push({ z0: z, uz, yan: i % 2 ? 1 : -1, renk: BINA_RENK[Math.floor(r() * BINA_RENK.length)], ad: DUKKAN[i % DUKKAN.length], tente: TENTE[Math.floor(r() * TENTE.length)] });
+    if (i % 2)
+      z += uz + 0.4 + r() * 0.8;
   }
-  binaDonem = x;
-  x = 0;
-  for (let i = 0; i < 9; i++) {
-    const w = 5 + r() * 4;
-    arkaBinalar.push({ x0: x, w, h: 9 + r() * 7, renk: BINA_RENK[Math.floor(r() * BINA_RENK.length)] });
-    x += w + 0.4 + r() * 1.5;
+  dukkanDonem = z;
+  perdeCiz();
+}
+// Gök, güneş, bulutlar ve uzakta tepelere yayılmış mahalle silueti: bir kez ayrı bir tuvale çizilir.
+function perdeCiz() {
+  const t = document.createElement('canvas');
+  t.width = GW;
+  t.height = UFUK + 40;
+  const a = t.getContext('2d'), r = rastgeleUret(91), H = UFUK;
+  const gr = a.createLinearGradient(0, 0, 0, H);
+  gr.addColorStop(0, '#2f7fa6');
+  gr.addColorStop(0.55, '#6fb9cf');
+  gr.addColorStop(0.86, '#bfe3df');
+  gr.addColorStop(1, '#f6dcb0');
+  a.fillStyle = gr;
+  a.fillRect(0, 0, GW, H + 40);
+  a.fillStyle = 'rgba(255,240,200,.35)';
+  a.beginPath();
+  a.arc(560, 330, 70, 0, TAU);
+  a.fill();
+  a.fillStyle = '#fff3cf';
+  a.beginPath();
+  a.arc(560, 330, 34, 0, TAU);
+  a.fill();
+  a.fillStyle = 'rgba(255,255,255,.55)';
+  for (const [x, y, w] of [[140, 300, 150], [420, 250, 120], [640, 390, 110], [250, 410, 90]]) {
+    a.beginPath();
+    a.ellipse(x, y, w / 2, 9, 0, 0, TAU);
+    a.ellipse(x - w * 0.18, y - 7, w / 4, 8, 0, 0, TAU);
+    a.fill();
   }
-  arkaDonem = x;
+  const tepe = (renk, yuk, f1, f2, kay) => {
+    a.fillStyle = renk;
+    a.beginPath();
+    a.moveTo(0, H + 40);
+    for (let x = 0; x <= GW; x += 8)
+      a.lineTo(x, H - yuk * (0.55 + 0.3 * Math.sin(x * f1 + kay) + 0.15 * Math.sin(x * f2 + kay * 2)));
+    a.lineTo(GW, H + 40);
+    a.closePath();
+    a.fill();
+  };
+  tepe('#8fb7b9', 60, 0.009, 0.021, 0.8);
+  // mahalle: tepeye tırmanan küçük evler, kiremit damlar
+  for (let x = 6; x < GW;) {
+    const w = 14 + r() * 16, h = 10 + r() * 16, y = H - 22 - 18 * (0.5 + 0.5 * Math.sin(x * 0.009 + 0.8));
+    a.fillStyle = BINA_RENK[Math.floor(r() * BINA_RENK.length)];
+    a.globalAlpha = 0.75;
+    a.fillRect(x, y - h, w, h + 30);
+    a.fillStyle = '#b5523b';
+    a.fillRect(x - 1, y - h - 3, w + 2, 4);
+    a.globalAlpha = 1;
+    x += w + 2 + r() * 6;
+  }
+  tepe('#6d9a9a', 22, 0.013, 0.03, 2.1);
+  perde = t;
 }
 
 /* ---- yardımcılar ---- */
@@ -3471,136 +3560,94 @@ function dunyaCokgen(k, renk, cizgi) {
   }
   return p;
 }
-// Ekranın dışında kalan bir x aralığını atlamak için kaba denetim.
-function ekrandaMi(x0, x1, y, z) {
-  const a = pr([x0, y, z]), b = pr([x1, y, z]);
-  return a.ok && b.ok && b.x > -40 && a.x < GW + 40;
-}
-// Tekrarlanan dizinin (dönem d) ekrana düşen kopyalarının kayma payları.
-function kopyalar(d, kay) {
-  const k0 = -(((kay % d) + d) % d);
-  return [k0 - d * 2, k0 - d, k0, k0 + d, k0 + d * 2];
+// Yol akınca dünyada kayan dizinin görünen kopyaları: z = taban + kayma (dönem d), yakından uzağa.
+function akanZ(d, z0, bas, son) {
+  const k = ((D.kayma % d) + d) % d, cik = [];
+  for (let z = z0 + k + Math.ceil((bas - z0 - k) / d) * d; z < son; z += d)
+    cik.push(z);
+  return cik;
 }
 
 /* ---- zemin ---- */
-let tepeBoya = null;
 function oyunZemin() {
-  c.fillStyle = SOKAK.gok;
+  const cw = Math.max(1, pr([0, 0, 0]).s * 0.011), Z0 = -6, Z1 = 26;
+  c.fillStyle = SOKAK.kaldirim;
   c.fillRect(0, 0, GW, GH);
-  const kay = D.kayma, cw = Math.max(1, pr([0, 0, 0]).s * 0.012);
-  // arka sıradaki yüksek bloklar (yol hızının yarısıyla akar: uzakta oldukları için)
-  for (const o of kopyalar(arkaDonem, kay * 0.5))
-    for (const b of arkaBinalar) {
-      const x0 = b.x0 + o - arkaDonem * 1.2, x1 = x0 + b.w;
-      if (!ekrandaMi(x0, x1, 0, ARKA_Z))
-        continue;
-      dunyaCokgen([[x0, 0, ARKA_Z], [x1, 0, ARKA_Z], [x1, b.h, ARKA_Z], [x0, b.h, ARKA_Z]], renkKat(b.renk, '#7fb3bf', 0.45));
-      dunyaCokgen([[x0, b.h, ARKA_Z], [x1, b.h, ARKA_Z], [x1, b.h, ARKA_Z + 3], [x0, b.h, ARKA_Z + 3]], renkKat(b.renk, '#e9f4f2', 0.5));
-      c.fillStyle = 'rgba(70,110,125,.35)';
-      for (let y = 2.2; y < b.h - 1; y += 1.6)
-        for (let x = x0 + 0.5; x < x1 - 0.6; x += 1.1) {
-          const p = pr([x, y, ARKA_Z]), q = pr([x + 0.55, y + 0.75, ARKA_Z]);
-          if (p.ok && q.ok)
-            c.fillRect(p.x, q.y, q.x - p.x, p.y - q.y);
-        }
-    }
-  // yollar ve kaldırımlar
-  const X = 70;
-  dunyaCokgen([[-X, 0, ARKA_Z - 0.5], [X, 0, ARKA_Z - 0.5], [X, 0, BINA_Z], [-X, 0, BINA_Z]], '#c7b8a0');
-  dunyaCokgen([[-X, 0.14, BINA_Z + 0.2], [X, 0.14, BINA_Z + 0.2], [X, 0.14, 2.75], [-X, 0.14, 2.75]], SOKAK.kaldirim);
-  dunyaCokgen([[-X, 0.14, 2.75], [X, 0.14, 2.75], [X, 0.14, 2.6], [-X, 0.14, 2.6]], SOKAK.bordur);
-  dunyaCokgen([[-X, 0, 2.6], [X, 0, 2.6], [X, 0.14, 2.6], [-X, 0.14, 2.6]], SOKAK.bordurKoyu);
-  dunyaCokgen([[-X, 0, 2.6], [X, 0, 2.6], [X, 0, -2.45], [-X, 0, -2.45]], SOKAK.asfalt);
-  dunyaCokgen([[-X, 0.14, -2.45], [X, 0.14, -2.45], [X, 0.14, -2.6], [-X, 0.14, -2.6]], SOKAK.bordur);
-  const kd = dunyaCokgen([[-X, 0.14, -2.6], [X, 0.14, -2.6], [X, 0.14, -7], [-X, 0.14, -7]], SOKAK.kaldirim);
-  if (kd) {
-    // kaldırım ekranın altına dek sürer (gök rengi alttan görünmesin)
-    c.fillStyle = SOKAK.kaldirim;
-    c.fillRect(0, Math.min(kd[2].y, kd[3].y) - 1, GW, GH);
+  // asfalt, bordürler, kaldırımlar
+  dunyaCokgen([[-YOL_X, 0, Z0], [YOL_X, 0, Z0], [YOL_X, 0, Z1], [-YOL_X, 0, Z1]], SOKAK.asfalt);
+  for (const s of [-1, 1]) {
+    dunyaCokgen([[s * YOL_X, 0, Z0], [s * YOL_X, 0.14, Z0], [s * YOL_X, 0.14, Z1], [s * YOL_X, 0, Z1]], SOKAK.bordurKoyu);
+    dunyaCokgen([[s * YOL_X, 0.14, Z0], [s * (YOL_X + 0.16), 0.14, Z0], [s * (YOL_X + 0.16), 0.14, Z1], [s * YOL_X, 0.14, Z1]], SOKAK.bordur);
   }
-  // kaldırım taşlarının derzleri ve orta çizgi akar
+  // kaldırım derzleri ve yoldaki işaretler akar
   c.strokeStyle = SOKAK.kaldirimCizgi;
   c.lineWidth = Math.max(1, cw * 0.8);
   c.beginPath();
-  for (const [z0, z1] of [[2.75, BINA_Z + 0.2], [-2.6, -7]]) {
-    const m0 = Math.floor((kay - 30) / 0.9);
-    for (let m = m0; m < m0 + 70; m++) {
-      const x = m * 0.9 - kay, a = pr([x, 0.14, z0]), b = pr([x, 0.14, z1]);
-      if (a.ok && b.ok && a.x > -20 && a.x < GW + 20) {
+  for (const z of akanZ(0.8, 0, Z0, Z1))
+    for (const s of [-1, 1]) {
+      const a = pr([s * (YOL_X + 0.16), 0.14, z]), b = pr([s * 9, 0.14, z]);
+      if (a.ok && b.ok) {
         c.moveTo(a.x, a.y);
         c.lineTo(b.x, b.y);
       }
     }
-  }
   c.stroke();
-  const m0 = Math.floor((kay - 30) / 3.2);
-  for (let m = m0; m < m0 + 22; m++) {
-    const x = m * 3.2 - kay;
-    if (ekrandaMi(x, x + 1.7, 0, 1.95))
-      dunyaCokgen([[x, 0, 1.88], [x + 1.7, 0, 1.88], [x + 1.7, 0, 2.02], [x, 0, 2.02]], SOKAK.cizgi);
-  }
-  // karşı kaldırımdaki apartmanlar
-  for (const o of kopyalar(binaDonem, kay))
-    for (const b of binalar) {
-      const x0 = b.x0 + o - binaDonem * 0.5;
-      if (ekrandaMi(x0, x0 + b.w, 0, BINA_Z))
-        binaCiz(b, x0, cw);
-    }
-  sokakEsyasi(kay, cw);
-  // geçilen araba (sollamada) ve durak tabelası
-  sollananCiz(cw);
-  durakTabelasi(cw);
-  // üstteki sahne yazıları okunsun diye çatıların üstü koyulaşır
-  if (!tepeBoya) {
-    tepeBoya = c.createLinearGradient(0, 0, 0, ALAN_UST - 20);
-    tepeBoya.addColorStop(0, 'rgba(14,44,58,.86)');
-    tepeBoya.addColorStop(0.55, 'rgba(14,44,58,.5)');
-    tepeBoya.addColorStop(1, 'rgba(14,44,58,0)');
-  }
-  c.fillStyle = tepeBoya;
-  c.fillRect(0, 0, GW, ALAN_UST - 20);
-  dolmusArka(cw);
-}
-
-/* ---- apartman: yüzü kameraya dönük, damı yukarıdan görünür ---- */
-function binaCiz(b, x0, cw) {
-  const x1 = x0 + b.w, z = BINA_Z, h = b.h, r = b.renk;
-  dunyaCokgen([[x0, h, z], [x1, h, z], [x1, h, z + 4], [x0, h, z + 4]], renkKat(r, '#fff6e8', 0.35), cw);
-  // kiremit saçak ve çatı
-  dunyaCokgen([[x0 - 0.15, h, z - 0.2], [x1 + 0.15, h, z - 0.2], [x1 - 0.2, h + 0.9, z + 1.6], [x0 + 0.2, h + 0.9, z + 1.6]], b.cati, cw);
-  dunyaCokgen([[x0, 0, z], [x1, 0, z], [x1, h, z], [x0, h, z]], r, cw);
-  // pencereler: kat kat, panjurlu; bazı katlarda balkon ve çamaşır ipi
-  const n = Math.max(1, Math.floor((b.w - 0.6) / 1.15)), ara = b.w / n;
-  for (let kat = 0; kat < b.kat; kat++) {
-    const y0 = 2.95 + kat * 1.5;
-    for (let i = 0; i < n; i++) {
-      const px = x0 + ara * (i + 0.5);
-      dunyaCokgen([[px - 0.32, y0, z], [px + 0.32, y0, z], [px + 0.32, y0 + 0.95, z], [px - 0.32, y0 + 0.95, z]], (i + kat) % 3 ? SOKAK.pencere : SOKAK.pencereAcik, cw * 0.8);
-      dunyaCokgen([[px - 0.48, y0, z], [px - 0.34, y0, z], [px - 0.34, y0 + 0.95, z], [px - 0.48, y0 + 0.95, z]], SOKAK.panjur);
-      dunyaCokgen([[px + 0.34, y0, z], [px + 0.48, y0, z], [px + 0.48, y0 + 0.95, z], [px + 0.34, y0 + 0.95, z]], SOKAK.panjur);
-    }
-    if (b.balkon && kat % 2 === 0) {
-      dunyaCokgen([[x0 + 0.3, y0 - 0.1, z - 0.6], [x1 - 0.3, y0 - 0.1, z - 0.6], [x1 - 0.3, y0 - 0.1, z], [x0 + 0.3, y0 - 0.1, z]], renkKat(r, '#ffffff', 0.4), cw);
-      dunyaCokgen([[x0 + 0.3, y0 - 0.1, z - 0.6], [x1 - 0.3, y0 - 0.1, z - 0.6], [x1 - 0.3, y0 + 0.4, z - 0.6], [x0 + 0.3, y0 + 0.4, z - 0.6]], renkKat(r, '#3a2a2c', 0.25), cw);
-      // çamaşırlar
-      for (let i = 0; i < 3; i++) {
-        const cx = x0 + 0.7 + i * 0.55;
-        if (cx > x1 - 0.6)
-          break;
-        dunyaCokgen([[cx, y0 + 0.75, z - 0.6], [cx + 0.35, y0 + 0.75, z - 0.6], [cx + 0.35, y0 + 0.45, z - 0.6], [cx, y0 + 0.45, z - 0.6]], TENTE[(i + kat + Math.round(b.w)) % TENTE.length]);
+  for (const z of akanZ(3.2, 0, Z0, Z1))
+    for (const s of [-1, 1])
+      dunyaCokgen([[s * 2.05, 0, z], [s * 2.18, 0, z], [s * 2.18, 0, z + 1.6], [s * 2.05, 0, z + 1.6]], SOKAK.cizgi);
+  for (const z of akanZ(22, 4, Z0, Z1))
+    for (let x = -2.1; x < 2.1; x += 0.6)
+      dunyaCokgen([[x, 0, z], [x + 0.36, 0, z], [x + 0.36, 0, z + 1.8], [x, 0, z + 1.8]], SOKAK.cizgi);
+  for (const z of akanZ(9, 2, Z0, Z1)) {
+    const p = pr([-1.2, 0, z]);
+    if (p.ok) {
+      // rögar kapağı: koyu delik gibi değil, halkalı dökme demir kapak gibi görünsün
+      c.fillStyle = SOKAK.rogar;
+      c.strokeStyle = '#8a939b';
+      c.lineWidth = Math.max(1, cw);
+      for (const r of [0.3, 0.2, 0.1]) {
+        c.beginPath();
+        c.ellipse(p.x, p.y, r * p.s, r * p.s * Math.sin(kam.egim), 0, 0, TAU);
+        if (r === 0.3)
+          c.fill();
+        c.stroke();
       }
     }
   }
-  // dükkân: vitrin, tente, tabela
-  dunyaCokgen([[x0 + 0.3, 0.14, z], [x1 - 0.3, 0.14, z], [x1 - 0.3, 2.0, z], [x0 + 0.3, 2.0, z]], '#3d5560', cw);
-  dunyaCokgen([[x0 + 0.5, 0.5, z], [x1 - 1.4, 0.5, z], [x1 - 1.4, 1.8, z], [x0 + 0.5, 1.8, z]], '#a9dbe2', cw * 0.8);
-  const t = dunyaCokgen([[x0 + 0.2, 2.05, z - 0.9], [x1 - 0.2, 2.05, z - 0.9], [x1 - 0.2, 2.5, z], [x0 + 0.2, 2.5, z]], b.tente, cw);
+  // dükkânlar: yüzleri yola bakar, tenteleri kaldırıma uzanır
+  for (const o of akanZ(dukkanDonem, 0, Z0 - dukkanDonem, Z1))
+    for (const d of dukkanlar)
+      dukkanCiz(d, o + d.z0, cw);
+  // çınarlar: tepeden görünen yuvarlak taçlar
+  for (const z of akanZ(7.5, 1, Z0, Z1))
+    for (const s of [-1, 1])
+      agacCiz(s * 3.35, z + (s > 0 ? 3.7 : 0), cw);
+  durakTabelasi(cw);
+  dolmusArka(cw);
+  hizCizgileri();
+  // gök perdesi: üstteki sahne yazılarının arkası sakin kalsın
+  c.drawImage(perde, 0, 0);
+  const pus = c.createLinearGradient(0, UFUK - 6, 0, UFUK + 34);
+  pus.addColorStop(0, 'rgba(246,220,176,1)');
+  pus.addColorStop(1, 'rgba(246,220,176,0)');
+  c.fillStyle = pus;
+  c.fillRect(0, UFUK - 6, GW, 40);
+}
+function dukkanCiz(d, z0, cw) {
+  const z1 = z0 + d.uz, s = d.yan, x = s * KALDIRIM_X;
+  if (z1 < -6 || z0 > 26)
+    return;
+  // cephe (yola bakan yüz) ve vitrin
+  const cp = dunyaCokgen([[x, 0.14, z0], [x, 0.14, z1], [x, 3.4, z1], [x, 3.4, z0]], d.renk, cw);
+  if (!cp)
+    return;
+  dunyaCokgen([[x - s * 0.01, 0.4, z0 + 0.4], [x - s * 0.01, 0.4, z1 - 1.3], [x - s * 0.01, 1.9, z1 - 1.3], [x - s * 0.01, 1.9, z0 + 0.4]], '#a9dbe2', cw * 0.8);
+  // tente: cepheden kaldırıma eğik iner; şeritli
+  const t = dunyaCokgen([[x, 2.5, z0 + 0.1], [x, 2.5, z1 - 0.1], [x - s * 1.1, 2.05, z1 - 0.1], [x - s * 1.1, 2.05, z0 + 0.1]], d.tente, cw);
   if (t) {
-    // tentenin beyaz şeritleri
     c.fillStyle = '#fbf3e4';
-    const s = 6;
-    for (let i = 1; i < s; i += 2) {
-      const a = i / s, e = (i + 1) / s;
+    for (let i = 1; i < 8; i += 2) {
+      const a = i / 8, e = (i + 1) / 8;
       c.beginPath();
       c.moveTo(lerp(t[0].x, t[1].x, a), lerp(t[0].y, t[1].y, a));
       c.lineTo(lerp(t[0].x, t[1].x, e), lerp(t[0].y, t[1].y, e));
@@ -3610,110 +3657,68 @@ function binaCiz(b, x0, cw) {
       c.fill();
     }
   }
-  const tb = dunyaCokgen([[x0 + 0.4, 2.55, z], [x1 - 0.4, 2.55, z], [x1 - 0.4, 2.85, z], [x0 + 0.4, 2.85, z]], '#fbf3e4', cw);
-  if (tb && tb[1].x - tb[0].x > 40) {
-    const boy = Math.round(clamp((tb[0].y - tb[3].y) * 0.75, 7, 22));
-    c.font = boy + 'px "Lilita One", Rubik, system-ui, sans-serif';
-    c.textAlign = 'center';
-    c.textBaseline = 'middle';
-    c.fillStyle = '#8a2f2a';
-    c.fillText(b.dukkan, (tb[0].x + tb[1].x) / 2, (tb[0].y + tb[3].y) / 2 + 1, tb[1].x - tb[0].x - 6);
-    c.textBaseline = 'alphabetic';
-  }
-}
-// Karşı kaldırımda lambalar ve ağaçlar (dolmuşun arkasında kalır).
-function sokakEsyasi(kay, cw) {
-  const z = 3.15, m0 = Math.floor((kay - 30) / 7);
-  for (let m = m0; m < m0 + 14; m++) {
-    const x = m * 7 - kay;
-    if (!ekrandaMi(x - 1, x + 1, 0, z))
-      continue;
-    if (m % 2) {
-      // çınar: gövde ve yuvarlak taç
-      const a = pr([x, 0.14, z]), b = pr([x, 2.2, z]), t = pr([x, 3.0, z]);
-      if (!a.ok || !t.ok)
-        continue;
-      golge(x + 0.4, z + 0.2, 1.1, 0.5);
-      c.strokeStyle = MUREKKEP;
-      c.lineWidth = 0.22 * a.s + 2;
-      c.beginPath();
-      c.moveTo(a.x, a.y);
-      c.lineTo(b.x, b.y);
-      c.stroke();
-      c.strokeStyle = '#7a5235';
-      c.lineWidth = 0.22 * a.s;
-      c.stroke();
-      for (const [dx, dy, r] of [[0, 0, 1], [-0.6, -0.3, 0.7], [0.65, -0.2, 0.75], [0.1, 0.55, 0.7]]) {
-        c.beginPath();
-        c.arc(t.x + dx * t.s, t.y - dy * t.s, r * t.s, 0, TAU);
-        c.fillStyle = dy > 0.3 ? '#8ccf6a' : '#5fae58';
-        c.fill();
-        c.lineWidth = cw;
-        c.strokeStyle = MUREKKEP;
-        c.stroke();
-      }
-    }
-    else {
-      // sokak lambası
-      const a = pr([x, 0.14, z]), b = pr([x, 3.6, z]), u = pr([x - 0.7, 3.7, z]);
-      if (!a.ok || !b.ok)
-        continue;
-      c.strokeStyle = '#2f4a55';
-      c.lineWidth = Math.max(2, 0.09 * a.s);
-      c.beginPath();
-      c.moveTo(a.x, a.y);
-      c.lineTo(b.x, b.y);
-      c.quadraticCurveTo(b.x, u.y, u.x, u.y);
-      c.stroke();
-      c.fillStyle = '#ffe9a8';
-      c.beginPath();
-      c.ellipse(u.x, u.y + 0.08 * u.s, 0.22 * u.s, 0.1 * u.s, 0, 0, TAU);
-      c.fill();
-      c.lineWidth = cw;
-      c.strokeStyle = MUREKKEP;
-      c.stroke();
+  // tabela: tentenin üstünde, cephede
+  const tb = dunyaCokgen([[x - s * 0.01, 2.6, z0 + 0.3], [x - s * 0.01, 2.6, z1 - 0.3], [x - s * 0.01, 3.2, z1 - 0.3], [x - s * 0.01, 3.2, z0 + 0.3]], '#fbf3e4', cw);
+  if (tb) {
+    const cx = (tb[0].x + tb[1].x + tb[2].x + tb[3].x) / 4, cy = (tb[0].y + tb[1].y + tb[2].y + tb[3].y) / 4, w = Math.abs(tb[0].x - tb[2].x), h = Math.abs(tb[0].y - tb[1].y);
+    if (h > 24 && w > 7) {
+      // cephe yola dik durduğu için tabela ekranda dikine uzanır: yazı da dikine döner
+      c.save();
+      c.translate(cx, cy);
+      c.rotate(s > 0 ? HP : -HP);
+      c.font = Math.round(clamp(w * 0.7, 8, 20)) + 'px "Lilita One", Rubik, system-ui, sans-serif';
+      c.textAlign = 'center';
+      c.textBaseline = 'middle';
+      c.fillStyle = '#8a2f2a';
+      c.fillText(d.ad, 0, 1, h - 6);
+      c.restore();
     }
   }
 }
-// Sollamada karşı şeritteki yavaş araba geriye doğru kalır.
-function sollananCiz(cw) {
-  const s = D.sollama;
-  if (!s)
+function agacCiz(x, z, cw) {
+  if (z < -6 || z > 26)
     return;
-  const u = B - s.bas;
-  if (u < 0 || u > s.sure)
+  const t = pr([x, 3.0, z]);
+  if (!t.ok)
     return;
-  const x = 7 - u * 2.4, z0 = 1.35, z1 = 2.35, y0 = 0.12;
-  if (!ekrandaMi(x - 2, x + 2, 0, z0))
-    return;
-  dunyaCokgen([[x - 1.9, 0, z0 - 0.1], [x + 1.9, 0, z0 - 0.1], [x + 1.9, 0, z1 + 0.3], [x - 1.9, 0, z1 + 0.3]], SOKAK.golge);
-  // kasa ve kabin
-  dunyaCokgen([[x - 1.7, y0, z0], [x + 1.7, y0, z0], [x + 1.7, 0.6, z0], [x - 1.7, 0.6, z0]], '#3d5bd0', cw);
-  dunyaCokgen([[x - 1.7, 0.6, z0], [x + 1.7, 0.6, z0], [x + 1.7, 0.6, z1], [x - 1.7, 0.6, z1]], '#6f88e6', cw);
-  dunyaCokgen([[x - 0.9, 0.6, z0 + 0.1], [x + 0.8, 0.6, z0 + 0.1], [x + 0.6, 1.05, z0 + 0.15], [x - 0.8, 1.05, z0 + 0.15]], '#bfe9f2', cw);
-  dunyaCokgen([[x - 0.8, 1.05, z0 + 0.15], [x + 0.6, 1.05, z0 + 0.15], [x + 0.6, 1.05, z1 - 0.15], [x - 0.8, 1.05, z1 - 0.15]], '#6f88e6', cw);
-  for (const tx of [x - 1.1, x + 1.1]) {
-    const p = pr([tx, 0.25, z0 - 0.02]);
-    if (p.ok) {
-      c.beginPath();
-      c.ellipse(p.x, p.y, 0.25 * p.s, 0.25 * p.s * Math.cos(kam.egim), 0, 0, TAU);
-      c.fillStyle = '#23262d';
-      c.fill();
-    }
+  golge(x + 0.5, z + 0.6, 1.0, 0.8);
+  for (const [dx, dz, r, renk] of [[0, 0, 0.95, '#5fae58'], [-0.35, 0.3, 0.6, '#6dbb60'], [0.3, -0.35, 0.55, '#8ccf6a']]) {
+    const p = pr([x + dx, 3.0 + (r < 0.9 ? 0.25 : 0), z + dz]);
+    c.beginPath();
+    c.arc(p.x, p.y, r * p.s, 0, TAU);
+    c.fillStyle = renk;
+    c.fill();
+    c.lineWidth = cw;
+    c.strokeStyle = MUREKKEP;
+    c.stroke();
   }
 }
-// "Müsait bir yerde" durağı: dolmuşun durduğu yerde karşı kaldırımda direk ve yuvarlak durak levhası. Gönderenin
-// adını hat tabelası yazar (40-dolmus.js); levha yüksekte kaldığı için ad oraya yazılmaz, sahne yazılarına girerdi.
+// Sollamada iki yanda yukarı akan hız çizgileri (dolmuş hızlanınca sokak geriye fırlar).
+function hizCizgileri() {
+  if (!etkin(D.sollama) || azHareket)
+    return;
+  const u = (B - D.sollama.bas) / D.sollama.sure, al = Math.sin(Math.PI * u);
+  c.strokeStyle = 'rgba(255,255,255,' + (0.6 * al).toFixed(3) + ')';
+  c.lineCap = 'round';
+  for (let i = 0; i < 16; i++) {
+    const x = i % 2 ? 18 + (i * 37) % 70 : GW - 18 - (i * 41) % 70, L = 70 + (i * 53) % 90, y = ALAN_ALT - ((zaman * 1500 + i * 173) % (ALAN_ALT - UFUK + L));
+    c.lineWidth = 3 + (i % 3);
+    c.beginPath();
+    c.moveTo(x, y);
+    c.lineTo(x, y + L);
+    c.stroke();
+  }
+}
+// "Müsait bir yerde" durağı: dolmuş durduğu yerde, kapı tarafındaki kaldırımda direk ve yuvarlak durak levhası.
 function durakTabelasi(cw) {
   const d = D.durak;
   if (!d || d.isaret === null)
     return;
-  const x = d.isaret - D.kayma, z = 3.0;
-  if (!ekrandaMi(x - 1.5, x + 1.5, 0, z))
+  const x = -3.0 - D.otoX, z = d.k.bz + (D.kayma - d.isaret);
+  if (z > 26)
     return;
-  const a = pr([x, 0.14, z]), b = pr([x, 2.2, z]);
-  // Yakın çekimde levha sahne yazılarının arkasına düşer: orada çizilmez (sıralama kutusunu bulandırmasın).
-  if (!a.ok || !b.ok || b.y < ALAN_UST - 30)
+  const a = pr([x, 0.14, z]), b = pr([x, 2.3, z]);
+  if (!a.ok || !b.ok || b.y < UFUK + 20)
     return;
   c.strokeStyle = MUREKKEP;
   c.lineWidth = 0.1 * a.s + 2;
@@ -3741,18 +3746,17 @@ function durakTabelasi(cw) {
 }
 
 /* ── oyunlar/dolmus/js/40-dolmus.js ── */
-/* DOLMUŞ ÇİZİMİ — kesit dolmuş: yakın yan duvarı oturak hizasından, tavanı pencere üstünden kesilmiş, içi
- * oyuncak ev gibi görünür. Kesilen yüzler krem rengi ve taralıdır (mimari kesit gibi).
- * dolmusArka(cw): zeminde çizilenler (gölge, uzak tekerler, taban ve kilim, uzak duvar, pencereler ve püsküllü
- * perde, arka duvar, ön panel, ön cam, hat tabelası) · yakinYan: yakın yan, kaput, tekerler (çizim listesinde en
- * önde) · koltukCiz: koltuk (yolcu, ön koltuk, şoför) · banknotCiz · Kancalar: oyunCiz(), oyunUst(dt), oyunEkAdlar().
- * Dolmuş ekseni: u ön tampondan geriye, y yukarı, z dünyadaki z (yakın yan -1). bp(u, y, z) ekrana düşürür.
+/* DOLMUŞ ÇİZİMİ — kameraya doğru gelen kesit dolmuş: tavanı yok, yan duvarları oturak üstünden kesik; içi basamaklı
+ * koltuk sıralarıyla oyuncak ev gibi görünür. Kesilen yüzler krem rengi ve taralıdır (mimari kesit gibi).
+ * dolmusArka(cw): zeminde çizilenler (gölge, basamaklı taban, yan duvarların iç yüzü, arka duvar ve cam, hat
+ * tabelası) · onPano: burun, torpido, tamponlar, ön tekerler (çizim listesinde en önde) · koltukCiz · banknotCiz
+ * onSiraCiz: ön sıranın adları çene altında ve balonları · Kancalar: oyunCiz(), oyunUst(dt).
+ * Dolmuş ekseni: bx sağa, y yukarı, bz önden arkaya. bp(bx, y, bz) ekrana düşürür (gövdenin yaylanması dahil).
  */
 const DOL = {
-  govde: '#ffc63a', govdeKoyu: '#e0a321', serit: '#2ec4b6', serit2: '#e8553b', ic: '#fbefdc', icKoyu: '#ead7b2',
-  kesit: '#fff7e6', tarama: '#c9a26a', taban: '#454b54', tabanCizgi: '#545b65', kilim: '#b8322f', kilim2: '#f2c14e',
-  koltuk: '#9a3340', dantel: '#fffaf0', on: '#ffc63a', boncuk: '#a0703f', cam: '#bfe9f2', teker: '#24272e', jant: '#d4dbe0',
-  pano: '#3a3036', perde: '#8e2f3a'
+  govde: '#ffc63a', serit: '#2ec4b6', serit2: '#e8553b', ic: '#fbefdc', icKoyu: '#ead7b2', kesit: '#fff7e6',
+  tarama: '#c9a26a', taban: '#454b54', basamak: '#ffd84f', koltuk: '#9a3340', dantel: '#fffaf0', on: '#ffc63a',
+  boncuk: '#a0703f', cam: '#cdeff5', teker: '#24272e', pano: '#3a3036', perde: '#8e2f3a', kilim2: '#f2c14e'
 };
 const renkBellek = new Map();
 // İki #rrggbb rengin karışımı: yüzlerin ışık ve gölge tonları buradan türer.
@@ -3766,8 +3770,7 @@ function renkKat(a, b, t) {
   renkBellek.set(anahtar, s);
   return s;
 }
-function bp(u, y, z) { return pr([D.otoX - u, y + D.bob, z]); }
-// Dolmuş eksenindeki çokgen.
+function bp(x, y, z) { return pr([x - D.otoX, y + D.bob, z]); }
 function bYuz(k, renk, cizgi) {
   const p = k.map(n => bp(n[0], n[1], n[2]));
   if (p.some(q => !q.ok))
@@ -3782,16 +3785,16 @@ function bYuz(k, renk, cizgi) {
   }
   return p;
 }
-// Kutu: yalnız kameraya bakan yüzler (yakın yan, üst, kameranın tarafındaki uç). Dışbükey: sıra gerekmez.
-function bKutu(u0, u1, y0, y1, z0, z1, renk, cizgi) {
-  const xOn = D.otoX - u0, xArka = D.otoX - u1;
-  if (kam.C[0] > xOn)
-    bYuz([[u0, y0, z0], [u0, y0, z1], [u0, y1, z1], [u0, y1, z0]], renkKat(renk, '#2a1a2a', 0.25), cizgi);
-  if (kam.C[0] < xArka)
-    bYuz([[u1, y0, z0], [u1, y0, z1], [u1, y1, z1], [u1, y1, z0]], renkKat(renk, '#2a1a2a', 0.25), cizgi);
-  const yan = bYuz([[u0, y0, z0], [u1, y0, z0], [u1, y1, z0], [u0, y1, z0]], renk, cizgi);
-  const ust = bYuz([[u0, y1, z0], [u1, y1, z0], [u1, y1, z1], [u0, y1, z1]], renkKat(renk, '#fff8e6', 0.3), cizgi);
-  return { yan, ust };
+// Kutu: yalnız kameraya bakan yüzler (ön, üst, kameranın tarafındaki yan). Dışbükey: sıra gerekmez.
+function bKutu(x0, x1, y0, y1, z0, z1, renk, cizgi) {
+  const yan = renkKat(renk, '#2a1a2a', 0.25);
+  if (kam.C[0] < x0 - D.otoX)
+    bYuz([[x0, y0, z0], [x0, y0, z1], [x0, y1, z1], [x0, y1, z0]], yan, cizgi);
+  if (kam.C[0] > x1 - D.otoX)
+    bYuz([[x1, y0, z0], [x1, y0, z1], [x1, y1, z1], [x1, y1, z0]], yan, cizgi);
+  const ust = bYuz([[x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1]], renkKat(renk, '#fff8e6', 0.3), cizgi);
+  const on = bYuz([[x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0]], renk, cizgi);
+  return { on, ust };
 }
 // Kesit yüzü: krem dolgu üstüne çapraz tarama (kesilen duvarın kalınlığı).
 function kesitCiz(p, cw) {
@@ -3812,8 +3815,7 @@ function kesitCiz(p, cw) {
   c.strokeStyle = DOL.tarama;
   c.lineWidth = Math.max(1, cw * 0.7);
   c.beginPath();
-  const ad = 7;
-  for (let x = x0 - (y1 - y0); x < x1; x += ad) {
+  for (let x = x0 - (y1 - y0); x < x1; x += 7) {
     c.moveTo(x, y1);
     c.lineTo(x + (y1 - y0), y0);
   }
@@ -3825,307 +3827,177 @@ function kesitCiz(p, cw) {
   c.stroke();
 }
 
-/* ---- zeminde: dolmuşun yolcuların arkasında kalan her şeyi ---- */
-const PENCERE_Y0 = ZEMIN_Y + 0.52, PENCERE_Y1 = ZEMIN_Y + 1.12;
+/* ---- zeminde: yolcuların arkasında kalan her şey ---- */
+const DUVAR_UST = ZEMIN_Y + 0.62;               // yan duvarların kesildiği yükseklik
+const ARKA_UST = tabanY(SIRA_SAY - 1) + 0.75;  // arka duvarın tepesi (en arkadakilerin omuz hizası)
 function dolmusArka(cw) {
-  // yoldaki gölge (güneş sol önden)
-  const g = [[-0.1, 0, -0.9], [ARKA_U + 0.2, 0, -0.9], [ARKA_U + 0.45, 0, 1.4], [0.15, 0, 1.4]].map(n => pr([D.otoX - n[0], 0, n[2]]));
+  const g = [[-DUVAR_X, 0, ON_UC], [DUVAR_X, 0, ON_UC], [DUVAR_X + 0.35, 0, ARKA_Z + 0.4], [-DUVAR_X + 0.35, 0, ARKA_Z + 0.4]].map(n => pr([n[0] - D.otoX, 0, n[2]]));
   if (g.every(q => q.ok)) {
     noktalar(g);
     c.fillStyle = SOKAK.golge;
     c.fill();
   }
-  // uzak tekerler: gövdenin altından görünür
-  for (const tu of [1.0, ARKA_U - 1.15])
-    tekerCiz(tu, 1.07, cw, false);
-  // taban, koridorda kilim
-  bYuz([[0.62, ZEMIN_Y, -1.0], [ARKA_U, ZEMIN_Y, -1.0], [ARKA_U, ZEMIN_Y, 0.99], [0.62, ZEMIN_Y, 0.99]], DOL.taban, cw);
-  c.strokeStyle = DOL.tabanCizgi;
-  c.lineWidth = Math.max(1, cw);
-  c.beginPath();
-  for (let z = -0.85; z < 0.95; z += 0.17) {
-    const a = bp(0.7, ZEMIN_Y, z), b = bp(ARKA_U - 0.05, ZEMIN_Y, z);
-    c.moveTo(a.x, a.y);
-    c.lineTo(b.x, b.y);
+  // arka tekerler gövdenin altından görünür
+  for (const s of [-1, 1])
+    bKutu(s > 0 ? DUVAR_X - 0.28 : -DUVAR_X - 0.02, s > 0 ? DUVAR_X + 0.02 : -DUVAR_X + 0.28, 0, 0.5, ARKA_Z - 0.9, ARKA_Z - 0.35, DOL.teker, cw);
+  // gövdenin altı (tabanın kenarı) ve arka duvar
+  const za = ARKA_Z, ya = tabanY(SIRA_SAY - 1);
+  bYuz([[-DUVAR_X, ya, za], [DUVAR_X, ya, za], [DUVAR_X, ARKA_UST, za], [-DUVAR_X, ARKA_UST, za]], DOL.icKoyu, cw);
+  c.globalAlpha = 0.8;
+  bYuz([[-1.45, ya + 0.42, za - 0.005], [1.45, ya + 0.42, za - 0.005], [1.45, ARKA_UST - 0.08, za - 0.005], [-1.45, ARKA_UST - 0.08, za - 0.005]], DOL.cam, cw * 0.8);
+  c.globalAlpha = 1;
+  // püsküllü perde arka camın üstünde
+  bYuz([[-1.45, ARKA_UST - 0.2, za - 0.01], [1.45, ARKA_UST - 0.2, za - 0.01], [1.45, ARKA_UST - 0.08, za - 0.01], [-1.45, ARKA_UST - 0.08, za - 0.01]], DOL.perde, cw * 0.7);
+  c.fillStyle = DOL.kilim2;
+  for (let x = -1.38; x < 1.45; x += 0.14) {
+    const q = bp(x, ARKA_UST - 0.2, za - 0.012);
+    c.beginPath();
+    c.arc(q.x, q.y + 0.03 * q.s, Math.max(1.5, 0.028 * q.s), 0, TAU);
+    c.fill();
   }
-  c.stroke();
-  const kl = bYuz([[ILK_U - 0.5, ZEMIN_Y, -0.2], [ARKA_U - 0.15, ZEMIN_Y, -0.2], [ARKA_U - 0.15, ZEMIN_Y, 0.2], [ILK_U - 0.5, ZEMIN_Y, 0.2]], DOL.kilim);
-  if (kl) {
-    // kilim: ortada sarı baklavalar
-    c.fillStyle = DOL.kilim2;
-    for (let u = ILK_U - 0.3; u < ARKA_U - 0.3; u += 0.4) {
-      const m = bp(u, ZEMIN_Y, 0), a = bp(u - 0.13, ZEMIN_Y, 0), b = bp(u, ZEMIN_Y, 0.12), d = bp(u, ZEMIN_Y, -0.12);
-      c.beginPath();
-      c.moveTo(a.x, a.y);
-      c.lineTo(b.x, b.y);
-      c.lineTo(2 * m.x - a.x, 2 * m.y - a.y);
-      c.lineTo(d.x, d.y);
-      c.closePath();
-      c.fill();
+  kesitCiz(bYuz([[-DUVAR_X - 0.05, ARKA_UST, za], [DUVAR_X + 0.05, ARKA_UST, za], [DUVAR_X + 0.05, ARKA_UST, za + 0.1], [-DUVAR_X - 0.05, ARKA_UST, za + 0.1]], DOL.kesit), cw);
+  // yan duvarların iç yüzü (kameraya yan bakar), kuşak şeridi ve kesik tepesi
+  for (const s of [-1, 1]) {
+    const x = s * DUVAR_X;
+    bYuz([[x, ZEMIN_Y, -0.45], [x, ZEMIN_Y, za], [x, DUVAR_UST, za], [x, DUVAR_UST, -0.45]], DOL.ic, cw);
+    bYuz([[x, DUVAR_UST - 0.16, -0.45], [x, DUVAR_UST - 0.16, za], [x, DUVAR_UST - 0.08, za], [x, DUVAR_UST - 0.08, -0.45]], DOL.serit);
+    kesitCiz(bYuz([[x, DUVAR_UST, -0.5], [x, DUVAR_UST, za + 0.1], [x + s * 0.09, DUVAR_UST, za + 0.1], [x + s * 0.09, DUVAR_UST, -0.5]], DOL.kesit), cw);
+  }
+  // basamaklı taban: her sıranın basamağı, önünde sarı uyarı şeridi
+  for (let r = 0; r < SIRA_SAY; r++) {
+    const z0 = r === 0 ? -0.45 : r * SIRA_Z - SIRA_Z / 2, z1 = r === SIRA_SAY - 1 ? za : (r + 1) * SIRA_Z - SIRA_Z / 2, y = tabanY(r);
+    bYuz([[-DUVAR_X, y, z0], [DUVAR_X, y, z0], [DUVAR_X, y, z1], [-DUVAR_X, y, z1]], DOL.taban, cw);
+    if (r > 0) {
+      bYuz([[-DUVAR_X, tabanY(r - 1), z0], [DUVAR_X, tabanY(r - 1), z0], [DUVAR_X, y, z0], [-DUVAR_X, y, z0]], renkKat(DOL.taban, '#000000', 0.25), cw);
+      bYuz([[-DUVAR_X, y - 0.03, z0 - 0.002], [DUVAR_X, y - 0.03, z0 - 0.002], [DUVAR_X, y, z0 - 0.002], [-DUVAR_X, y, z0 - 0.002]], DOL.basamak);
     }
   }
   // gösterideki yolcunun arkası ışır
   const dr = D.durak;
   if (dr && dr.ayakta && dr.k.p.kafa && dr.k.p.kafa.ok) {
-    const h = dr.k.p.kafa, r = h.s * 1.6, gr = c.createRadialGradient(h.x, h.y, 0, h.x, h.y, r);
-    gr.addColorStop(0, 'rgba(255,214,102,.75)');
+    const h = dr.k.p.kafa, r = h.s * 1.8, gr = c.createRadialGradient(h.x, h.y, 0, h.x, h.y, r);
+    gr.addColorStop(0, 'rgba(255,214,102,.8)');
     gr.addColorStop(1, 'rgba(255,214,102,0)');
     c.fillStyle = gr;
     c.fillRect(h.x - r, h.y - r, r * 2, r * 2);
   }
-  // uzak duvarın iç yüzü: pencere altı, pencere üstü, dikmeler; camlar saydam (sokak görünür)
-  const z = 0.99, u0 = 0.95, u1 = ARKA_U;
-  bYuz([[u0, ZEMIN_Y, z], [u1, ZEMIN_Y, z], [u1, PENCERE_Y0, z], [u0, PENCERE_Y0, z]], DOL.ic, cw);
-  bYuz([[u0, PENCERE_Y1, z], [u1, PENCERE_Y1, z], [u1, TAVAN_Y, z], [u0, TAVAN_Y, z]], DOL.icKoyu, cw);
-  const PN = 5, pw = (u1 - u0 - 0.1) / PN;
-  for (let i = 0; i < PN; i++) {
-    const a = u0 + 0.05 + i * pw, b = a + pw;
-    bYuz([[a, PENCERE_Y0, z], [a + 0.09, PENCERE_Y0, z], [a + 0.09, PENCERE_Y1, z], [a, PENCERE_Y1, z]], DOL.icKoyu, cw);
-    c.globalAlpha = 0.38;
-    bYuz([[a + 0.09, PENCERE_Y0, z], [b, PENCERE_Y0, z], [b, PENCERE_Y1, z], [a + 0.09, PENCERE_Y1, z]], DOL.cam);
-    c.globalAlpha = 1;
-    // camın parıltısı
-    const p1 = bp(a + 0.3, PENCERE_Y1 - 0.05, z), p2 = bp(a + 0.55, PENCERE_Y0 + 0.05, z);
-    c.strokeStyle = 'rgba(255,255,255,.55)';
-    c.lineWidth = Math.max(1.5, cw * 2);
-    c.beginPath();
-    c.moveTo(p1.x, p1.y);
-    c.lineTo(p2.x, p2.y);
-    c.stroke();
-    // püsküllü perde: pencerenin üstünde bordo saçak, altında sarı püsküller
-    const pp = bYuz([[a + 0.09, PENCERE_Y1 - 0.12, z - 0.01], [b, PENCERE_Y1 - 0.12, z - 0.01], [b, PENCERE_Y1, z - 0.01], [a + 0.09, PENCERE_Y1, z - 0.01]], DOL.perde, cw * 0.7);
-    if (pp) {
-      c.fillStyle = DOL.kilim2;
-      for (let t = 0.06; t < 1; t += 0.12) {
-        const q = bp(lerp(a + 0.09, b, t), PENCERE_Y1 - 0.12, z - 0.01);
-        c.beginPath();
-        c.arc(q.x, q.y + 0.025 * q.s, Math.max(1.2, 0.025 * q.s), 0, TAU);
-        c.fill();
-      }
-    }
-  }
-  // tavan tutamak borusu
-  const t0 = bp(u0 + 0.6, TAVAN_Y - 0.06, 0.75), t1 = bp(u1 - 0.1, TAVAN_Y - 0.06, 0.75);
-  c.strokeStyle = MUREKKEP;
-  c.lineWidth = Math.max(2, 0.05 * t0.s + 2);
-  c.beginPath();
-  c.moveTo(t0.x, t0.y);
-  c.lineTo(t1.x, t1.y);
-  c.stroke();
-  c.strokeStyle = '#d4dbe0';
-  c.lineWidth = Math.max(1, 0.05 * t0.s);
-  c.stroke();
-  // kesilmiş tavan: uzak duvarın tepesi ve tavanın kalan payı
-  kesitCiz(bYuz([[u0, TAVAN_Y, 0.8], [u1 + 0.06, TAVAN_Y, 0.8], [u1 + 0.06, TAVAN_Y, 1.06], [u0, TAVAN_Y, 1.06]], DOL.kesit), cw);
-  // arka duvar: iç yüzü ileri bakar; ortasında arka cam
-  const ra = bYuz([[u1, ZEMIN_Y, -1.0], [u1, ZEMIN_Y, 1.0], [u1, TAVAN_Y, 1.0], [u1, TAVAN_Y, -1.0]], DOL.icKoyu, cw);
-  if (ra) {
-    c.globalAlpha = 0.45;
-    bYuz([[u1, PENCERE_Y0, -0.6], [u1, PENCERE_Y0, 0.75], [u1, PENCERE_Y1, 0.75], [u1, PENCERE_Y1, -0.6]], DOL.cam);
-    c.globalAlpha = 1;
-    kesitCiz(bYuz([[u1, TAVAN_Y, -1.0], [u1 + 0.07, TAVAN_Y, -1.0], [u1 + 0.07, TAVAN_Y, 1.06], [u1, TAVAN_Y, 1.06]], DOL.kesit), cw);
-    kesitCiz(bYuz([[u1, ZEMIN_Y + 0.2, -1.06], [u1 + 0.07, ZEMIN_Y + 0.2, -1.06], [u1 + 0.07, TAVAN_Y, -1.06], [u1, TAVAN_Y, -1.06]], DOL.kesit), cw);
-  }
-  // ön: torpido, ön cam, uzak A direği
-  bKutu(0.6, 0.95, ZEMIN_Y, ZEMIN_Y + 0.42, -0.98, 0.98, DOL.pano, cw);
-  c.globalAlpha = 0.3;
-  bYuz([[0.62, ZEMIN_Y + 0.42, -1.0], [0.62, ZEMIN_Y + 0.42, 1.0], [0.97, TAVAN_Y, 1.0], [0.97, TAVAN_Y, -1.0]], DOL.cam);
-  c.globalAlpha = 1;
-  const d0 = bp(0.62, ZEMIN_Y + 0.42, 1.0), d1 = bp(0.97, TAVAN_Y, 1.0);
-  c.strokeStyle = MUREKKEP;
-  c.lineWidth = Math.max(3, 0.09 * d0.s + 2);
-  c.beginPath();
-  c.moveTo(d0.x, d0.y);
-  c.lineTo(d1.x, d1.y);
-  c.stroke();
-  c.strokeStyle = DOL.govde;
-  c.lineWidth = Math.max(2, 0.09 * d0.s);
-  c.stroke();
-  // teyp ve kasa göstergesi torpidonun üstünde
-  const ty = bKutu(0.7, 0.86, ZEMIN_Y + 0.42, ZEMIN_Y + 0.5, -0.15, 0.25, '#2a2a35', cw * 0.8);
-  if (ty.ust) {
-    const m = bp(0.78, ZEMIN_Y + 0.5, 0.05);
-    c.fillStyle = etkin(D.teyp) ? '#7cf0c8' : '#3f6b5e';
-    c.beginPath();
-    c.arc(m.x, m.y, Math.max(2, 0.04 * m.s), 0, TAU);
-    c.fill();
-  }
-  const ks = bp(0.78, ZEMIN_Y + 0.43, -0.6);
-  if (ks.ok && ks.s > 70) {
-    c.font = '700 ' + Math.round(clamp(ks.s * 0.11, 10, 20)) + 'px Rubik, system-ui, sans-serif';
-    const m = '₺' + D.kasa, w = c.measureText(m).width + 10, h = clamp(ks.s * 0.15, 14, 26);
-    c.fillStyle = '#1b2228';
-    c.beginPath();
-    c.roundRect(ks.x - w / 2, ks.y - h, w, h, 4);
-    c.fill();
-    c.fillStyle = '#7cf0c8';
-    c.textAlign = 'center';
-    c.textBaseline = 'middle';
-    c.fillText(m, ks.x, ks.y - h / 2 + 1);
-    c.textBaseline = 'alphabetic';
-  }
-  // ayna ve sallanan nazar boncuğu
-  const ay = bp(0.92, TAVAN_Y - 0.1, 0.05), sal = azHareket ? 0 : Math.sin(TAU * B / 2) * 0.35 + (etkin(D.kasis) ? Math.sin(TAU * B * 2) * 0.4 : 0);
-  if (ay.ok) {
-    c.fillStyle = '#2a2a35';
-    c.beginPath();
-    c.roundRect(ay.x - 0.14 * ay.s, ay.y - 0.05 * ay.s, 0.28 * ay.s, 0.09 * ay.s, 3);
-    c.fill();
-    const L = 0.32 * ay.s, bx = ay.x + Math.sin(sal) * L, by = ay.y + Math.cos(sal) * L;
-    c.strokeStyle = '#f6ecd9';
-    c.lineWidth = Math.max(1, ay.s * 0.008);
-    c.beginPath();
-    c.moveTo(ay.x, ay.y);
-    c.lineTo(bx, by);
-    c.stroke();
-    for (const [r, renk] of [[0.075, '#1f5fc6'], [0.052, '#f6ecd9'], [0.033, '#4aa3e8'], [0.016, '#080a1c']]) {
-      c.fillStyle = renk;
-      c.beginPath();
-      c.arc(bx, by, r * ay.s, 0, TAU);
-      c.fill();
-    }
-  }
-  // hat tabelası: uzak yanın tepesinde, önde. Gösteride gönderenin adını yazar.
-  const hb = bYuz([[1.0, TAVAN_Y + 0.04, 1.02], [3.0, TAVAN_Y + 0.04, 1.02], [3.0, TAVAN_Y + 0.4, 1.02], [1.0, TAVAN_Y + 0.4, 1.02]], '#fbf3e4', cw * 1.4);
-  if (hb) {
-    const w = hb[0].x - hb[1].x, h = hb[1].y - hb[2].y;
-    const m = dr && dr.yakin ? dr.k.ad + ' durağı' : 'ÇARŞI  ⇄  İSKELE';
-    c.font = Math.round(clamp(h * 0.62, 8, 34)) + 'px "Lilita One", Rubik, system-ui, sans-serif';
-    c.textAlign = 'center';
-    c.textBaseline = 'middle';
-    c.fillStyle = dr && dr.yakin ? DOL.serit2 : '#1f5063';
-    c.fillText(m, (hb[0].x + hb[1].x) / 2, (hb[0].y + hb[2].y) / 2 + 1, w - 10);
-    c.textBaseline = 'alphabetic';
-  }
-}
-// Teker: yan yüzü kameraya bakan disk; jant çizgileri yol hızıyla döner.
-function tekerCiz(u, z, cw, yakin) {
-  const p = bp(u, 0.25 - D.bob, z);
-  if (!p.ok)
-    return;
-  const r = 0.25 * p.s, ry = r * Math.cos(kam.egim) * 0.9 + r * 0.1;
-  c.fillStyle = DOL.teker;
-  c.beginPath();
-  c.ellipse(p.x, p.y, r, ry, 0, 0, TAU);
-  c.fill();
-  if (!yakin)
-    return;
-  c.lineWidth = cw;
-  c.strokeStyle = MUREKKEP;
-  c.stroke();
-  c.fillStyle = DOL.jant;
-  c.beginPath();
-  c.ellipse(p.x, p.y, r * 0.5, ry * 0.5, 0, 0, TAU);
-  c.fill();
-  c.stroke();
-  const a0 = -D.kayma / 0.25;
-  c.strokeStyle = '#7a848c';
-  c.lineWidth = Math.max(1, r * 0.08);
-  c.beginPath();
-  for (let i = 0; i < 5; i++) {
-    const a = a0 + i * TAU / 5;
-    c.moveTo(p.x, p.y);
-    c.lineTo(p.x + Math.cos(a) * r * 0.45, p.y + Math.sin(a) * ry * 0.45);
-  }
-  c.stroke();
 }
 
-/* ---- çizim listesinde: koltuklar, yakın yan, şoför, yolcular (banknotlar oyunUst'te, hepsinin üstünde) ---- */
-const KAPI0 = 1.63, KAPI1 = 1.82; // kapı: ön koltukla ilk koltuk arası
-// Yakın yan: oturak hizasında kesilmiş alçak duvar (kapı boşluğuyla), kaput, tampon, tekerler.
-function yakinYan() {
-  const cw = Math.max(1, bp(2, 0, -1).s * 0.012), ust = ZEMIN_Y + 0.2, z0 = -1.06, z1 = -0.98;
-  for (const [a, b] of [[0.64, KAPI0], [KAPI1, ARKA_U + 0.07]]) {
-    const k = bKutu(a, b, 0.14, ust, z0, z1, DOL.govde, 0);
-    kesitCiz(k.ust, cw);
-    if (k.yan) {
-      // turkuaz kuşak ve kırmızı ince şerit
-      bYuz([[a, 0.27, z0 - 0.002], [b, 0.27, z0 - 0.002], [b, 0.37, z0 - 0.002], [a, 0.37, z0 - 0.002]], DOL.serit);
-      bYuz([[a, 0.4, z0 - 0.002], [b, 0.4, z0 - 0.002], [b, 0.425, z0 - 0.002], [a, 0.425, z0 - 0.002]], DOL.serit2);
-      noktalar(k.yan);
-      c.lineWidth = cw;
-      c.strokeStyle = MUREKKEP;
-      c.stroke();
-    }
-  }
-  // kapı basamağı
-  bKutu(KAPI0, KAPI1, 0.14, 0.28, -1.04, -0.9, '#8a949c', cw);
-  // "14+1" yazısı arka tekerin önünde
-  const yz = bp(ARKA_U - 2.0, 0.21, z0 - 0.003);
-  if (yz.ok && yz.s > 50) {
-    c.font = Math.round(clamp(yz.s * 0.13, 9, 26)) + 'px "Lilita One", Rubik, system-ui, sans-serif';
+/* ---- çizim listesinde ---- */
+// Ön: torpido (ön sıranın dizlerini örter), ön cam payı, burun, tampon, farlar, ön tekerler.
+function onPano() {
+  const cw = Math.max(1, bp(0, 0.5, -0.5).s * 0.011), PZ = -0.44;
+  for (const s of [-1, 1])
+    bKutu(s > 0 ? DUVAR_X - 0.3 : -DUVAR_X - 0.02, s > 0 ? DUVAR_X + 0.02 : -DUVAR_X + 0.3, 0, 0.5, -0.56, -0.2, DOL.teker, cw);
+  bKutu(-DUVAR_X - 0.02, DUVAR_X + 0.02, 0.14, ZEMIN_Y + 0.3, ON_UC, -0.5, DOL.govde, cw);
+  bYuz([[-DUVAR_X, 0.22, ON_UC - 0.002], [DUVAR_X, 0.22, ON_UC - 0.002], [DUVAR_X, 0.3, ON_UC - 0.002], [-DUVAR_X, 0.3, ON_UC - 0.002]], DOL.serit);
+  // burundaki hat tabelası (gösteride gönderenin adı alttaki büyük yazıda; tabela onun arkasında kalır)
+  const hb = bYuz([[-1.05, 0.33, ON_UC - 0.004], [1.05, 0.33, ON_UC - 0.004], [1.05, 0.6, ON_UC - 0.004], [-1.05, 0.6, ON_UC - 0.004]], '#fbf3e4', cw);
+  if (hb) {
+    const w = hb[1].x - hb[0].x, h = hb[0].y - hb[3].y;
+    c.font = Math.round(clamp(h * 0.62, 9, 30)) + 'px "Lilita One", Rubik, system-ui, sans-serif';
     c.textAlign = 'center';
     c.textBaseline = 'middle';
     c.fillStyle = '#1f5063';
-    c.fillText('14+1', yz.x, yz.y);
+    c.fillText('ÇARŞI  ⇄  İSKELE', (hb[0].x + hb[1].x) / 2, (hb[0].y + hb[3].y) / 2 + 1, w - 10);
     c.textBaseline = 'alphabetic';
   }
-  // kaput ve tampon
-  const kp = bKutu(0.02, 0.66, 0.14, ZEMIN_Y + 0.36, -1.04, 1.04, DOL.govde, cw);
-  if (kp.yan) {
-    bYuz([[0.02, 0.27, -1.042], [0.66, 0.27, -1.042], [0.66, 0.37, -1.042], [0.02, 0.37, -1.042]], DOL.serit);
-    const f = bp(0.1, 0.55, -1.045);
-    if (f.ok) {
-      c.fillStyle = '#fff3c4';
-      c.beginPath();
-      c.arc(f.x, f.y, 0.07 * f.s, 0, TAU);
-      c.fill();
-      c.lineWidth = cw;
+  for (const s of [-1, 1]) {
+    const f = bp(s * 1.55, 0.46, ON_UC - 0.006);
+    c.fillStyle = '#fff3c4';
+    c.beginPath();
+    c.ellipse(f.x, f.y, 0.2 * f.s, 0.11 * f.s, 0, 0, TAU);
+    c.fill();
+    c.lineWidth = cw;
+    c.strokeStyle = MUREKKEP;
+    c.stroke();
+  }
+  bKutu(-DUVAR_X - 0.06, DUVAR_X + 0.06, 0.08, 0.26, ON_UC - 0.1, ON_UC, '#cfd6dc', cw);
+  // ön camın kesik alt çerçevesi ve torpido
+  kesitCiz(bYuz([[-DUVAR_X, ZEMIN_Y + 0.46, -0.52], [DUVAR_X, ZEMIN_Y + 0.46, -0.52], [DUVAR_X, ZEMIN_Y + 0.46, -0.44], [-DUVAR_X, ZEMIN_Y + 0.46, -0.44]], DOL.kesit), cw);
+  const tp = bKutu(-DUVAR_X + 0.05, DUVAR_X - 0.05, ZEMIN_Y + 0.15, ZEMIN_Y + 0.42, PZ, -0.26, DOL.pano, cw);
+  if (tp.on) {
+    // ön koltuğun önünde levha
+    const pl = bp(0, ZEMIN_Y + 0.29, PZ - 0.005);
+    if (pl.ok) {
+      c.font = '700 ' + Math.round(clamp(pl.s * 0.1, 11, 22)) + 'px Rubik, system-ui, sans-serif';
+      const w = c.measureText('ÖN KOLTUK').width + 14, h = clamp(pl.s * 0.15, 15, 30);
+      c.fillStyle = DOL.on;
       c.strokeStyle = MUREKKEP;
-      c.stroke();
-    }
-  }
-  bKutu(-0.06, 0.04, 0.1, 0.3, -1.08, 1.08, '#cfd6dc', cw);
-  bKutu(ARKA_U + 0.03, ARKA_U + 0.12, 0.1, 0.28, -1.08, 1.08, '#cfd6dc', cw);
-  for (const tu of [1.0, ARKA_U - 1.15])
-    tekerCiz(tu, -1.08, cw, true);
-}
-// Koltuk: oturak, arkalık ve başlık örtüsü. tur: 'yolcu' bordo + dantel, 'on' altın sarısı boncuklu, 'sofor' ahşap boncuklu.
-function koltukCiz(u, z, tur) {
-  const cw = Math.max(1, bp(u, ZEMIN_Y, z).s * 0.011), a = 0.25;
-  const renk = tur === 'on' ? DOL.on : tur === 'sofor' ? '#3a3036' : DOL.koltuk;
-  bKutu(u - 0.18, u + 0.2, ZEMIN_Y, ZEMIN_Y + 0.07, z - a + 0.04, z + a - 0.04, '#2a2a35', cw);
-  bKutu(u - 0.22, u + 0.22, ZEMIN_Y + 0.07, ZEMIN_Y + 0.16, z - a, z + a, renk, cw);
-  const ar = bKutu(u + 0.2, u + 0.31, ZEMIN_Y + 0.12, ZEMIN_Y + 0.8, z - a, z + a, renk, cw);
-  if (tur === 'yolcu')
-    bKutu(u + 0.185, u + 0.325, ZEMIN_Y + 0.6, ZEMIN_Y + 0.82, z - a + 0.03, z + a - 0.03, DOL.dantel, cw * 0.8);
-  else if (ar.yan) {
-    // boncuklu örtü: arkalığın yanında nokta nokta
-    c.fillStyle = tur === 'on' ? '#b07a12' : DOL.boncuk;
-    for (let y = ZEMIN_Y + 0.2; y < ZEMIN_Y + 0.78; y += 0.08)
-      for (const du of [0.23, 0.28]) {
-        const q = bp(u + du, y, z - a - 0.003);
-        c.beginPath();
-        c.arc(q.x, q.y, Math.max(1, 0.018 * q.s), 0, TAU);
-        c.fill();
-      }
-  }
-  if (tur === 'on') {
-    // ön koltuk el değiştirince koltuk parlar; hep küçük bir yıldız ışıltısı
-    const yas = B - D.parla, m = bp(u, ZEMIN_Y + 0.45, z);
-    if (yas >= 0 && yas < 3 && m.ok) {
-      c.globalAlpha = 0.6 * (1 - yas / 3);
-      c.strokeStyle = '#ffe9a8';
-      c.lineWidth = 0.08 * m.s;
+      c.lineWidth = 2;
       c.beginPath();
-      c.ellipse(m.x, m.y, (0.5 + yas * 0.15) * m.s, (0.55 + yas * 0.15) * m.s, 0, 0, TAU);
-      c.stroke();
-      c.globalAlpha = 1;
-    }
-    const pl = bp(u - 0.02, ZEMIN_Y + 0.115, z - a - 0.004);
-    if (pl.ok && pl.s > 85) {
-      c.font = '700 ' + Math.round(clamp(pl.s * 0.06, 9, 15)) + 'px Rubik, system-ui, sans-serif';
-      const w = c.measureText('ÖN KOLTUK').width + 8, h = clamp(pl.s * 0.08, 11, 19);
-      c.fillStyle = DOL.serit2;
-      c.beginPath();
-      c.roundRect(pl.x - w / 2, pl.y - h / 2, w, h, 3);
+      c.roundRect(pl.x - w / 2, pl.y - h / 2, w, h, 5);
       c.fill();
-      c.fillStyle = '#fff7e6';
+      c.stroke();
+      c.fillStyle = MUREKKEP;
       c.textAlign = 'center';
       c.textBaseline = 'middle';
       c.fillText('ÖN KOLTUK', pl.x, pl.y + 1);
       c.textBaseline = 'alphabetic';
     }
+    // teyp ve kasa göstergesi
+    const ks = bp(-1.15, ZEMIN_Y + 0.29, PZ - 0.005);
+    if (ks.ok) {
+      c.font = '700 ' + Math.round(clamp(ks.s * 0.11, 11, 22)) + 'px Rubik, system-ui, sans-serif';
+      const m = '₺' + D.kasa, w = c.measureText(m).width + 12, h = clamp(ks.s * 0.15, 15, 30);
+      c.fillStyle = '#1b2228';
+      c.beginPath();
+      c.roundRect(ks.x - w / 2, ks.y - h / 2, w, h, 4);
+      c.fill();
+      c.fillStyle = etkin(D.teyp) ? '#ffe9a8' : '#7cf0c8';
+      c.textAlign = 'center';
+      c.textBaseline = 'middle';
+      c.fillText(m, ks.x, ks.y + 1);
+      c.textBaseline = 'alphabetic';
+    }
+    // torpidoda sallanan nazar boncuğu
+    const ay = bp(-1.65, ZEMIN_Y + 0.42, PZ), sal = azHareket ? 0 : Math.sin(TAU * B / 2) * 0.35 + (etkin(D.kasis) ? Math.sin(TAU * B * 2) * 0.4 : 0);
+    if (ay.ok) {
+      const L = 0.25 * ay.s, bx = ay.x + Math.sin(sal) * L, by = ay.y + Math.cos(sal) * L;
+      c.strokeStyle = '#f6ecd9';
+      c.lineWidth = Math.max(1, ay.s * 0.008);
+      c.beginPath();
+      c.moveTo(ay.x, ay.y);
+      c.lineTo(bx, by);
+      c.stroke();
+      for (const [r, renk] of [[0.075, '#1f5fc6'], [0.052, '#f6ecd9'], [0.033, '#4aa3e8'], [0.016, '#080a1c']]) {
+        c.fillStyle = renk;
+        c.beginPath();
+        c.arc(bx, by, r * ay.s, 0, TAU);
+        c.fill();
+      }
+    }
+  }
+}
+// Koltuk: oturak, arkalık ve başlık örtüsü. 'yolcu' bordo + dantel, 'on' altın sarısı boncuklu, 'sofor' koyu boncuklu.
+function koltukCiz(s, tur) {
+  const y = tabanY(s.r), cw = Math.max(1, bp(s.x, y, s.z).s * 0.011), a = 0.32;
+  const renk = tur === 'on' ? DOL.on : tur === 'sofor' ? '#3a3036' : DOL.koltuk;
+  if (tur === 'on') {
+    // ön koltuk el değiştirince parlar; her zaman altın bir ışıltı
+    const yas = B - D.parla, m = bp(s.x, y + 0.5, s.z + 0.15);
+    const r = (0.62 + (yas >= 0 && yas < 3 ? yas * 0.12 : 0)) * m.s, gr = c.createRadialGradient(m.x, m.y, 0, m.x, m.y, r);
+    gr.addColorStop(0, 'rgba(255,214,102,' + (yas >= 0 && yas < 3 ? 0.9 - yas * 0.15 : 0.45) + ')');
+    gr.addColorStop(1, 'rgba(255,214,102,0)');
+    c.fillStyle = gr;
+    c.fillRect(m.x - r, m.y - r, r * 2, r * 2);
+  }
+  // Ön koltuğun arkalığı geniş ve yüksektir: liderin başının arkasında altın bir taht gibi durur.
+  const ab = tur === 'on' ? 0.44 : a, ust = tur === 'on' ? 1.12 : 0.66;
+  bKutu(s.x - a, s.x + a, y + 0.06, y + 0.16, s.z - 0.2, s.z + 0.2, renk, cw);
+  const ar = bKutu(s.x - ab, s.x + ab, y + 0.12, y + ust, s.z + 0.2, s.z + 0.3, renk, tur === 'on' ? cw * 2 : cw);
+  if (tur === 'yolcu')
+    bKutu(s.x - a + 0.04, s.x + a - 0.04, y + 0.5, y + 0.68, s.z + 0.19, s.z + 0.31, DOL.dantel, cw * 0.8);
+  else if (ar.on) {
+    // boncuklu örtü
+    c.fillStyle = tur === 'on' ? '#b07a12' : DOL.boncuk;
+    for (let yy = y + 0.2; yy < y + ust - 0.02; yy += 0.08)
+      for (let xx = s.x - ab + 0.06; xx < s.x + ab - 0.03; xx += 0.08) {
+        const q = bp(xx, yy, s.z + 0.198);
+        c.beginPath();
+        c.arc(q.x, q.y, Math.max(1, 0.017 * q.s), 0, TAU);
+        c.fill();
+      }
   }
 }
 // Banknot demeti: küçük hediyede tek, büyüdükçe kalınlaşan yelpaze.
@@ -4135,21 +4007,19 @@ function banknotCiz(n) {
   const p = pr(n.p);
   if (!p.ok)
     return;
-  const w = Math.max(38, 0.5 * p.s), h = w * 0.52, adet = PARA_ADET[n.tip] || 1, renk = PARA_RENK[n.tip] || PARA_RENK.uzat;
-  if (adet >= 3) {
-    const r = w * 1.2, gr = c.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
-    gr.addColorStop(0, 'rgba(255,233,168,.7)');
-    gr.addColorStop(1, 'rgba(255,233,168,0)');
-    c.fillStyle = gr;
-    c.fillRect(p.x - r, p.y - r, r * 2, r * 2);
-  }
+  const w = Math.max(56, 0.5 * p.s), h = w * 0.52, adet = PARA_ADET[n.tip] || 1, renk = PARA_RENK[n.tip] || PARA_RENK.uzat;
+  const r = w * 1.1, gr = c.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
+  gr.addColorStop(0, 'rgba(255,240,190,.75)');
+  gr.addColorStop(1, 'rgba(255,240,190,0)');
+  c.fillStyle = gr;
+  c.fillRect(p.x - r, p.y - r, r * 2, r * 2);
   for (let i = 0; i < adet; i++) {
     c.save();
     c.translate(p.x + (i - (adet - 1) / 2) * w * 0.14, p.y - i * h * 0.1);
     c.rotate(-0.3 + 0.18 * i + (azHareket ? 0 : 0.12 * Math.sin(TAU * B * 2 + i)));
     c.fillStyle = renk;
     c.strokeStyle = MUREKKEP;
-    c.lineWidth = Math.max(1.2, w * 0.05);
+    c.lineWidth = Math.max(2, w * 0.05);
     c.beginPath();
     c.roundRect(-w / 2, -h / 2, w, h, w * 0.06);
     c.fill();
@@ -4159,16 +4029,14 @@ function banknotCiz(n) {
     c.strokeRect(-w * 0.4, -h * 0.32, w * 0.8, h * 0.64);
     c.fillStyle = renkKat(renk, '#ffffff', 0.55);
     c.beginPath();
-    c.arc(0, 0, h * 0.26, 0, TAU);
+    c.arc(0, 0, h * 0.28, 0, TAU);
     c.fill();
-    if (w > 24) {
-      c.fillStyle = renkKat(renk, '#080a1c', 0.55);
-      c.font = '700 ' + Math.round(h * 0.42) + 'px Rubik, system-ui, sans-serif';
-      c.textAlign = 'center';
-      c.textBaseline = 'middle';
-      c.fillText('₺', 0, 1);
-      c.textBaseline = 'alphabetic';
-    }
+    c.fillStyle = renkKat(renk, '#080a1c', 0.55);
+    c.font = '700 ' + Math.round(h * 0.44) + 'px Rubik, system-ui, sans-serif';
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    c.fillText('₺', 0, 1);
+    c.textBaseline = 'alphabetic';
     c.restore();
   }
 }
@@ -4218,40 +4086,159 @@ function direksiyonCiz() {
     return;
   c.save();
   c.translate(p.x, p.y);
-  c.rotate(-0.5 + (azHareket ? 0 : 0.08 * Math.sin(TAU * B / 4)));
-  c.lineWidth = Math.max(3, 0.05 * p.s);
+  c.rotate(azHareket ? 0 : 0.08 * Math.sin(TAU * B / 4));
+  c.lineWidth = Math.max(4, 0.06 * p.s);
   c.strokeStyle = '#1b1f26';
   c.beginPath();
-  c.ellipse(0, 0, 0.07 * p.s, 0.18 * p.s, 0, 0, TAU);
+  c.ellipse(0, 0, 0.24 * p.s, 0.11 * p.s, 0, 0, TAU);
   c.stroke();
   c.restore();
 }
+// Ad etiketinin punto ölçeği: çekirdek punto'yu et.s'den seçer (13–18); kalabalıkta yan yana adlar sığsın diye
+// ölçek sınırlanır (14 punto).
+const ETIKET_S = 82;
 
 function oyunCiz() {
-  const derin = (u, y, z) => bp(u, y, z).d;
-  // koltuklar: oturanın arkasında kalsın diye biraz geride sıralanır
-  for (const y of KOLTUK)
-    ozel(derin(y.u, ZEMIN_Y + 0.4, y.z) + 0.3, () => koltukCiz(y.u, y.z, 'yolcu'));
-  ozel(derin(ON_U, ZEMIN_Y + 0.4, YAKIN_Z) + 0.3, () => koltukCiz(ON_U, YAKIN_Z, 'on'));
-  ozel(derin(ON_U, ZEMIN_Y + 0.4, UZAK_Z) + 0.3, () => koltukCiz(ON_U, UZAK_Z, 'sofor'));
-  ozel(derin(2, 0.4, -1.08) - 0.05, yakinYan);
+  const derin = s => bp(s.x, tabanY(s.r) + 0.4, s.z).d;
+  for (const s of KOLTUK)
+    ozel(derin(s) + 0.35, () => koltukCiz(s, 'yolcu'));
+  ozel(derin(ON_KOLTUK) + 0.35, () => koltukCiz(ON_KOLTUK, 'on'));
+  ozel(derin(SOFOR_KOLTUK) + 0.35, () => koltukCiz(SOFOR_KOLTUK, 'sofor'));
+  // Torpido ön sıranın dizlerinin önündedir; önlük gibi öne uzanan parçalar da altında kalsın diye en öne sıralanır.
+  ozel(bp(0, 0.5, ON_UC).d - 0.3, onPano);
   // şoför, gözlüğü ve direksiyonu
   if (insanEkle(sofor)) {
     basCevir(sofor);
     ozel(sofor.p.kafa.d - 0.052, gozluk);
-    ozel(Math.min(sofor.p.haR.d, sofor.p.haL.d) - 0.03, direksiyonCiz);
+    ozel(pr(direksiyonYeri()).d - 0.06, direksiyonCiz);
+    sofor.et.s = Math.min(sofor.et.s, ETIKET_S);
   }
-  // Kadrajın dışında kalanın adı yazılmaz: çekirdek etiketi ekran kenarına sıkıştırır, kenarda yığılırdı.
+  // Kadrajın dışında kalanın adı yazılmaz: çekirdek etiketi ekran kenarına sıkıştırır, kenarda yığılırdı. Oyuncu
+  // şeridinin üstüne taşan ad da yazılmaz (gösterideki yakın çekimde arkadakiler): sıralama kutusunun altına girerdi.
   for (const k of D.oy.values())
     if (insanEkle(k)) {
       basCevir(k);
-      if (k.et.x < -10 || k.et.x > GW + 10)
+      k.et.s = Math.min(k.et.s, ETIKET_S);
+      if (k.et.x < -10 || k.et.x > GW + 10 || k.et.y > ALAN_ALT + 40 || k.et.y < ALAN_UST + 3)
         k.et = null;
     }
+  // Gösteride sahne tek kişinindir: yakın çekimde öteki adlar hem kalabalık eder hem çekirdek onları üst üste itip
+  // sahne yazılarının altına sokar. Yalnız yıldızın ve şoförün adı kalır.
+  const dr = D.durak;
+  if (dr && dr.yakin)
+    for (const k of D.oy.values())
+      if (k !== dr.k)
+        k.et = null;
+  adlariAc();
+  onSiraAyir();
 }
-function oyunEkAdlar() { return [sofor]; }
+// Ön sıranın (kapı yanı, ön koltuk, şoför) adları çenenin altına, torpidonun üstündeki boşluğa yazılır: başın üstüne
+// yazılsalar ikinci sıranın yüzlerini örterlerdi. Çekirdek etiketi hep başın üstüne koyduğu için (etiketCiz) bu
+// adları oyunUst çekirdeğin görünüşüyle kendisi çizer; k.et boşaltılır. Onların yorum balonu da başlarının üstüne
+// buradan çizilir: çekirdek balonu ancak etiketi olana çizer. Balon kapatma ve ad gizleme ayarına uyulur.
+const onSira = [];
+D.onSira = onSira; // testler ön sıranın adlarına bakabilsin
+function onSiraAyir() {
+  onSira.length = 0;
+  const dr = D.durak;
+  for (const k of [...D.oy.values(), sofor]) {
+    if (!k.et || !k.koltuk || k.koltuk.r !== 0 || k.atla || k.cikiyor || (dr && dr.k === k && dr.ayakta))
+      continue;
+    const ph = k.p.kafa, R = KAFA_R * k.g.boy * ph.s;
+    onSira.push({ k, x: k.et.x, y: ph.y + R + 3, ust: ph.y - R });
+    k.et = null;
+  }
+}
+function onSiraCiz() {
+  c.textAlign = 'center';
+  c.textBaseline = 'middle';
+  for (const a of onSira) {
+    const k = a.k, bas = k === D.lider, punto = 14 + (bas ? 4 : 0), yk = punto + 9, tac = bas ? punto * 1.05 : 0;
+    c.font = (bas ? '700 ' : '500 ') + punto + 'px Rubik, system-ui, sans-serif';
+    const w = c.measureText(k.ad).width + punto * 1.1 + tac, x = clamp(a.x, w / 2 + 4, GW - w / 2 - 4), y = a.y;
+    c.fillStyle = bas ? RENK.vurgu : renkSaydam(MUREKKEP, 0.78);
+    c.beginPath();
+    c.roundRect(x - w / 2, y, w, yk, yk / 2);
+    c.fill();
+    if (bas) {
+      c.lineWidth = 2.5;
+      c.strokeStyle = MUREKKEP;
+      c.stroke();
+      // taç (çekirdeğin etiketindeki gibi)
+      const tx = x - w / 2 + punto * 0.5, ty = y + yk / 2, b = punto * 0.42;
+      c.fillStyle = RENK.sicak;
+      c.beginPath();
+      c.moveTo(tx, ty + b * 0.7);
+      c.lineTo(tx - b * 0.15, ty - b * 0.6);
+      c.lineTo(tx + b * 0.45, ty);
+      c.lineTo(tx + b, ty - b * 0.85);
+      c.lineTo(tx + b * 1.55, ty);
+      c.lineTo(tx + b * 2.15, ty - b * 0.6);
+      c.lineTo(tx + b * 2, ty + b * 0.7);
+      c.closePath();
+      c.fill();
+    }
+    c.fillStyle = bas ? MUREKKEP : k.ozel ? RENK.vurgu : RENK.acik;
+    c.fillText(k.ad, x + tac / 2, y + yk / 2 + 1);
+    const bl = k.balon, ya = bl ? zaman - bl.t0 : 99;
+    if (bl && ayar.balon && !modKume.gizli.has(k.id) && ya < 3.4) {
+      c.font = '700 21px Rubik, system-ui, sans-serif';
+      const bw = Math.min(330, c.measureText(bl.m).width + 28), bx = clamp(a.x, bw / 2 + 8, GW - bw / 2 - 8), by = a.ust - 10;
+      c.globalAlpha = Math.min(1, ya * 8, (3.4 - ya) * 4);
+      c.fillStyle = RENK.vurgu;
+      c.strokeStyle = MUREKKEP;
+      c.lineWidth = 2.5;
+      c.beginPath();
+      c.roundRect(bx - bw / 2, by - 36, bw, 36, 14);
+      c.fill();
+      c.stroke();
+      c.beginPath();
+      c.moveTo(a.x - 8, by - 2);
+      c.lineTo(a.x, by + 9);
+      c.lineTo(a.x + 8, by - 2);
+      c.stroke();
+      c.fill();
+      c.fillStyle = MUREKKEP;
+      c.fillText(bl.m, bx, by - 17, bw - 18);
+      c.globalAlpha = 1;
+    }
+  }
+  c.textBaseline = 'alphabetic';
+}
+// Aynı sıradaki adlar yan yana sığmazsa çekirdek birini bir satır yukarı iter: arkadaki yüzün üstüne, en arka sırada
+// sıralama kutusunun altına girer. Bunu önlemek için her sıranın adları burada yana açılır (çekirdeğin punto ve
+// kutu genişliği hesabıyla, 30-sahne.js etiketCiz).
+function adlariAc() {
+  const siralar = new Map();
+  for (const k of [...D.oy.values(), sofor]) {
+    if (!k.et || !k.koltuk || k.atla || k.cikiyor)
+      continue;
+    const bas = k === D.lider, punto = clamp(Math.round(k.et.s * 0.17), 13, 18) + (bas ? 4 : 0);
+    c.font = (bas ? '700 ' : '500 ') + punto + 'px Rubik, system-ui, sans-serif';
+    const w = c.measureText(k.ad).width + punto * 1.1 + (bas ? punto * 1.05 : 0) + 6;
+    const s = siralar.get(k.koltuk.r) || [];
+    s.push({ k, w, x: k.et.x });
+    siralar.set(k.koltuk.r, s);
+  }
+  for (const s of siralar.values()) {
+    s.sort((a, b) => a.x - b.x);
+    for (let tur = 0; tur < 8; tur++) {
+      for (let i = 0; i + 1 < s.length; i++) {
+        const eksik = (s[i].w + s[i + 1].w) / 2 - (s[i + 1].x - s[i].x);
+        if (eksik > 0) {
+          s[i].x -= eksik / 2;
+          s[i + 1].x += eksik / 2;
+        }
+      }
+      for (const a of s)
+        a.x = clamp(a.x, a.w / 2 + 4, GW - a.w / 2 - 4);
+    }
+    for (const a of s)
+      a.k.et.x = a.x;
+  }
+}
 
-/* ---- listenin üstüne: yazılar ve gösteriler ---- */
+/* ---- listenin üstüne: banknotlar, yazılar, gösteriler ---- */
 function yaziKalin(m, x, y, punto, renk) {
   c.font = punto + 'px "Lilita One", Rubik, system-ui, sans-serif';
   c.textAlign = 'center';
@@ -4282,77 +4269,73 @@ function hap(m, x, y, punto, zemin, yazi) {
   c.textBaseline = 'alphabetic';
 }
 function oyunUst() {
-  // sollama: hız çizgileri
-  if (etkin(D.sollama) && !azHareket) {
-    const u = (B - D.sollama.bas) / D.sollama.sure, al = Math.sin(Math.PI * u);
-    c.strokeStyle = 'rgba(255,255,255,' + (0.55 * al).toFixed(3) + ')';
-    c.lineCap = 'round';
-    for (let i = 0; i < 14; i++) {
-      const y = ALAN_UST + 30 + ((i * 97) % (ALAN_ALT - ALAN_UST - 60)), L = 60 + (i * 53) % 90, x = GW - ((zaman * 1400 + i * 211) % (GW + 300));
-      c.lineWidth = 2 + (i % 3);
-      c.beginPath();
-      c.moveTo(x, y);
-      c.lineTo(x + L, y);
-      c.stroke();
-    }
-    const on = bp(-0.2, 0.9, -0.5);
+  if (etkin(D.sollama)) {
+    const on = bp(0, 0.6, ON_UC), u = (B - D.sollama.bas) / D.sollama.sure;
     if (on.ok && u < 0.6)
-      yaziKalin('VIIIN!', clamp(on.x, 90, GW - 90), Math.max(ALAN_UST + 30, on.y - 40), 34, RENK.vurgu);
+      yaziKalin('VIIIN!', GW / 2, Math.min(ALAN_ALT - 30, on.y + 10), 40, RENK.vurgu);
   }
   // teyp: torpidodan notalar yükselir
   if (etkin(D.teyp) && !azHareket) {
-    const m = bp(0.78, ZEMIN_Y + 0.55, 0.05);
+    const m = bp(-1.15, ZEMIN_Y + 0.45, -0.44);
     if (m.ok)
-      for (let i = 0; i < 5; i++) {
-        const t = ((B - D.teyp.bas) * 0.5 + i / 5) % 1, x = m.x - t * m.s * 1.6 + Math.sin(t * 9 + i) * m.s * 0.15, y = m.y - t * m.s * 1.1;
+      for (let i = 0; i < 6; i++) {
+        const t = ((B - D.teyp.bas) * 0.5 + i / 6) % 1, x = m.x + (i % 2 ? -1 : 1) * t * m.s * 0.9 + Math.sin(t * 9 + i) * m.s * 0.12, y = m.y - t * m.s * 1.6;
         c.globalAlpha = Math.sin(Math.PI * t);
-        notaCiz(x, y, clamp(m.s * 0.11, 8, 22), i % 2 ? RENK.serin : RENK.vurgu);
+        notaCiz(x, y, clamp(m.s * 0.12, 10, 26), i % 2 ? RENK.serin : RENK.vurgu);
       }
     c.globalAlpha = 1;
   }
   // kasis: "HOP!"
-  if (D.kasis && B - D.kasis.bas < 1.6 && B >= D.kasis.bas) {
-    const p = bp((D.bolge0 + D.bolge1) / 2, TAVAN_Y + 0.2, 0), u = (B - D.kasis.bas) / 1.6;
+  if (D.kasis && B >= D.kasis.bas && B - D.kasis.bas < 1.6) {
+    const p = bp(0, ARKA_UST, ARKA_Z), u = (B - D.kasis.bas) / 1.6;
     if (p.ok) {
       c.globalAlpha = Math.min(1, (1 - u) * 3);
-      yaziKalin('HOP!', p.x, Math.max(ALAN_UST + 30, p.y - u * 30), Math.round(30 + 16 * Math.sin(Math.PI * Math.min(1, u * 2))), RENK.vurgu);
+      yaziKalin('HOP!', GW / 2, Math.max(ALAN_UST + 40, p.y + 30 - u * 30), Math.round(34 + 16 * Math.sin(Math.PI * Math.min(1, u * 2))), RENK.vurgu);
       c.globalAlpha = 1;
     }
+  }
+  onSiraCiz();
+  // şoförün teşekkürü: başının yanında, dolmuşun sağ kenarına doğru (yüzlerin ve banknotun üstüne düşmesin)
+  const ts = D.tesekkur, sk = sofor.p.kafa;
+  if (ts && B - ts.b0 < 2 && sk && sk.ok) {
+    c.globalAlpha = clamp((2 - (B - ts.b0)) * 3, 0, 1);
+    hap(ts.m, sk.x + KAFA_R * sofor.g.boy * sk.s * 2.2, sk.y + KAFA_R * sofor.g.boy * sk.s * 0.9, 15, '#fff7e6', MUREKKEP);
+    c.globalAlpha = 1;
   }
   // Banknotlar her şeyin üstünde: elden ele geçiş oyunun asıl anıdır, öndeki başların arkasında kaybolmasın.
   // Arkasında az önce geçtiği yerlerden kalan altın bir iz olur; havadayken "Uzatır mısınız?" yazar.
   for (const n of D.paralar) {
     if (!n.p)
       continue;
-    const iz = n.iz || (n.iz = []), p = pr(n.p);
+    const p = pr(n.p);
     if (!p.ok)
       continue;
-    iz.push([p.x, p.y]);
-    if (iz.length > 9)
-      iz.shift();
+    n.iz.push([p.x, p.y]);
+    if (n.iz.length > 10)
+      n.iz.shift();
     c.fillStyle = '#ffe9a8';
-    for (let i = 0; i < iz.length - 1; i++) {
-      c.globalAlpha = (i + 1) / iz.length * 0.7;
+    for (let i = 0; i < n.iz.length - 1; i++) {
+      c.globalAlpha = (i + 1) / n.iz.length * 0.8;
       c.beginPath();
-      c.arc(iz[i][0], iz[i][1], 2 + i * 0.7, 0, TAU);
+      c.arc(n.iz[i][0], n.iz[i][1], 3 + i * 0.9, 0, TAU);
       c.fill();
     }
     c.globalAlpha = 1;
     banknotCiz(n);
     if (B < n.t0)
-      hap('Uzatır mısınız?', p.x, p.y - 34, 15, '#fff7e6', MUREKKEP);
+      hap('Uzatır mısınız?', p.x, p.y - Math.max(56, 0.5 * p.s) * 0.5 - 26, 19, '#fff7e6', MUREKKEP);
   }
   // inen yolcu
   for (const k of D.oy.values())
     if (k.cikiyor && zaman - k.cikis < 1.4 && k.p.kafa && k.p.kafa.ok)
-      hap('Müsait bir yerde!', k.p.kafa.x, k.p.kafa.y - KAFA_R * k.g.boy * k.p.kafa.s - 18, 14, '#fff7e6', MUREKKEP);
+      hap('Müsait bir yerde!', k.p.kafa.x, k.p.kafa.y - KAFA_R * k.g.boy * k.p.kafa.s - 20, 16, '#fff7e6', MUREKKEP);
   // gösteri: gönderenin büyük adı
   const d = D.durak;
   if (d && d.yakin) {
-    const y = ALAN_ALT - 46;
+    const y = ALAN_ALT - 40;
     c.globalAlpha = clamp((B - d.bas - 0.5) * 2, 0, 1) * clamp((d.bas + DURAK_V - 0.8 - B) * 2, 0, 1);
-    yaziKalin('MÜSAİT BİR YERDE!', GW / 2, y - 44, 30, RENK.sicak);
-    hap(d.k.ad + ' için duruyoruz', GW / 2, y, 22, RENK.vurgu, MUREKKEP);
+    yaziKalin('MÜSAİT BİR YERDE!', GW / 2, y - 50, 38, RENK.sicak);
+    hap(d.k.ad + ' için duruyoruz', GW / 2, y, 26, RENK.vurgu, MUREKKEP);
     c.globalAlpha = 1;
   }
 }
