@@ -232,7 +232,7 @@ function oyunUst() {
       continue;
     const u = (B - k.korna) / KORNA_V, olc = 0.8 + 0.35 * Math.sin(Math.min(1, u * 4) * HP), punto = Math.round(clamp(p.s * 0.2, 13, 26) * olc);
     c.globalAlpha = Math.min(1, (1 - u) * 3);
-    c.font = punto + 'px "Lilita One", Rubik, system-ui, sans-serif';
+    c.font = punto + 'px "Paytone One", Rubik, system-ui, sans-serif';
     c.lineWidth = 4;
     c.strokeStyle = MUREKKEP;
     const x = p.x + (k.x + k.ox >= 0 ? 1 : -1) * p.s * 0.25, y = p.y - u * p.s * 0.3;
@@ -267,7 +267,7 @@ function oyunUst() {
     const k = D.drift.k, T = arabaDonusum(k), kb = KABIN[k.ar.kasa], boy = clamp(k.g.boy, 0.98, 1.1);
     const p = pr([T.x, 0, T.z - GOVDE.c * T.k - 0.35]);
     if (p.ok) {
-      c.font = '30px "Lilita One", Rubik, system-ui, sans-serif';
+      c.font = '30px "Paytone One", Rubik, system-ui, sans-serif';
       c.textAlign = 'center';
       c.textBaseline = 'middle';
       const w = Math.min(420, c.measureText(k.ad).width + 40), x = clamp(p.x, w / 2 + 8, GW - w / 2 - 8), y = Math.min(ALAN_ALT - 30, p.y + 24);
@@ -280,7 +280,7 @@ function oyunUst() {
       c.stroke();
       c.fillStyle = MUREKKEP;
       c.fillText(k.ad, x, y + 1, w - 24);
-      c.font = '20px "Lilita One", Rubik, system-ui, sans-serif';
+      c.font = '20px "Paytone One", Rubik, system-ui, sans-serif';
       c.lineWidth = 4;
       c.strokeText('DRIFT ŞOV!', x, y - 36);
       c.fillStyle = RENK.sicak;

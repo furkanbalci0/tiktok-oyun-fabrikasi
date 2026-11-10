@@ -5,7 +5,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Vur Düzelsin!</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Rubik:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Paytone+One&family=Rubik:wght@400;500;700&display=swap">
 <style>
 body{margin:0}[hidden]{display:none!important}
 /* Yerleşim: solda 9:16 sahne (yayına giden görüntü), sağda yayın masası (panel); 900 px ve altında alt alta.
@@ -18,7 +18,7 @@ body{margin:0}[hidden]{display:none!important}
   --soluk:#a9b0dc; --murekkep:#080a1c;
   --vurgu-a:rgba(255,209,102,.13); --sicak-a:rgba(226,61,47,.17); --sicak-b:rgba(226,61,47,.42); --serin-a:rgba(34,184,167,.16);
   --acik-a:rgba(246,236,217,.05); --acik-b:rgba(246,236,217,.1); --murekkep-a:rgba(8,10,28,.55);
-  --baslik:'Lilita One','Rubik','Trebuchet MS',sans-serif;
+  --baslik:'Paytone One','Rubik','Trebuchet MS',sans-serif;
   --govde:'Rubik',system-ui,'Segoe UI',sans-serif;
 }
 *{box-sizing:border-box}
@@ -5595,7 +5595,7 @@ function macCiz(t, oyna) {
     g.save();
     g.translate(W / 2, H / 2 - 6);
     g.scale(olc, olc);
-    g.font = '400 46px "Lilita One", Rubik, system-ui, sans-serif';
+    g.font = '400 46px "Paytone One", Rubik, system-ui, sans-serif';
     g.lineWidth = 6;
     g.strokeStyle = '#111';
     g.strokeText('GOOOL!', 0, 0);
@@ -5922,7 +5922,7 @@ function ustaAdi() {
   const al = clamp((B - D.usta.b0) * 2, 0, 1);
   c.save();
   c.globalAlpha = al;
-  c.font = '30px "Lilita One", Rubik, system-ui, sans-serif';
+  c.font = '30px "Paytone One", Rubik, system-ui, sans-serif';
   c.textAlign = 'center';
   c.textBaseline = 'middle';
   const w = Math.min(330, c.measureText(k.ad).width + 44), x = clamp(p.x + 30, w / 2 + 8, GW - w / 2 - 8), y = Math.max(ALAN_UST - 10, p.y - 40);
@@ -5935,7 +5935,7 @@ function ustaAdi() {
   c.stroke();
   c.fillStyle = MUREKKEP;
   c.fillText(k.ad, x, y + 1, w - 24);
-  c.font = '20px "Lilita One", Rubik, system-ui, sans-serif';
+  c.font = '20px "Paytone One", Rubik, system-ui, sans-serif';
   c.lineWidth = 5;
   c.strokeText('USTA İŞ BAŞINDA!', x, y - 36);
   c.fillStyle = RENK.sicak;
@@ -6046,7 +6046,7 @@ function carpma(e) {
   c.fill();
   // yazı
   const punto = Math.round(clamp(r * 0.62, 16, 46));
-  c.font = punto + 'px "Lilita One", Rubik, system-ui, sans-serif';
+  c.font = punto + 'px "Paytone One", Rubik, system-ui, sans-serif';
   c.textAlign = 'center';
   c.textBaseline = 'middle';
   c.lineWidth = Math.max(3, punto * 0.16);
@@ -6067,7 +6067,7 @@ function seslenis() {
   if (!el || !el.ok)
     return;
   const yazi = a <= 5 ? 'TUT, KIPIRDAMA!' : 'KIPIRDAMA!', punto = 22;
-  c.font = punto + 'px "Lilita One", Rubik, system-ui, sans-serif';
+  c.font = punto + 'px "Paytone One", Rubik, system-ui, sans-serif';
   const w = c.measureText(yazi).width + 26, x = clamp(el.x + 6, w / 2 + 6, GW - w / 2 - 6), y = Math.max(ALAN_UST - 40, el.y - 64);
   const t = a <= 5 ? a : B % 24, al = Math.min(1, t * 4, (a <= 5 ? 5 - t : 3 - t) * 2), sars = Math.sin(zaman * 40) * 1.5;
   c.save();
@@ -6110,7 +6110,7 @@ function basamakYazisi() {
   const punto = D.asamaYon > 0 ? 28 : 24, y = p.y - a * 6;
   c.save();
   c.globalAlpha = clamp(Math.min(a * 5, (3.5 - a) * 2), 0, 1);
-  c.font = punto + 'px "Lilita One", Rubik, system-ui, sans-serif';
+  c.font = punto + 'px "Paytone One", Rubik, system-ui, sans-serif';
   c.textAlign = 'center';
   c.textBaseline = 'middle';
   c.lineWidth = 6;

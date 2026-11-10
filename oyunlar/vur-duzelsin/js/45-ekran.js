@@ -152,7 +152,7 @@ function macCiz(t, oyna) {
     g.save();
     g.translate(W / 2, H / 2 - 6);
     g.scale(olc, olc);
-    g.font = '400 46px "Lilita One", Rubik, system-ui, sans-serif';
+    g.font = '400 46px "Paytone One", Rubik, system-ui, sans-serif';
     g.lineWidth = 6;
     g.strokeStyle = '#111';
     g.strokeText('GOOOL!', 0, 0);

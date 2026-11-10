@@ -5,7 +5,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Müsait Bir Yerde</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Rubik:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Paytone+One&family=Rubik:wght@400;500;700&display=swap">
 <style>
 body{margin:0}[hidden]{display:none!important}
 /* Yerleşim: solda 9:16 sahne (yayına giden görüntü), sağda yayın masası (panel); 900 px ve altında alt alta.
@@ -18,7 +18,7 @@ body{margin:0}[hidden]{display:none!important}
   --soluk:#a9b0dc; --murekkep:#080a1c;
   --vurgu-a:rgba(255,209,102,.13); --sicak-a:rgba(226,61,47,.17); --sicak-b:rgba(226,61,47,.42); --serin-a:rgba(34,184,167,.16);
   --acik-a:rgba(246,236,217,.05); --acik-b:rgba(246,236,217,.1); --murekkep-a:rgba(8,10,28,.55);
-  --baslik:'Lilita One','Rubik','Trebuchet MS',sans-serif;
+  --baslik:'Paytone One','Rubik','Trebuchet MS',sans-serif;
   --govde:'Rubik',system-ui,'Segoe UI',sans-serif;
 }
 *{box-sizing:border-box}
@@ -4158,7 +4158,7 @@ function dukkanCiz(d, z0, cw) {
       c.save();
       c.translate(cx, cy);
       c.rotate(s > 0 ? HP : -HP);
-      c.font = Math.round(clamp(w * 0.7, 8, 20)) + 'px "Lilita One", Rubik, system-ui, sans-serif';
+      c.font = Math.round(clamp(w * 0.7, 8, 20)) + 'px "Paytone One", Rubik, system-ui, sans-serif';
       c.textAlign = 'center';
       c.textBaseline = 'middle';
       c.fillStyle = '#8a2f2a';
@@ -4230,7 +4230,7 @@ function durakTabelasi(cw) {
   c.strokeStyle = '#fbf3e4';
   c.stroke();
   c.fillStyle = '#fbf3e4';
-  c.font = Math.round(r * 0.55) + 'px "Lilita One", Rubik, system-ui, sans-serif';
+  c.font = Math.round(r * 0.55) + 'px "Paytone One", Rubik, system-ui, sans-serif';
   c.textAlign = 'center';
   c.textBaseline = 'middle';
   c.fillText('DURAK', b.x, b.y + 1, r * 1.8);
@@ -4376,7 +4376,7 @@ function onPano() {
   const hb = bYuz([[-1.05, 0.33, ON_UC - 0.004], [1.05, 0.33, ON_UC - 0.004], [1.05, 0.6, ON_UC - 0.004], [-1.05, 0.6, ON_UC - 0.004]], '#fbf3e4', cw);
   if (hb) {
     const w = hb[1].x - hb[0].x, h = hb[0].y - hb[3].y;
-    c.font = Math.round(clamp(h * 0.62, 9, 30)) + 'px "Lilita One", Rubik, system-ui, sans-serif';
+    c.font = Math.round(clamp(h * 0.62, 9, 30)) + 'px "Paytone One", Rubik, system-ui, sans-serif';
     c.textAlign = 'center';
     c.textBaseline = 'middle';
     c.fillStyle = '#1f5063';
@@ -4721,7 +4721,7 @@ function adlariAc() {
 
 /* ---- listenin üstüne: banknotlar, yazılar, gösteriler ---- */
 function yaziKalin(m, x, y, punto, renk) {
-  c.font = punto + 'px "Lilita One", Rubik, system-ui, sans-serif';
+  c.font = punto + 'px "Paytone One", Rubik, system-ui, sans-serif';
   c.textAlign = 'center';
   c.textBaseline = 'middle';
   c.lineJoin = 'round';

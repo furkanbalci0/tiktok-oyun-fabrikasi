@@ -17,7 +17,7 @@ const fs = require('fs'), path = require('path');
 const KOK = path.join(__dirname, '..');
 const oku = y => fs.readFileSync(path.join(KOK, y), 'utf8').replace(/\r\n/g, '\n').replace(/\n+$/, '');
 const KANCALAR = ['oyunBaslat', 'oyunBosalt', 'oyunGiris', 'oyunYerlesim', 'oyunHediye', 'oyunLiderDegisti', 'oyunGuncelle', 'oyunKamera', 'oyunZemin', 'oyunCiz'];
-const YAZI_TIPI = '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Rubik:wght@400;500;700&display=swap">';
+const YAZI_TIPI = '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Paytone+One&family=Rubik:wght@400;500;700&display=swap">';
 const kacir = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 function oyunlar() {

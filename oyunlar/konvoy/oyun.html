@@ -5,7 +5,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Gelin Konvoyu</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Rubik:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Paytone+One&family=Rubik:wght@400;500;700&display=swap">
 <style>
 body{margin:0}[hidden]{display:none!important}
 /* Yerleşim: solda 9:16 sahne (yayına giden görüntü), sağda yayın masası (panel); 900 px ve altında alt alta.
@@ -18,7 +18,7 @@ body{margin:0}[hidden]{display:none!important}
   --soluk:#a9b0dc; --murekkep:#080a1c;
   --vurgu-a:rgba(255,209,102,.13); --sicak-a:rgba(226,61,47,.17); --sicak-b:rgba(226,61,47,.42); --serin-a:rgba(34,184,167,.16);
   --acik-a:rgba(246,236,217,.05); --acik-b:rgba(246,236,217,.1); --murekkep-a:rgba(8,10,28,.55);
-  --baslik:'Lilita One','Rubik','Trebuchet MS',sans-serif;
+  --baslik:'Paytone One','Rubik','Trebuchet MS',sans-serif;
   --govde:'Rubik',system-ui,'Segoe UI',sans-serif;
 }
 *{box-sizing:border-box}
@@ -4349,7 +4349,7 @@ function oyunUst() {
       continue;
     const u = (B - k.korna) / KORNA_V, olc = 0.8 + 0.35 * Math.sin(Math.min(1, u * 4) * HP), punto = Math.round(clamp(p.s * 0.2, 13, 26) * olc);
     c.globalAlpha = Math.min(1, (1 - u) * 3);
-    c.font = punto + 'px "Lilita One", Rubik, system-ui, sans-serif';
+    c.font = punto + 'px "Paytone One", Rubik, system-ui, sans-serif';
     c.lineWidth = 4;
     c.strokeStyle = MUREKKEP;
     const x = p.x + (k.x + k.ox >= 0 ? 1 : -1) * p.s * 0.25, y = p.y - u * p.s * 0.3;
@@ -4384,7 +4384,7 @@ function oyunUst() {
     const k = D.drift.k, T = arabaDonusum(k), kb = KABIN[k.ar.kasa], boy = clamp(k.g.boy, 0.98, 1.1);
     const p = pr([T.x, 0, T.z - GOVDE.c * T.k - 0.35]);
     if (p.ok) {
-      c.font = '30px "Lilita One", Rubik, system-ui, sans-serif';
+      c.font = '30px "Paytone One", Rubik, system-ui, sans-serif';
       c.textAlign = 'center';
       c.textBaseline = 'middle';
       const w = Math.min(420, c.measureText(k.ad).width + 40), x = clamp(p.x, w / 2 + 8, GW - w / 2 - 8), y = Math.min(ALAN_ALT - 30, p.y + 24);
@@ -4397,7 +4397,7 @@ function oyunUst() {
       c.stroke();
       c.fillStyle = MUREKKEP;
       c.fillText(k.ad, x, y + 1, w - 24);
-      c.font = '20px "Lilita One", Rubik, system-ui, sans-serif';
+      c.font = '20px "Paytone One", Rubik, system-ui, sans-serif';
       c.lineWidth = 4;
       c.strokeText('DRIFT ŞOV!', x, y - 36);
       c.fillStyle = RENK.sicak;

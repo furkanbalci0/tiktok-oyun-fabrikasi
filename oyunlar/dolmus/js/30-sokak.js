@@ -212,7 +212,7 @@ function dukkanCiz(d, z0, cw) {
       c.save();
       c.translate(cx, cy);
       c.rotate(s > 0 ? HP : -HP);
-      c.font = Math.round(clamp(w * 0.7, 8, 20)) + 'px "Lilita One", Rubik, system-ui, sans-serif';
+      c.font = Math.round(clamp(w * 0.7, 8, 20)) + 'px "Paytone One", Rubik, system-ui, sans-serif';
       c.textAlign = 'center';
       c.textBaseline = 'middle';
       c.fillStyle = '#8a2f2a';
@@ -284,7 +284,7 @@ function durakTabelasi(cw) {
   c.strokeStyle = '#fbf3e4';
   c.stroke();
   c.fillStyle = '#fbf3e4';
-  c.font = Math.round(r * 0.55) + 'px "Lilita One", Rubik, system-ui, sans-serif';
+  c.font = Math.round(r * 0.55) + 'px "Paytone One", Rubik, system-ui, sans-serif';
   c.textAlign = 'center';
   c.textBaseline = 'middle';
   c.fillText('DURAK', b.x, b.y + 1, r * 1.8);

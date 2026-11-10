@@ -136,7 +136,7 @@ function onPano() {
   const hb = bYuz([[-1.05, 0.33, ON_UC - 0.004], [1.05, 0.33, ON_UC - 0.004], [1.05, 0.6, ON_UC - 0.004], [-1.05, 0.6, ON_UC - 0.004]], '#fbf3e4', cw);
   if (hb) {
     const w = hb[1].x - hb[0].x, h = hb[0].y - hb[3].y;
-    c.font = Math.round(clamp(h * 0.62, 9, 30)) + 'px "Lilita One", Rubik, system-ui, sans-serif';
+    c.font = Math.round(clamp(h * 0.62, 9, 30)) + 'px "Paytone One", Rubik, system-ui, sans-serif';
     c.textAlign = 'center';
     c.textBaseline = 'middle';
     c.fillStyle = '#1f5063';
@@ -481,7 +481,7 @@ function adlariAc() {
 
 /* ---- listenin üstüne: banknotlar, yazılar, gösteriler ---- */
 function yaziKalin(m, x, y, punto, renk) {
-  c.font = punto + 'px "Lilita One", Rubik, system-ui, sans-serif';
+  c.font = punto + 'px "Paytone One", Rubik, system-ui, sans-serif';
   c.textAlign = 'center';
   c.textBaseline = 'middle';
   c.lineJoin = 'round';

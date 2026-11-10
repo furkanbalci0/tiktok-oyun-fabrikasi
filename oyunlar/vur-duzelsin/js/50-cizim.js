@@ -217,7 +217,7 @@ function ustaAdi() {
   const al = clamp((B - D.usta.b0) * 2, 0, 1);
   c.save();
   c.globalAlpha = al;
-  c.font = '30px "Lilita One", Rubik, system-ui, sans-serif';
+  c.font = '30px "Paytone One", Rubik, system-ui, sans-serif';
   c.textAlign = 'center';
   c.textBaseline = 'middle';
   const w = Math.min(330, c.measureText(k.ad).width + 44), x = clamp(p.x + 30, w / 2 + 8, GW - w / 2 - 8), y = Math.max(ALAN_UST - 10, p.y - 40);
@@ -230,7 +230,7 @@ function ustaAdi() {
   c.stroke();
   c.fillStyle = MUREKKEP;
   c.fillText(k.ad, x, y + 1, w - 24);
-  c.font = '20px "Lilita One", Rubik, system-ui, sans-serif';
+  c.font = '20px "Paytone One", Rubik, system-ui, sans-serif';
   c.lineWidth = 5;
   c.strokeText('USTA İŞ BAŞINDA!', x, y - 36);
   c.fillStyle = RENK.sicak;
@@ -341,7 +341,7 @@ function carpma(e) {
   c.fill();
   // yazı
   const punto = Math.round(clamp(r * 0.62, 16, 46));
-  c.font = punto + 'px "Lilita One", Rubik, system-ui, sans-serif';
+  c.font = punto + 'px "Paytone One", Rubik, system-ui, sans-serif';
   c.textAlign = 'center';
   c.textBaseline = 'middle';
   c.lineWidth = Math.max(3, punto * 0.16);
@@ -362,7 +362,7 @@ function seslenis() {
   if (!el || !el.ok)
     return;
   const yazi = a <= 5 ? 'TUT, KIPIRDAMA!' : 'KIPIRDAMA!', punto = 22;
-  c.font = punto + 'px "Lilita One", Rubik, system-ui, sans-serif';
+  c.font = punto + 'px "Paytone One", Rubik, system-ui, sans-serif';
   const w = c.measureText(yazi).width + 26, x = clamp(el.x + 6, w / 2 + 6, GW - w / 2 - 6), y = Math.max(ALAN_UST - 40, el.y - 64);
   const t = a <= 5 ? a : B % 24, al = Math.min(1, t * 4, (a <= 5 ? 5 - t : 3 - t) * 2), sars = Math.sin(zaman * 40) * 1.5;
   c.save();
@@ -405,7 +405,7 @@ function basamakYazisi() {
   const punto = D.asamaYon > 0 ? 28 : 24, y = p.y - a * 6;
   c.save();
   c.globalAlpha = clamp(Math.min(a * 5, (3.5 - a) * 2), 0, 1);
-  c.font = punto + 'px "Lilita One", Rubik, system-ui, sans-serif';
+  c.font = punto + 'px "Paytone One", Rubik, system-ui, sans-serif';
   c.textAlign = 'center';
   c.textBaseline = 'middle';
   c.lineWidth = 6;
