@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /* Bütün testler: bir oyun için (node araclar/test.js <ad>) ya da oyunlar/ altındaki her oyun için.
  * Her oyunda sırayla: derleme güncel mi (derle.js --denetle), çekirdek testleri (cekirdek/test/cekirdek.test.js),
- * varsa oyunun kendi testi (oyunlar/<ad>/test.js). En sonda köprü testi bir kez (cekirdek/test/kopru.test.js).
+ * varsa oyunun kendi testi (oyunlar/<ad>/test.js). En sonda bir kez köprü testi (cekirdek/test/kopru.test.js; kapısı
+ * KOPRU_TEST_PORT ile seçilir, öntanım 8791) ve araç testi (cekirdek/test/araclar.test.js: yeni-oyun, derle, kare-cek).
  * Biri bile kalırsa 1 koduyla çıkar. Tarayıcı: CHROME_PATH ya da playwright'ın Chromium'u (cekirdek/test/ortak.js).
  */
 'use strict';
@@ -22,6 +23,7 @@ for (const ad of oyunlar) {
     calistir(ad + ': oyun testleri', 'oyunlar/' + ad + '/test.js', ad);
 }
 calistir('köprü testleri', 'cekirdek/test/kopru.test.js', oyunlar.includes('halay') ? 'halay' : oyunlar[0]);
+calistir('araç testleri', 'cekirdek/test/araclar.test.js');
 console.log('\n==== ÖZET ====');
 for (const [d, ad] of sonuc)
   console.log(d, '|', ad);

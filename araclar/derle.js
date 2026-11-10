@@ -44,6 +44,23 @@ function uret(ad) {
   const eksik = KANCALAR.filter(k => !new RegExp('\\bfunction\\s+' + k + '\\s*\\(').test(oyunJs));
   if (eksik.length)
     hata(ad + ': şu kancalar işlev bildirimi olarak tanımlanmamış: ' + eksik.join(', ') + ' (docs/KANCALAR.md)');
+  // Ad çakışması: hepsi tek kapalı işlevde olduğu için oyunun aynı adla yazdığı işlev çekirdeğinkini sessizce ezer
+  // (çekirdekte o adı kullanan her yer oyununkini çağırır); const / let çakışması sayfayı hiç açtırmaz.
+  const ustAdlar = metin => {
+    const m = new Map();
+    for (const r of metin.matchAll(/^(function|const|let|class)\s+([\w$]+)/gm))
+      m.set(r[2], r[1]);
+    return m;
+  };
+  const cekAd = ustAdlar(cekirdek.map(oku).join('\n')), cakisan = [];
+  for (const [isim, tur] of ustAdlar(oyunJs))
+    if (cekAd.has(isim))
+      cakisan.push([isim, tur, cekAd.get(isim)]);
+  const olumcul = cakisan.filter(([, a, b]) => a !== 'function' || b !== 'function');
+  if (olumcul.length)
+    hata(ad + ': şu adlar çekirdekte de tanımlı, sayfa açılmaz (SyntaxError): ' + olumcul.map(x => x[0]).join(', ') + '. Oyundaki adı değiştir.');
+  if (cakisan.length && !sessiz)
+    console.warn('UYARI ' + ad + ': şu işlevler çekirdektekini eziyor (çekirdek de oyununkini çağırır): ' + cakisan.map(x => x[0]).join(', ') + '. Bilerek değilse oyundaki adı değiştir.');
   const js = sira.map(parca).join('\n\n');
   const betik = '<script>\n(() => {\n\'use strict\';\n' + js + '\n})();\n</script>';
   const BASLIK = '<title>' + kacir(bilgi.ad || ad) + '</title>';
@@ -83,6 +100,7 @@ ${betik}
 }
 
 const args = process.argv.slice(2), bayrak = a => args.includes(a), adlar = args.filter((a, i) => !a.startsWith('--') && args[i - 1] !== '--parca');
+const sessiz = bayrak('--denetle'); // denetimde ad uyarısı tekrar yazılmaz
 if (bayrak('--denetle')) {
   const liste = adlar.length ? adlar : oyunlar();
   let eski = 0;

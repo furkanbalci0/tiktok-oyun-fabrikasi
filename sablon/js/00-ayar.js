@@ -31,6 +31,11 @@ const OYUN = {
   tohum: [['zeyno.47', 120], ['elif_naz', 40], ['hasan.usta', 10], ['pınar_34', 0], ['berfin_gül', 0], ['mert.can.21', 0]],
   // sahte izleyicinin yazdıkları (panelde "Otomatik izleyici" açıkken)
   sahteYorum: ['selam!', 'ben de geldim', 'adımı gördüm', 'zıpla zıpla', 'lider kim?', 'yer açın geliyorum'],
-  renk: {},                              // isteğe bağlı: { vurgu: '#ffd166', zemin: '#0e1230', … } tema renklerini ezer
-  kamera: {}                             // isteğe bağlı: { egim, F, enYakin } kameranın varsayılanlarını ezer
+  renk: {},                              // isteğe bağlı: { vurgu: '#ffd166', zemin: '#0e1230', … } sahnenin renkleri
+  // panelRenk: {},                      // aç: sahne gündüz / açık renkliyse panel çekirdeğin koyu temasında kalsın
+  kamera: {},                            // isteğe bağlı: { egim, F, enYakin, ustPay, altPay, ustPx, x, on, odakEn }
+  // Yeni oyunlar için önerilen ayarlar (docs/KANCALAR.md): adlar sıralama kutusuna ve yorum alanına girmez,
+  // ekran dışındakinin adı kenarda yığılmaz; pankart sıralama kutusunun altından geçer.
+  etiket: { ustSinir: true, altSinir: true, disari: 'gizle' },
+  sahneYazi: { pankart: 'alt' }
 };
