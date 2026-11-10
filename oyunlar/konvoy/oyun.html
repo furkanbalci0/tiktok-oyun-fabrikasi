@@ -694,13 +694,28 @@ class Muzik {
       return;
     }
     const t = this.simdi();
-    if (this.sonraki === null || this.sonraki < t - 0.4)
+    if (this.sonraki === null)
       this.sonraki = t + 0.05;
+    else if (this.sonraki < t - 0.4)
+      this.atla(t + 0.05);
     let guard = 0;
     while (this.sonraki < t + ufuk && guard++ < 400)
       this.adimCal();
     while (this.iz.length > 2 && this.iz[1].t < t - 0.5)
       this.iz.shift();
+  }
+  // Ana iş parçacığı uzun süre kilitlenince (olay seli, ağır bir kare) zamanı geçmiş adımlar çalınmaz, ama
+  // vuruş sayacı o adımlar kadar ileri alınır. Eskiden yalnız "sonraki" şimdiye çekiliyordu: sayaç geride kaldığı
+  // için yeni adımların vuruşu, saatin o ana dek (son kayıttan ileri yürüterek) gösterdiği vuruştan küçük kalıyor,
+  // B kilit süresi kadar donuyordu (beatAt geri gitmez, bekler).
+  atla(hedef) {
+    const h = this.hava, dur = 60 / (h.bpm * this.carpan) / h.spb, n = Math.ceil((hedef - this.sonraki) / dur);
+    if (!(n > 0))
+      return;
+    this.sonraki += n * dur;
+    this.beat += n / h.spb;
+    this.havaSure += n * dur;
+    this.adim = (this.adim + n) % h.formAdim;
   }
   adimCal() {
     let h = this.hava;
