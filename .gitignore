@@ -1,7 +1,8 @@
 node_modules/
 test/cikti/
 dist/
-# Kendi muzik parcalarin depoya girmez: haklari sende kalir (docs/MUZIK.md).
+# Oyunlarin kendi hazir parcalari (oyunlar/<ad>/muzik/) depoya girmez: haklari sende kalir (docs/MUZIK.md).
+# Kural her derinlikte gecer (oyunlar/*/muzik/, paketlerin muzik/ klasoru); ortak bir kok muzik/ klasoru kullanilmaz.
 muzik/
 *.log
 .DS_Store

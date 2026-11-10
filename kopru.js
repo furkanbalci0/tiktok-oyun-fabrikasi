@@ -39,6 +39,9 @@ function oyunKlasoru() {
 }
 const KLASOR = oyunKlasoru();
 const OYUN = KLASOR ? path.join(KLASOR, 'oyun.html') : null;
+// Hazır parçalar açılan oyunun kendi klasöründen gelir: oyunlar/<ad>/muzik/ (paketlenince paketin muzik/ klasörü).
+// Bütün oyunların ortak kullandığı bir müzik klasörü yoktur: her oyunun müziği kendinedir (docs/MUZIK.md).
+const MUZIK_KLASOR = KLASOR ? path.join(KLASOR, 'muzik') : null;
 
 const yaz = (...a) => console.log(new Date().toTimeString().slice(0, 8), ...a);
 
@@ -78,12 +81,12 @@ const sunucu = http.createServer((req, res) => {
     muzikSun(yol.slice(7), req, res);
   } else { res.writeHead(404); res.end(); }
 });
-// İsteğe bağlı hazır parçalar: yalnız muzik/ klasöründeki düz adlı .js ve ses dosyaları sunulur.
+// İsteğe bağlı hazır parçalar: yalnız açılan oyunun muzik/ klasöründeki düz adlı .js ve ses dosyaları sunulur.
 const MUZIK_TUR = { '.js': 'text/javascript; charset=utf-8', '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg', '.wav': 'audio/wav', '.m4a': 'audio/mp4' };
 function muzikSun(ad, req, res) {
   const tur = MUZIK_TUR[path.extname(ad).toLowerCase()];
-  if (!tur || !/^[\w.-]+$/.test(ad) || ad.includes('..')) { res.writeHead(404); res.end(); return; }
-  const dosya = path.join(KLASOR, 'muzik', ad);
+  if (!tur || !MUZIK_KLASOR || !/^[\w.-]+$/.test(ad) || ad.includes('..')) { res.writeHead(404); res.end(); return; }
+  const dosya = path.join(MUZIK_KLASOR, ad);
   fs.stat(dosya, (hata, bilgi) => {
     if (hata || !bilgi.isFile()) { res.writeHead(404); res.end(); return; }
     // Ses öğesi parçanın içinde gezinebilsin diye aralık isteği desteklenir.
@@ -145,6 +148,10 @@ function calistir() {
     console.log('\n  Köprü çalışıyor. Oyun: ' + path.relative(__dirname, OYUN));
     console.log('  Oyun (panelli):      http://localhost:' + PORT + '/');
     console.log('  Yalnızca sahne:      http://localhost:' + PORT + '/#yayin');
+    let parca = [];
+    try { parca = fs.readdirSync(MUZIK_KLASOR).filter(a => /\.(mp3|ogg|wav|m4a)$/i.test(a)); } catch (e) { }
+    const mk = path.relative(__dirname, MUZIK_KLASOR) || 'muzik';
+    console.log('  Müzik:               ' + (parca.length && fs.existsSync(path.join(MUZIK_KLASOR, 'liste.js')) ? parca.length + ' hazır parça (' + mk + ')' : 'oyunun kendi üretilen müziği (' + mk + ' içinde hazır parça yok)'));
     console.log('  Kapatmak için bu pencerede Ctrl+C.\n');
     if (DENEME) denemeBaslat(); else tiktokBaslat();
     if (args.includes('--ac')) { // oyunu varsayılan tarayıcıda aç (köprü dinlemeye başladıktan sonra)

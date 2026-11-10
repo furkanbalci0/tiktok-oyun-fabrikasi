@@ -57,6 +57,15 @@ function baslat(klasor, args) { const c = spawn(process.execPath, ['kopru.js', .
   const mz = { tam: await ham('/muzik/_kopru-test.js'), parca: await ham('/muzik/_kopru-test.js', { range: 'bytes=2-5' }), son: await ham('/muzik/_kopru-test.js', { range: 'bytes=-3' }), tasan: await ham('/muzik/_kopru-test.js', { range: 'bytes=50-60' }),
     disari: [await ham('/muzik/../kopru.js'), await ham('/muzik/..%2Fkopru.js'), await ham('/muzik/%2e%2e/kopru.js'), await ham('/muzik/..\\kopru.js'), await ham('/muzik/alt/_kopru-test.js'), await ham('/muzik/_kopru-test.html'), await ham('/muzik/yok.mp3'), await ham('/muzik/')] };
   fs.unlinkSync(denemeDosya); if (!klasorVardi) fs.rmdirSync(muzikKlasor);
+  // Her oyunun müziği kendinedir: köprü başka oyunun muzik/ klasörünü de, depo kökünde bir muzik/ klasörünü de sunmaz.
+  const baskaAd = fs.readdirSync(path.join(KOK, 'oyunlar')).find(a => a !== OYUN_AD && fs.existsSync(path.join(KOK, 'oyunlar', a, 'js'))), yabanci = [];
+  for (const kl of [baskaAd && path.join(KOK, 'oyunlar', baskaAd, 'muzik'), path.join(KOK, 'muzik')].filter(Boolean)) {
+    const vardi = fs.existsSync(kl), dosya = path.join(kl, '_kopru-yabanci.js');
+    fs.mkdirSync(kl, { recursive: true }); fs.writeFileSync(dosya, 'yabanci');
+    yabanci.push([path.relative(KOK, kl), (await ham('/muzik/_kopru-yabanci.js')).kod]);
+    fs.unlinkSync(dosya); if (!vardi) fs.rmdirSync(kl);
+  }
+  kontrol('Köprü yalnız açtığı oyunun muzik/ klasörünü sunar (başka oyununkini ve depo kökündekini sunmaz)', yabanci.length === 2 && yabanci.every(x => x[1] === 404), yabanci);
   kontrol('Köprü müzik klasöründeki dosyayı sunar, aralık isteğini karşılar', mz.tam.kod === 200 && mz.tam.govde === '0123456789' && mz.parca.kod === 206 && mz.parca.govde === '2345' && mz.parca.aralik === 'bytes 2-5/10' && mz.son.govde === '789' && mz.tasan.kod === 416, { tam: mz.tam.kod, parca: mz.parca, son: mz.son.govde, tasan: mz.tasan.kod });
   kontrol('Köprü müzik adresinden klasör dışına ya da başka türde dosyaya çıkılmaz', mz.disari.every(x => x.kod === 404), mz.disari.map(x => x.kod));
   await p.locator('#sahne').screenshot({ path: S + '/k-deneme.png' });

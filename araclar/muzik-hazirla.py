@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
-"""Hazır müzik parçalarını oyuna tanıtır: vuruşlarını ölçer, muzik/ klasörüne kopyalar, muzik/liste.js yazar.
+"""Hazır müzik parçalarını BİR oyuna tanıtır: vuruşlarını ölçer, o oyunun muzik/ klasörüne kopyalar, liste.js yazar.
 
-Oyun kendi davul zurnasını üretir; bu betik isteğe bağlıdır. Kendi parçalarını (kendi bestelediğin ya da
-kullanma hakkın olan kayıtlar) çalmak istersen bir kez çalıştırırsın, oynayanlar o parçanın vuruşuna adım atar.
+Her oyun kendi müziğini üretir (OYUN.muzik, docs/MUZIK.md); bu betik isteğe bağlıdır. Kendi parçalarını (kendi
+bestelediğin ya da kullanma hakkın olan kayıtlar) bir oyunda çalmak istersen bir kez çalıştırırsın, oynayanlar o
+parçanın vuruşuna göre hareket eder. Parçalar yalnız o oyunun klasörüne gider: oyunlar/<ad>/muzik/. Bütün oyunların
+ortak kullandığı bir müzik klasörü yoktur; aynı parçayı iki oyunda istiyorsan betiği iki oyun için ayrı çalıştır.
 
 Kullanım:
-    python araclar/muzik-hazirla.py "parçaların durduğu klasör" oyunlar/<ad>
+    python araclar/muzik-hazirla.py "parçaların durduğu klasör" <oyun adı>
+    python araclar/muzik-hazirla.py "C:/Users/ben/Muzik/konvoy" konvoy
 
 Gerekenler: Python 3.9+, `pip install librosa` (mp3 okumak için ffmpeg kurulu olmalı).
-muzik/ klasörü depoya girmez (.gitignore); parçaların hakları sende kalır.
+oyunlar/<ad>/muzik/ depoya girmez (.gitignore); parçaların hakları sende kalır.
 """
 import json
 import os
@@ -16,11 +19,27 @@ import re
 import shutil
 import sys
 
-import librosa
-import numpy as np
+DEPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-KOK = os.path.abspath(sys.argv[2]) if len(sys.argv) > 2 else None  # oyun klasörü: oyunlar/<ad>
+
+def oyun_klasoru(ad):
+    """Oyun adını (eski kullanım 'oyunlar/<ad>' de olur) depodaki oyunlar/<ad> klasörüne çevirir; yoksa durur."""
+    ad = ad.replace('\\', '/').rstrip('/')
+    if ad.startswith('oyunlar/'):
+        ad = ad[len('oyunlar/'):]
+    if not re.fullmatch(r'[a-z0-9][a-z0-9-]*', ad):
+        sys.exit('Oyun adı yalnız küçük harf, rakam ve tire olabilir (örn. konvoy): "%s"' % ad)
+    kl = os.path.join(DEPO, 'oyunlar', ad)
+    if not os.path.isfile(os.path.join(kl, 'js', '00-ayar.js')):
+        var = sorted(a for a in os.listdir(os.path.join(DEPO, 'oyunlar')) if os.path.isfile(os.path.join(DEPO, 'oyunlar', a, 'js', '00-ayar.js')))
+        sys.exit('"%s" adında oyun yok. Oyunlar: %s' % (ad, ', '.join(var)))
+    return kl
+
+
+KOK = oyun_klasoru(sys.argv[2]) if len(sys.argv) > 2 else None  # oyun klasörü: oyunlar/<ad>
 HEDEF = os.path.join(KOK, 'muzik') if KOK else None
+import librosa  # noqa: E402  (ad denetimi kütüphane yüklenmeden yapılsın)
+import numpy as np  # noqa: E402
 HARF = str.maketrans('çğıöşüÇĞİÖŞÜâîûÂÎÛ', 'cgiosuCGIOSUaiuAIU')
 
 
@@ -88,7 +107,7 @@ def main():
     with open(os.path.join(HEDEF, 'liste.js'), 'w', encoding='utf-8', newline='\n') as d:
         d.write('// araclar/muzik-hazirla.py üretir; elle düzenleme. vurus: adım atılan vuruşların saniyeleri.\n')
         d.write('window.OYUN_MUZIK = ' + json.dumps(liste, ensure_ascii=False, separators=(',', ':')) + ';\n')
-    print(len(liste), 'parça hazır: muzik/liste.js')
+    print(len(liste), 'parça hazır:', os.path.relpath(os.path.join(HEDEF, 'liste.js'), DEPO).replace(os.sep, '/'), '(yalnız bu oyunda çalar)')
 
 
 if __name__ == '__main__':
