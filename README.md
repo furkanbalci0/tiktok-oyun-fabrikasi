@@ -10,7 +10,7 @@ Bu proje TikTok ile bağlantılı değildir ve TikTok tarafından onaylanmamış
 
 | Parça | Yer | Ne yapar |
 | --- | --- | --- |
-| Çekirdek | `cekirdek/` | Her oyunda aynı kalan iş: sahne, izleyici sırası, coşku göstergesi, hediye kademeleri, lider tablosu, müzik saati, deneme paneli, testler |
+| Çekirdek | `cekirdek/` | Her oyunda aynı kalan iş: sahne, izleyici sırası, coşku göstergesi, hediye kademeleri, lider tablosu, müzik saati, yayın masası (deneme ve moderasyon paneli), testler |
 | Örnek oyun | `oyunlar/halay/` | "Mendil Kimde?": bir halay oyunu. Yorum yazan halaya girer, en çok hediye atan halay başı olur |
 | Şablon | `sablon/` | Çalışan en küçük oyun. Yeni oyun buradan kopyalanır |
 | Köprü | `kopru.js` | Bir TikTok canlı yayınını okur ve olayları oyun sayfasına iletir |

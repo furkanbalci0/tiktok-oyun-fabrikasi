@@ -29,22 +29,24 @@ girer. Oyun `D`'yi başka yoldan değiştirmez.
 | `00-yardimci.js` | Sayı yardımcıları (`clamp`, `lerp`, `yumusak`, `basamak`), addan tekrarlanabilir rastgelelik (`ozet`, `rastgeleUret`), `aciFark`, `azHareket`, `$`. |
 | `10-muzik.js` | `HAVALAR` (üç üretilen ezgi), `Muzik` sınıfı ve tek örneği `muzik`: zamanlayıcı, ses zinciri, vuruş saati, hazır parça kipi. |
 | `20-oyuncular.js` | `OYUN` eksiklerini doldurur; `KADEME`, `MAKS`, `D`, `karakterYap`, `gorunumUret`, `katil`, `cikar`, `siraGuncelle`, `olay`. |
-| `25-yazilar.js` | Sıra kutusu, bildirim satırı, pankart, paneldeki olay günlüğü. Hepsi `textContent`. |
+| `25-yazilar.js` | Sıra kutusu, bildirim satırı, pankart, paneldeki olay akışı (`gunluk`, en yenisi üstte). Hepsi `textContent`. |
 | `30-sahne.js` | Tuval, `RENK`, kamera (`kam`, `kamKur`, `pr`), `ik`, çizim listesi (`kap`, `top`, `ozel`, `listeCiz`), `kameraSigdir`, `golge`, `etiketCiz`, `kenarKarart`. |
 | `31-insan.js` | İnsan takımı: `iskeletKur`, `kolKur`, `pozBekle`, `insanEkle`, `kafaCiz`. |
 | `32-parcacik.js` | `konfeti`, `kalpAt`, `parcaCiz`: ekran koordinatında uçan parçacıklar. |
 | `35-kare.js` | `kare()`: her karenin sırası ve ölçümü. |
 | `40-sahte-izleyici.js` | Deneme için uydurma ad, yorum, beğeni, hediye üreten otomatik izleyici. |
 | `50-yayin.js` | `Yayin`: köprüye WebSocket bağlantısı, dış iletiyi olaya çevirme, sıra ve ayar saklama. |
-| `60-panel.js` | Sayfa yazıları, panel düğmeleri, `boyutla`, yayın görünümü, açılış (`baslat`), `window.CanliOyun`. |
+| `60-panel.js` | Sayfa yazıları, yayın masası (durum şeridi, sahnedekiler, sekmeler, yayıncının hızlı eylemleri), `boyutla`, yayın görünümü, açılış (`baslat`), `window.CanliOyun`. |
 
 ## Olay kapısı ve izleyici kaydı (`20-oyuncular.js`)
 
 `olay(o)` önce kimliği süzer: kimlik ve ad kontrol karakterlerinden arındırılır, boşlukları sadeleşir; kimlik 64,
-ad 18 karaktere kısalır. Kimliği boş olay düşer. Yasaklı kelime geçen ad `misafir` olur.
+ad 18 karaktere kısalır. Kimliği boş olay düşer. Yayıncının panelden sahneden çıkardığı kimliğin olayı da düşer
+(geri alınana kadar). Yasaklı kelime geçen ya da yayıncının adını gizlediği izleyicinin adı `misafir` olur.
 
 - **Yorum:** izleyici sahneye girer (`katil`), `k.son` tazelenir. Metin 200 karaktere kısalır; yasaklı kelime,
-  adres ve telefon süzülünce 30 karakterlik konuşma balonu olur. Balonlar panelden kapatılabilir.
+  adres ve telefon süzülünce 30 karakterlik konuşma balonu olur. Balonlar panelden ya da `B` tuşuyla kapatılır;
+  kapatınca ekrandaki balonlar da hemen silinir.
 - **Beğeni:** adet 1 ile 500 arasına sıkışır; `D.begeni` ve coşku (adet × 0,006) artar, kalpler uçar. Sahnede
   olmayanı sahneye almaz; olan varsa `k.son` tazelenir.
 - **Takip:** izleyici girer, adı 3 sn yeşil yazılır, "takip etti, hoş geldin" bildirimi çıkar.
@@ -138,8 +140,24 @@ adını yazıp durur. Sayfa iskeleti `cekirdek/sayfa.html`, stili `cekirdek/stil
 - **Yayın görünümü:** adrese `#yayin` eklenir ya da panelden "Yalnızca sahneyi göster" seçilir. Panel gizlenir,
   sahne pencereyi 9:16 doldurur, tuval en çok 1080×1920 olur. Esc ya da sahne köşesindeki düğme paneli geri
   getirir. `#yayin` ya da köprüyle açılınca ses, tarayıcı izin verirse beklemeden açılmayı dener.
-- **Deneme paneli:** sahte yorum, beğeni, takip ve her kademe için hediye düğmeleri; otomatik izleyicinin hızı;
-  boşaltma; ses ve hava seçimi; balon ve yasaklı kelime ayarı; köprü adresi. Düğmeler de `olay(o)`ya yazar.
+- **Yayın masası (panel):** her oyunda aynıdır; oyuna özgü yazılar `OYUN`dan gelir. Yukarıdan aşağı:
+  - *Durum şeridi:* bağlantı (Deneme, Bağlanıyor, Canlı, Koptu), sahnedeki kişi, sahnedekilerin toplam jetonu,
+    lider, vuruş/dk ve çalan hava, kare süresi. `masaYaz` 250 ms'de bir yazar; yayın görünümünde çalışmaz.
+  - *Yayın güvenliği:* yorum balonları anahtarı (`B` tuşu da), gizlenecek kelimeler, çıkarılanların özeti.
+    Kelime alanından çıkınca sahnedeki eşleşen ad ve balonlar da hemen gizlenir.
+  - *Sahnedekiler:* jetona göre ilk 12 kişi (gerisi ad aramasıyla), her satırda "Gizle" ve "Çıkar".
+  - *Olay akışı:* en yenisi üstte, 40 satır, türüne göre renkli; fare ya da odak akıştayken satırlar kaymaz.
+    Satırlarda yine "Gizle" ve "Çıkar" vardır (`gunluk` çağrısına kimlik verilmişse).
+  - *Sekmeler:* Deneme (sahte yorum, beğeni, takip, kademe başına hediye, otomatik kalabalık ve hızı, boşaltma),
+    Yayın (köprü adresi ve durumu, çıkarılanlar listesi ve geri alma, ileti biçimi), Müzik, Hediyeler (kademe
+    tablosu). Köprüden açılınca Yayın sekmesi açık gelir ve Deneme sekmesinde uyarı çıkar.
+  - Düzen panelin genişliğine göre değişir (CSS `@container masa`): dar panelde alt alta, orta genişlikte iki
+    sütun, geniş panelde üç sütun. 900 px ve daha dar pencerede panel sahnenin altına iner.
+  - Düğmeler de `olay(o)`ya yazar.
+- **Hızlı eylemler:** "Gizle" (`izleyiciGizle`) kimliği `ayar.gizli`ye ekler, adı hemen `misafir` yapar ve balonunu
+  siler; sonraki olaylarda da ad süzgecinden `misafir` çıkar. "Çıkar" (`izleyiciCikar`) kimliği `ayar.cikan`a ekler
+  ve `cikar(k)` çağırır; lider çıkarsa `oyunLiderDegisti` çağrılır. Çıkarılanın olayları oyuna işlenmez. İkisi de
+  `ayarYaz` ile tarayıcıda saklanır (en çok 300 kişi) ve Yayın sekmesinden geri alınır.
 - **Sahte izleyici:** adı `OYUN.sahteAd`'dan (yoksa genel listeden), yorumu `OYUN.sahteYorum`'dan alır. Hediyeyi
   kademelerden seçer (en büyüğü %0,7, ikincisi %3,8, üçüncüsü %10,5, dördüncüsü %25). Açılıştaki kalabalık
   `OYUN.tohum`'dan gelir.

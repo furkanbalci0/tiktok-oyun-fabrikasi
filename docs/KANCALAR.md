@@ -8,7 +8,7 @@ dokunmaz; burada adı geçen kancaları doldurur.
 
 ```
 cekirdek/
-  sayfa.html, stil.css      sayfa iskeleti (sahne + deneme paneli); metinler OYUN ayarından doldurulur
+  sayfa.html, stil.css      sayfa iskeleti (sahne + yayın masası paneli); metinler OYUN ayarından doldurulur
   js/NN-*.js                çekirdek parçaları (aşağıda)
   test/                     ortak.js, cekirdek.test.js (her oyuna uygulanır), kopru.test.js
 oyunlar/<ad>/
@@ -157,7 +157,8 @@ Oyunun yazdığı bayraklar:
   Hiçbiri yoksa hediye sevinci süresince (`B < k.zip1`) ve `D.cosku > 0.72` iken güler.
 
 **Olaylar ve yazılar:** `olay(o)`, `katil(id, ad, zorla)`, `cikar(k)`, `siraGuncelle()`, `bildir(ad, orta,
-vurgu)`, `pankart(satir1, satir2)`, `gunluk(tur, ad, metin)`, `konfeti(adet, guc)`, `kalpAt(adet)`.
+vurgu)`, `pankart(satir1, satir2)`, `gunluk(tur, ad, metin, hediye, id)` (son ikisi isteğe bağlı: `hediye` satırı
+altın renkte yazar, `id` verilirse satırda yayıncının Gizle / Çıkar düğmeleri olur), `konfeti(adet, guc)`, `kalpAt(adet)`.
 
 **Sahne:** `c` (2B çizim bağlamı, 720×1280 sanal ölçekte), `GW`, `GH`, `ALAN_UST`, `ALAN_ALT`, `kam`,
 `pr([x, y, z])` → `{ x, y, s, d, ok }`, `kap(pa, ra, pb, rb, renk, derinlik)` (iki ucu farklı yarıçaplı kapsül),

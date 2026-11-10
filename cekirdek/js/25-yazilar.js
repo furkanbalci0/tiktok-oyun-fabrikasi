@@ -69,22 +69,74 @@ function pankart(b1, b2) {
   yer.append(p);
   setTimeout(() => p.remove(), 3500);
 }
+/* ---- paneldeki olay akışı ----
+ * En yenisi üstte, en çok 40 satır. Fare ya da klavye odağı akıştayken (gunlukDur) satırlar kaymaz: yeni olaylar
+ * bekler, yayıncı tıklamak istediği satırı kaçırmaz. id verilen satırda "Gizle" ve "Çıkar" düğmeleri olur
+ * (60-panel.js bunları dinler). hediye ve id isteğe bağlıdır; oyun gunluk(tur, ad, metin) diye de çağırabilir.
+ */
 const gunlukBekleyen = [];
-function gunluk(tur, ad, metin, hediye) { gunlukBekleyen.push([tur, ad, metin, hediye]); if (gunlukBekleyen.length > 40)
+let gunlukDur = false, gunlukYeni = 0;
+const GUNLUK_TIP = { yorum: 'y', 'beğeni': 'b', takip: 't', hediye: 'h', 'paylaşım': 'p', geldi: 'g', gizlendi: 'm', 'çıkarıldı': 'm', 'geri alındı': 'm' };
+function gunluk(tur, ad, metin, hediye, id) { gunlukBekleyen.push([tur, ad, metin, hediye, id, Date.now()]); gunlukYeni++; if (gunlukBekleyen.length > 40)
   gunlukBekleyen.shift(); }
+const ikiHane = n => (n < 10 ? '0' : '') + n;
+function gunlukSatir(tur, ad, metin, hediye, id, t) {
+  const li = document.createElement('li'), zm = document.createElement('span'), tp = document.createElement('span'), ic = document.createElement('span'), a = document.createElement('span');
+  const s = new Date(t);
+  li.className = 't-' + (GUNLUK_TIP[tur] || (hediye ? 'h' : 'o'));
+  zm.className = 'zm';
+  zm.textContent = ikiHane(s.getHours()) + ':' + ikiHane(s.getMinutes()) + ':' + ikiHane(s.getSeconds());
+  tp.className = 'tur';
+  tp.textContent = tur;
+  ic.className = 'icerik';
+  a.className = 'ad';
+  a.textContent = String(ad);
+  ic.append(a);
+  if (metin) {
+    const m = document.createElement('span');
+    m.className = 'metin';
+    m.textContent = kisalt(String(metin), 80);
+    ic.append(m);
+  }
+  li.append(zm, tp, ic);
+  if (id) {
+    li.dataset.id = id;
+    li.classList.toggle('gizli', modKume.gizli.has(id));
+    li.classList.toggle('cikan', modKume.cikan.has(id));
+    const e = document.createElement('span');
+    e.className = 'eylem';
+    for (const [sinif, yazi, etiket] of [['g-gizle', 'Gizle', 'Adını gizle: '], ['g-cikar tehlike', 'Çıkar', 'Sahneden çıkar: ']]) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'mini ' + sinif;
+      b.textContent = yazi;
+      b.setAttribute('aria-label', etiket + ad);
+      e.append(b);
+    }
+    li.append(e);
+  }
+  return li;
+}
 function gunlukYaz() {
+  const dur = $('akis-dur');
+  if (gunlukDur) {
+    if (gunlukYeni) {
+      dur.hidden = false;
+      dur.textContent = 'Durdu · ' + (gunlukYeni > 40 ? '40+' : gunlukYeni) + ' yeni';
+    }
+    return;
+  }
+  if (!dur.hidden)
+    dur.hidden = true;
+  gunlukYeni = 0;
   if (!gunlukBekleyen.length)
     return;
-  const ul = $('gunluk');
-  for (const [tur, ad, metin, hediye] of gunlukBekleyen) {
-    const li = document.createElement('li'), t = document.createElement('span');
-    t.className = 'tur' + (hediye ? ' h' : '');
-    t.textContent = tur;
-    li.append(t, ad + (metin ? ': ' + kisalt(String(metin), 80) : ''));
-    ul.append(li);
-  }
+  const ul = $('gunluk'), parca = document.createDocumentFragment();
+  for (const g of gunlukBekleyen)
+    parca.prepend(gunlukSatir(...g));
+  ul.prepend(parca);
   gunlukBekleyen.length = 0;
   while (ul.children.length > 40)
-    ul.firstChild.remove();
-  ul.scrollTop = ul.scrollHeight;
+    ul.lastChild.remove();
+  ul.scrollTop = 0;
 }

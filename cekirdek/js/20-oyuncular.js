@@ -46,7 +46,14 @@ function karakterYap(id, ad) {
 const calgi = { dumP: 0, tekP: 0, perde: 3 };
 
 const temiz = s => String(s == null ? '' : s).replace(/[\u0000-\u001f\u007f​-‏‪-‮⁦-⁩]/g, ' ').replace(/\s+/g, ' ').trim();
-const ayar = { balon: true, yasak: [] };
+// balon: konuşma balonları açık mı · yasak: gizlenecek kelimeler · gizli / cikan: yayıncının panelden adını
+// gizlediği ve sahneden çıkardığı izleyiciler ({ id, ad }). Hepsi tarayıcıda saklanır (ayarOku / ayarYaz).
+const ayar = { balon: true, yasak: [], gizli: [], cikan: [] };
+const modKume = { gizli: new Set(), cikan: new Set() };
+function modKur() { modKume.gizli = new Set(ayar.gizli.map(x => x.id)); modKume.cikan = new Set(ayar.cikan.map(x => x.id)); }
+function balonlariSil(f) { for (const k of D.oy.values())
+  if (k.balon && (!f || f(k)))
+    k.balon = null; }
 const yasakVar = m => { const k = m.toLocaleLowerCase('tr'); return ayar.yasak.some(y => k.includes(y)); };
 const balonMetni = m => yasakVar(m) ? '' : m.replace(/(https?:\/\/|www\.)\S+/gi, '…').replace(/\d[\d\s().+-]{6,}\d/g, '…');
 const kisalt = (s, n) => { const a = Array.from(s); return a.length > n ? a.slice(0, n - 1).join('') + '…' : s; };
@@ -95,8 +102,11 @@ function olay(o) {
   const kim = o.kullanici || {}, id = temiz(kim.id || kim.ad).slice(0, 64);
   if (!id)
     return;
+  // Yayıncının sahneden çıkardığı izleyicinin hiçbir olayı oyuna işlenmez (panelden geri alınana kadar).
+  if (modKume.cikan.has(id))
+    return;
   let ad = kisalt(temiz(kim.ad || kim.id), 18);
-  if (yasakVar(ad))
+  if (yasakVar(ad) || modKume.gizli.has(id))
     ad = 'misafir';
   if (o.tip === 'yorum') {
     const m = temiz(o.metin).slice(0, 200), b = ayar.balon ? balonMetni(m) : '';
@@ -106,7 +116,7 @@ function olay(o) {
       if (b)
         k.balon = { m: kisalt(b, 30), t0: zaman };
     }
-    gunluk('yorum', ad, m);
+    gunluk('yorum', ad, m, false, id);
   }
   else if (o.tip === 'begeni') {
     const n = clamp(Math.round(o.adet) || 1, 1, 500);
@@ -116,7 +126,7 @@ function olay(o) {
     if (k)
       k.son = zaman;
     kalpAt(n);
-    gunluk('beğeni', ad, '×' + n);
+    gunluk('beğeni', ad, '×' + n, false, id);
   }
   else if (o.tip === 'takip') {
     const k = katil(id, ad, false);
@@ -125,14 +135,14 @@ function olay(o) {
       k.yeni = zaman;
     }
     bildir(ad, 'takip etti, hoş geldin');
-    gunluk('takip', ad, '');
+    gunluk('takip', ad, '', false, id);
   }
   else if (o.tip === 'paylasim') {
     D.cosku = Math.min(1, D.cosku + 0.05);
-    gunluk('paylaşım', ad, '');
+    gunluk('paylaşım', ad, '', false, id);
   }
   else if (o.tip === 'katilim') {
-    gunluk('geldi', ad, '');
+    gunluk('geldi', ad, '', false, id);
   }
   else if (o.tip === 'hediye') {
     const j = clamp(Math.round((+o.jeton || 1) * (+o.adet || 1)), 1, 1e7), onceki = D.lider;
@@ -148,7 +158,7 @@ function olay(o) {
     k.zip1 = k.zip0 + 4;
     bildir(ad, j + ' jeton', kd.ad + '!');
     muzik.zil(Math.min(1, j / 200));
-    gunluk('hediye', ad, j + ' jeton → ' + kd.ad, true);
+    gunluk('hediye', ad, j + ' jeton → ' + kd.ad, true, id);
     oyunHediye(k, j, kd);
     siraGuncelle();
     if (onceki && D.lider !== onceki)

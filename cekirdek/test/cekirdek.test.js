@@ -121,6 +121,72 @@ const { sonuc, kontrol } = kontrolcu();
   kontrol('Bağlantı adresi ve telefon balonda gizlenir', !/https|www|ornek|0555|123/.test(suz.link[1] + suz.tel[1]), [suz.link[1], suz.tel[1]]);
   kontrol('Balonlar kapatılınca yorum balonu çıkmaz ama kişi oyuna girer', suz.kapali[0] === 'iyi6' && !suz.kapali[1], suz.kapali);
 
+  // ---------- YAYIN MASASI: durum şeridi, sahneden çıkar, adını gizle, balon kapatma ----------
+  await bosalt();
+  await p.evaluate(() => {
+    CanliOyun.olay({ tip: 'yorum', kullanici: { id: 'm1', ad: 'Mert' }, metin: 'selam' });
+    CanliOyun.olay({ tip: 'hediye', kullanici: { id: 'm2', ad: 'Lale' }, jeton: 40 });
+    CanliOyun.olay({ tip: 'yorum', kullanici: { id: 'm3', ad: 'kotu_ad' }, metin: 'yasak slogan' });
+    CanliOyun.olay({ tip: 'hediye', kullanici: { id: 'm1', ad: 'Mert' }, jeton: 5 });
+  });
+  await p.waitForTimeout(450);
+  const ms = await p.evaluate(() => { const t = id => document.getElementById(id).textContent; return { kisi: t('d-kisi'), jeton: t('d-jeton'), lider: t('d-lider'), bag: t('d-bag'), kare: t('d-kare'), satir: [...document.querySelectorAll('#kisi-liste li[data-id]')].map(li => li.dataset.id + ':' + li.querySelector('.ad').textContent), sekmeGizli: document.getElementById('bolum-deneme').hidden === false && document.getElementById('bolum-yayin').hidden === true }; });
+  kontrol('Durum şeridi: kişi sayısı, toplam jeton, lider ve bağlantı canlı yazar', ms.kisi === '3' && ms.jeton === '45' && ms.lider === 'Lale' && ms.bag === 'Deneme' && /\d/.test(ms.kare), ms);
+  kontrol('Sahnedekiler listesi jetona göre sıralı', ms.satir.join(',') === 'm2:Lale,m1:Mert,m3:kotu_ad', ms.satir);
+  const mod = await p.evaluate(async () => {
+    const T = CanliOyun._test, bekle = ms2 => new Promise(r => setTimeout(r, ms2)), satir = id => [...document.querySelectorAll('#kisi-liste li')].find(li => li.dataset.id === id);
+    const r = {};
+    // adını gizle: sıralamadaki düğmeyle
+    r.balonVardi = !!T.D.oy.get('m3').balon;
+    satir('m3').querySelector('.k-gizle').click();
+    r.gizliAd = T.D.oy.get('m3').ad; r.gizliBalon = T.D.oy.get('m3').balon;
+    CanliOyun.olay({ tip: 'yorum', kullanici: { id: 'm3', ad: 'kotu_ad' }, metin: 'yine ben' });
+    r.gizliKalir = T.D.oy.get('m3').ad;
+    r.sakli = JSON.parse(localStorage.getItem(T.OYUN.id + '-ayar') || '{}');
+    // sahneden çıkar: lider çıkınca lider değişir, çıkan hediye atsa da geri gelmez
+    satir('m2').querySelector('.k-cikar').click();
+    await bekle(30);
+    r.cikinca = CanliOyun.durum();
+    CanliOyun.olay({ tip: 'hediye', kullanici: { id: 'm2', ad: 'Lale' }, jeton: 500 });
+    CanliOyun.olay({ tip: 'yorum', kullanici: { id: 'm2', ad: 'Lale' }, metin: 'geri geldim' });
+    r.donmedi = CanliOyun.durum();
+    // olay akışından çıkar
+    await bekle(250);
+    const akis = [...document.getElementById('gunluk').children].find(li => li.dataset.id === 'm1');
+    r.akisSatir = !!akis;
+    if (akis) akis.querySelector('.g-cikar').click();
+    await bekle(30);
+    r.akistanCikti = CanliOyun.durum();
+    await bekle(300);
+    r.modListe = document.getElementById('mod-liste').querySelectorAll('li[data-id]').length;
+    r.ozet = document.getElementById('mod-ozet').textContent;
+    // geri al: Yayın sekmesindeki listeden
+    const geri = id => [...document.getElementById('mod-liste').children].find(li => li.dataset.id === id).querySelector('button').click();
+    geri('m2');
+    CanliOyun.olay({ tip: 'yorum', kullanici: { id: 'm2', ad: 'Lale' }, metin: 'döndüm' });
+    r.geriGeldi = CanliOyun.durum().sira.some(x => x[0] === 'Lale');
+    geri('m3');
+    r.adGeri = T.D.oy.get('m3').ad;
+    document.getElementById('mod-temizle').click();
+    r.temiz = T.ayar.gizli.length + T.ayar.cikan.length;
+    // balonu kapatınca ekrandaki balonlar da hemen gider; B tuşu aynı işi yapar
+    CanliOyun.olay({ tip: 'yorum', kullanici: { id: 'm4', ad: 'Balon' }, metin: 'görünür' });
+    r.balonOnce = !!T.D.oy.get('m4').balon;
+    document.getElementById('balon-dugme').click();
+    r.balonSonra = T.D.oy.get('m4').balon; r.balonAyar = T.ayar.balon;
+    document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'b', bubbles: true }));
+    r.tusla = T.ayar.balon;
+    document.getElementById('yasak').dispatchEvent(new KeyboardEvent('keydown', { key: 'b', bubbles: true }));
+    r.yazarken = T.ayar.balon;
+    return r;
+  });
+  kontrol('Adını gizle: ad hemen "misafir" olur, balonu silinir, sonraki yorumda da gizli kalır, saklanır', mod.balonVardi && mod.gizliAd === 'misafir' && !mod.gizliBalon && mod.gizliKalir === 'misafir' && (mod.sakli.gizli || []).some(x => x.id === 'm3' && x.ad === 'kotu_ad'), mod);
+  kontrol('Sahneden çıkar: lider çıkar, yeni lider gelir; çıkanın hediyesi ve yorumu onu geri getirmez', !mod.cikinca.sira.some(x => x[0] === 'Lale') && mod.cikinca.lider === 'Mert' && !mod.donmedi.sira.some(x => x[0] === 'Lale') && mod.donmedi.kisi === 2, { cikinca: mod.cikinca.sira, sonra: mod.donmedi.sira });
+  kontrol('Olay akışındaki satırdan da çıkarılır; çıkarılanlar listesi ve özeti güncellenir', mod.akisSatir && !mod.akistanCikti.sira.some(x => x[0] === 'Mert') && mod.modListe === 3 && /2 çıkarılan · 1 gizli/.test(mod.ozet), { akis: mod.akisSatir, sira: mod.akistanCikti.sira, liste: mod.modListe, ozet: mod.ozet });
+  kontrol('Geri al: çıkarılan yeniden girebilir, gizlenenin adı döner, liste boşalır', mod.geriGeldi && mod.adGeri === 'kotu_ad' && mod.temiz === 0, { geri: mod.geriGeldi, ad: mod.adGeri, kalan: mod.temiz });
+  kontrol('Balonlar kapatılınca ekrandaki balon hemen silinir; B tuşu aç/kapa, yazı alanında çalışmaz', mod.balonOnce && !mod.balonSonra && mod.balonAyar === false && mod.tusla === true && mod.yazarken === true, { once: mod.balonOnce, sonra: mod.balonSonra, tus: mod.tusla, yazarken: mod.yazarken });
+  kontrol('Sekmeler: açılışta Deneme görünür, diğer sekmeler gizli', ms.sekmeGizli);
+
   // köprü ileti çevirisi (sayfa tarafı)
   const cv = await p.evaluate(() => { const c = CanliOyun.cevir; return {
     v1chat: c({ event: 'chat', data: { uniqueId: 'a', nickname: 'A', comment: 'selam' } }),

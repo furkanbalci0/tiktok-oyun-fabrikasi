@@ -1,11 +1,23 @@
-/* PANEL VE AÇILIŞ — sayfa yazıları, deneme panelinin düğmeleri, sahnenin boyutlandırılması, oyunun başlatılması.
+/* PANEL VE AÇILIŞ — sayfa yazıları, yayın masası (panel), sahnenin boyutlandırılması, oyunun başlatılması.
  * sayfaYaz: logo, nasıl oynanır, başlıklar, kademe tablosu ve tema renkleri OYUN'dan · boyutla: sahneyi 9:16 tutar
  * yayinModu: yalnız sahne görünümü (#yayin) · baslat: tohum kalabalığı kurar, oyunBaslat(kayit) çağırır, döngüyü açar
+ * masaYaz: durum şeridi ve sahnedekiler listesi (250 ms'de bir; yayın görünümünde çalışmaz)
+ * izleyiciGizle / izleyiciCikar (+ geri alma): yayıncının hızlı eylemleri; kimliğe göre, ayarla birlikte saklanır
  * window.CanliOyun: dışarıya açık arayüz (olay, baglan, kes, cevir, durum, _test). Testler bunu kullanır.
  * Açılış bütün parçalar çalıştıktan sonra (mikro görevde) yapılır: oyunun üst düzey const'ları kancalarda hazırdır.
  */
 const KANCA_DURUM = typeof oyunDurum === 'function' ? oyunDurum : null;
-function otoAyarla(v) { oto = v; const b = $('oto'); b.textContent = 'Otomatik izleyici: ' + (v ? 'açık' : 'kapalı'); b.classList.toggle('secili', v); b.setAttribute('aria-pressed', v); }
+// Aç / kapa düğmesi: görünen ad + küçük durum yazısı (ekran okuyucu durumu aria-pressed'den alır).
+function anahtarYaz(id, on, ad) {
+  const b = $(id), d = document.createElement('span');
+  d.className = 'durum';
+  d.setAttribute('aria-hidden', 'true');
+  d.textContent = on ? 'açık' : 'kapalı';
+  b.textContent = ad + ' ';
+  b.append(d);
+  b.setAttribute('aria-pressed', on);
+}
+function otoAyarla(v) { oto = v; anahtarYaz('oto', v, 'Otomatik izleyici'); }
 async function sesDegistir(ac) {
   if (ac) {
     const ok = await muzik.sesAc();
@@ -19,7 +31,7 @@ async function sesDegistir(ac) {
   $('ses-cagri').hidden = muzik.acik;
 }
 function boyutla() {
-  const yayin = document.body.classList.contains('yayin'), dar = innerWidth <= 820, kok = document.documentElement, s = $('sahne');
+  const yayin = document.body.classList.contains('yayin'), dar = innerWidth <= 900, kok = document.documentElement, s = $('sahne');
   const cs = getComputedStyle(kok), yukH = kok.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
   let w;
   if (yayin)
@@ -41,13 +53,17 @@ function yayinModu(v) { document.body.classList.toggle('yayin', v); try {
   if ((location.hash === '#yayin') !== v)
     history.replaceState(null, '', v ? '#yayin' : location.pathname + location.search);
 }
-catch (e) { } boyutla(); }
+catch (e) { } boyutla(); if (!v)
+  masaYaz(); }
 
 // Sayfadaki oyuna özgü her yazı OYUN'dan gelir (hepsi textContent; HTML yazılmaz).
 function sayfaYaz() {
   const kok = document.documentElement.style;
   for (const [ad, css] of [['zemin', '--zemin'], ['zemin2', '--zemin-2'], ['zemin3', '--zemin-3'], ['cizgi', '--cizgi'], ['vurgu', '--vurgu'], ['sicak', '--sicak'], ['serin', '--serin'], ['acik', '--acik'], ['soluk', '--soluk'], ['murekkep', '--murekkep']])
     kok.setProperty(css, RENK[ad]);
+  // panelin yarı saydam tonları da temadan türetilir
+  for (const [ad, css, a] of [['vurgu', '--vurgu-a', 0.13], ['sicak', '--sicak-a', 0.17], ['sicak', '--sicak-b', 0.42], ['serin', '--serin-a', 0.16], ['acik', '--acik-a', 0.05], ['acik', '--acik-b', 0.1], ['murekkep', '--murekkep-a', 0.55]])
+    kok.setProperty(css, renkSaydam(RENK[ad], a));
   const y = OYUN.yazi, logo = $('logo'), lp = [].concat(OYUN.logo || OYUN.ad || '').map(String);
   logo.textContent = '';
   logo.append(lp[0] + (lp.length > 1 ? ' ' : ''));
@@ -63,6 +79,7 @@ function sayfaYaz() {
     else
       s.hidden = true;
   }
+  $('masa-oyun').textContent = String(OYUN.ad || '');
   $('sira-baslik').textContent = y.sira;
   $('gosterge-baslik').textContent = y.gosterge;
   $('ses-cagri').textContent = y.ses;
@@ -72,14 +89,257 @@ function sayfaYaz() {
   $('bosalt').textContent = y.bosalt;
   // kademe tablosu: küçükten büyüğe
   const tablo = $('kademe-tablo');
-  for (const kd of [...KADEME].reverse()) {
-    const tr = document.createElement('tr'), a = document.createElement('td'), b = document.createElement('td');
-    a.textContent = kd.min + '+ jeton';
-    b.textContent = kd.etki || kd.ad;
-    tr.append(a, b);
+  [...KADEME].reverse().forEach((kd, i) => {
+    const tr = document.createElement('tr');
+    tr.style.setProperty('--kd', kademeRenk(i));
+    for (const yazi of [kd.min + '+', kd.ad, kd.etki || '']) {
+      const td = document.createElement('td');
+      td.textContent = yazi;
+      tr.append(td);
+    }
     tablo.append(tr);
+  });
+}
+// Kademenin paneldeki rengi (i: küçükten büyüğe sırası): en küçüğü serin, ortası vurgu, en büyüğü sıcak.
+function kademeRenk(i) { const t = KADEME.length > 1 ? i / (KADEME.length - 1) : 1; return 'var(--' + (t < 0.34 ? 'serin' : t < 0.75 ? 'vurgu' : 'sicak') + ')'; }
+
+/* ---- yayın masası: durum şeridi, sahnedekiler, yayıncının hızlı eylemleri ---- */
+const KISI_SINIR = 12; // listede en çok kaç satır (gerisi aramayla bulunur): sayfa öğeleri kalabalıkla şişmesin
+const sayi = n => Math.round(n).toLocaleString('tr-TR');
+const yaz = (id, v) => { const e = $(id); v = String(v); if (e.textContent !== v)
+  e.textContent = v; };
+function durumAl() {
+  const ws = Yayin.ws;
+  if (ws && ws.readyState === 1)
+    return ['canli', 'Canlı', sayi(Yayin.alinan) + ' olay alındı'];
+  if (ws)
+    return ['bekliyor', 'Bağlanıyor', 'köprü aranıyor'];
+  if (Yayin.surekli)
+    return ['koptu', 'Koptu', 'yeniden deniyor'];
+  if ($('bag-rozet').classList.contains('hata'))
+    return ['koptu', 'Bağlanamadı', 'Yayın sekmesine bak'];
+  return ['deneme', 'Deneme', oto ? 'sahte izleyici açık' : 'sahte izleyici kapalı'];
+}
+function masaYaz() {
+  if (document.body.classList.contains('yayin'))
+    return;
+  const [bag, bagAd, bagAlt] = durumAl(), hucre = $('d-bag-hucre');
+  if (hucre.dataset.durum !== bag)
+    hucre.dataset.durum = bag;
+  yaz('d-bag', bagAd);
+  yaz('d-bag-alt', bagAlt);
+  let top = 0;
+  for (const k of D.sira)
+    top += k.jeton;
+  yaz('d-kisi', D.sira.length);
+  yaz('d-kisi-alt', 'en çok ' + MAKS);
+  yaz('d-jeton', sayi(top));
+  yaz('d-lider', D.lider ? D.lider.ad : '-');
+  yaz('d-lider-alt', D.lider ? sayi(D.lider.jeton) + ' jeton' : 'henüz kimse yok');
+  yaz('d-bpm', Math.round(muzik.calanBpm()));
+  yaz('d-hava', muzik.calanAd());
+  const ms = D.kareMs || 0;
+  yaz('d-kare', ms ? ms.toFixed(1) : '-');
+  $('d-kare-hucre').dataset.durum = ms > 33 ? 'kotu' : ms > 22 ? 'agir' : 'iyi';
+  kisilerYaz();
+}
+const kisiSatirlar = new Map();
+let kisiImza = '', modSurum = 0;
+const gizliAd = id => { const g = ayar.gizli.find(x => x.id === id); return g ? g.ad : ''; };
+function kisiSatirYap(id) {
+  const li = document.createElement('li'), e = document.createElement('span');
+  li.dataset.id = id;
+  for (const s of ['no', 'ad', 'jt']) {
+    const x = document.createElement('span');
+    x.className = s;
+    li.append(x);
+  }
+  e.className = 'eylem';
+  for (const s of ['k-gizle', 'k-cikar tehlike']) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'mini ' + s;
+    e.append(b);
+  }
+  li.append(e);
+  return li;
+}
+function kisiSatirDoldur(li, k) {
+  const [no, ad, jt, e] = li.children, gizli = modKume.gizli.has(k.id), asil = gizli ? gizliAd(k.id) || k.ad : k.ad;
+  no.textContent = k.sn + 1;
+  ad.textContent = k.ad;
+  ad.title = gizli ? asil : k.ad;
+  jt.textContent = sayi(k.jeton);
+  jt.classList.toggle('sifir', !k.jeton);
+  li.classList.toggle('bas', k === D.lider);
+  li.classList.toggle('gizli', gizli);
+  const [bg, bc] = e.children;
+  bg.textContent = gizli ? 'Göster' : 'Gizle';
+  bg.setAttribute('aria-label', (gizli ? 'Adını yeniden göster: ' : 'Adını gizle: ') + asil);
+  bc.textContent = 'Çıkar';
+  bc.setAttribute('aria-label', 'Sahneden çıkar: ' + asil);
+}
+function kisilerYaz() {
+  const ol = $('kisi-liste'), ara = temiz($('kisi-ara').value).toLocaleLowerCase('tr');
+  const uyan = ara ? D.sira.filter(k => (k.ad + ' ' + k.id + ' ' + gizliAd(k.id)).toLocaleLowerCase('tr').includes(ara)) : D.sira;
+  const liste = uyan.slice(0, KISI_SINIR);
+  const imza = ara + '#' + modSurum + '#' + (D.lider && D.lider.id) + '#' + liste.map(k => k.id + ':' + k.jeton + ':' + k.ad + ':' + k.sn).join('|');
+  if (imza === kisiImza)
+    return;
+  kisiImza = imza;
+  const odak = ol.contains(document.activeElement) ? document.activeElement : null, kalan = new Set(liste.map(k => k.id));
+  for (const [id, li] of kisiSatirlar)
+    if (!kalan.has(id)) {
+      li.remove();
+      kisiSatirlar.delete(id);
+    }
+  const bos = ol.querySelector('.bos-satir');
+  if (bos)
+    bos.remove();
+  liste.forEach((k, i) => {
+    let li = kisiSatirlar.get(k.id);
+    if (!li) {
+      li = kisiSatirYap(k.id);
+      kisiSatirlar.set(k.id, li);
+    }
+    kisiSatirDoldur(li, k);
+    if (ol.children[i] !== li)
+      ol.insertBefore(li, ol.children[i] || null);
+  });
+  if (odak && odak !== document.activeElement && ol.contains(odak))
+    odak.focus();
+  if (!liste.length) {
+    const li = document.createElement('li');
+    li.className = 'bos-satir';
+    li.textContent = ara ? 'Bu adla sahnede kimse yok.' : OYUN.yazi.bos;
+    ol.append(li);
+  }
+  yaz('kisi-not', uyan.length > liste.length ? 'İlk ' + liste.length + ' kişi görünüyor, ' + (uyan.length - liste.length) + ' kişi daha var. Başkasını bulmak için adını ara.' : '');
+}
+// Yayıncının çıkardığı / adını gizlediği kişiler listesi (Yayın sekmesi) ve güvenlik şeridindeki özet.
+function modYaz() {
+  modSurum++;
+  const ul = $('mod-liste');
+  ul.textContent = '';
+  const satirlar = [...ayar.cikan.map(x => [x, 'cikan']), ...ayar.gizli.map(x => [x, 'gizli'])];
+  for (const [x, tur] of satirlar) {
+    const li = document.createElement('li'), a = document.createElement('span'), n = document.createElement('span'), b = document.createElement('button');
+    li.dataset.id = x.id;
+    li.dataset.tur = tur;
+    a.className = 'ad';
+    a.textContent = x.ad;
+    a.title = x.id;
+    n.className = 'ne' + (tur === 'cikan' ? ' cik' : '');
+    n.textContent = tur === 'cikan' ? 'sahneden çıkarıldı' : 'adı gizli';
+    b.type = 'button';
+    b.className = 'mini';
+    b.textContent = 'Geri al';
+    b.setAttribute('aria-label', 'Geri al: ' + x.ad + (tur === 'cikan' ? ', sahneye yeniden girebilir' : ', adı yeniden görünür'));
+    li.append(a, n, b);
+    ul.append(li);
+  }
+  if (!satirlar.length) {
+    const li = document.createElement('li');
+    li.className = 'bos';
+    li.textContent = 'Kimse yok. Sahnedekiler listesinde ya da olay akışında bir adın üstüne gelince çıkan Gizle ve Çıkar düğmeleriyle eklenir.';
+    ul.append(li);
+  }
+  $('mod-temizle').hidden = !satirlar.length;
+  const c = ayar.cikan.length, g = ayar.gizli.length;
+  yaz('mod-ozet', c || g ? c + ' çıkarılan · ' + g + ' gizli' : 'kimse yok');
+  $('mod-ac').classList.toggle('dolu', !!(c || g));
+  for (const li of $('gunluk').children)
+    if (li.dataset.id) {
+      li.classList.toggle('gizli', modKume.gizli.has(li.dataset.id));
+      li.classList.toggle('cikan', modKume.cikan.has(li.dataset.id));
+    }
+  kisiImza = '';
+  masaYaz();
+}
+function modDegisti() { modKur(); ayarYaz(); modYaz(); }
+// Adını gizle: ad "misafir" olur ve öyle kalır (yasaklı kelimeli adla aynı yol). Konuşma balonu hemen silinir.
+function izleyiciGizle(id, ad) {
+  if (!id || modKume.gizli.has(id))
+    return;
+  const k = D.oy.get(id);
+  ad = String((k && k.ad !== 'misafir' ? k.ad : ad) || id).slice(0, 64);
+  ayar.gizli.push({ id, ad });
+  if (ayar.gizli.length > 300)
+    ayar.gizli.shift();
+  if (k) {
+    k.ad = 'misafir';
+    k.balon = null;
+    D.siraKirli = true;
+  }
+  gunluk('gizlendi', ad, 'adı artık misafir yazılır');
+  modDegisti();
+}
+function izleyiciGoster(id) {
+  const i = ayar.gizli.findIndex(x => x.id === id);
+  if (i < 0)
+    return;
+  const g = ayar.gizli.splice(i, 1)[0], k = D.oy.get(id);
+  if (k && k.ad === 'misafir' && !yasakVar(g.ad)) {
+    k.ad = kisalt(g.ad, 18);
+    D.siraKirli = true;
+  }
+  gunluk('geri alındı', g.ad, 'adı yeniden görünür');
+  modDegisti();
+}
+// Sahneden çıkar: cikar(k) ile gider ve geri alınana kadar olayları oyuna işlenmez. Lider çıkarsa rol devredilir.
+function izleyiciCikar(id, ad) {
+  if (!id || modKume.cikan.has(id))
+    return;
+  const k = D.oy.get(id);
+  ad = String(gizliAd(id) || (k ? k.ad : ad) || id).slice(0, 64);
+  ayar.cikan.push({ id, ad });
+  if (ayar.cikan.length > 300)
+    ayar.cikan.shift();
+  if (k && !k.cikiyor) {
+    const eski = D.lider;
+    k.balon = null;
+    cikar(k);
+    if (eski === k && D.lider)
+      oyunLiderDegisti(eski, D.lider);
+  }
+  gunluk('çıkarıldı', ad, 'olayları oyuna işlenmez');
+  modDegisti();
+}
+function izleyiciGeriAl(id) {
+  const i = ayar.cikan.findIndex(x => x.id === id);
+  if (i < 0)
+    return;
+  const c = ayar.cikan.splice(i, 1)[0];
+  gunluk('geri alındı', c.ad, 'yeniden oyuna girebilir');
+  modDegisti();
+}
+function balonAyarla(v) {
+  ayar.balon = v;
+  anahtarYaz('balon-dugme', v, 'Yorum balonları');
+  if (!v)
+    balonlariSil(); // kapatınca ekrandaki balonlar da hemen gider
+  ayarYaz();
+}
+// Yasaklı kelime eklenince (alan bırakılınca) sahnedeki eşleşen ad ve balonlar da hemen gizlenir.
+function yasakUygula() {
+  balonlariSil(k => yasakVar(k.balon.m));
+  for (const k of D.oy.values())
+    if (k.ad !== 'misafir' && yasakVar(k.ad)) {
+      k.ad = 'misafir';
+      D.siraKirli = true;
+    }
+}
+function sekmeSec(ad, odakla) {
+  for (const t of $('sekmeler').children) {
+    const on = t.dataset.sekme === ad;
+    t.setAttribute('aria-selected', on);
+    t.tabIndex = on ? 0 : -1;
+    $('bolum-' + t.dataset.sekme).hidden = !on;
+    if (on && odakla)
+      t.focus();
   }
 }
+const yaziAlani = e => e && (/^(INPUT|TEXTAREA|SELECT)$/.test(e.tagName) || e.isContentEditable);
 
 function baslat(kayit) {
   sayfaYaz();
@@ -93,19 +353,22 @@ function baslat(kayit) {
     b.onclick = () => { muzik.bekleyen = h; muzik.havaSure = 0; };
     $('hava-sec').append(b);
   });
-  for (const kd of [...KADEME].reverse()) {
+  [...KADEME].reverse().forEach((kd, i) => {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'dugme';
     b.id = 'h-' + kd.min;
-    const g = document.createElement('b');
-    g.textContent = kd.min + ' jeton';
+    b.style.setProperty('--kd', kademeRenk(i));
+    const g = document.createElement('b'), j = document.createElement('span');
+    j.textContent = 'jeton';
+    g.append(sayi(kd.min), j);
     const s = document.createElement('small');
     s.textContent = kd.ad;
     b.append(g, s);
+    b.title = kd.etki || kd.ad;
     b.onclick = () => { ilkDokunus(); olay({ tip: 'hediye', kullanici: sahteKim(), jeton: kd.min }); };
     $('hediyeler').append(b);
-  }
+  });
   HIZLAR.forEach((h, i) => {
     const b = document.createElement('button');
     b.type = 'button';
@@ -126,19 +389,84 @@ function baslat(kayit) {
   $('s-yorum').onclick = () => { ilkDokunus(); olay({ tip: 'yorum', kullanici: sahteKim(), metin: sec(SAHTE_YORUM) }); };
   $('s-begeni').onclick = () => { ilkDokunus(); olay({ tip: 'begeni', kullanici: sahteKim(), adet: 15 }); };
   $('s-takip').onclick = () => { ilkDokunus(); olay({ tip: 'takip', kullanici: sahteKim() }); };
+  otoAyarla(oto);
   $('oto').onclick = () => otoAyarla(!oto);
   // Boşalt: önce bütün oyuncular silinir, sonra oyun kendi durumunu sıfırlar (oyunBosalt), sonra sıra yeniden kurulur.
   $('bosalt').onclick = () => { D.oy.clear(); D.cosku = 0; siraImza = '?'; oyunBosalt(); siraGuncelle(); otoAyarla(false); try {
     localStorage.removeItem(SAKLA);
   }
-  catch (e) { } };
-  const dugmeYaz = (id, on, ad) => { const b = $(id); b.textContent = ad + (on ? 'açık' : 'kapalı'); b.classList.toggle('secili', on); b.setAttribute('aria-pressed', on); };
-  $('sirayla').onclick = () => { muzik.sirayla = !muzik.sirayla; dugmeYaz('sirayla', muzik.sirayla, 'Havaları sırayla çal: '); };
+  catch (e) { } masaYaz(); };
+  anahtarYaz('sirayla', muzik.sirayla, 'Havaları sırayla çal');
+  $('sirayla').onclick = () => { muzik.sirayla = !muzik.sirayla; anahtarYaz('sirayla', muzik.sirayla, 'Havaları sırayla çal'); };
+  // yayın güvenliği: balonlar, yasaklı kelimeler, çıkarılanlar
   ayarOku();
-  dugmeYaz('balon-dugme', ayar.balon, 'Yorum balonları: ');
+  anahtarYaz('balon-dugme', ayar.balon, 'Yorum balonları');
   $('yasak').value = ayar.yasak.join(', ');
-  $('balon-dugme').onclick = () => { ayar.balon = !ayar.balon; dugmeYaz('balon-dugme', ayar.balon, 'Yorum balonları: '); ayarYaz(); };
-  $('yasak').oninput = e => { ayar.yasak = e.target.value.split(',').map(x => x.trim().toLocaleLowerCase('tr')).filter(x => x.length > 1).slice(0, 200); ayarYaz(); };
+  const yasakSay = () => yaz('yasak-say', ayar.yasak.length ? ayar.yasak.length + ' kelime' : '');
+  yasakSay();
+  $('balon-dugme').onclick = () => balonAyarla(!ayar.balon);
+  $('yasak').oninput = e => { ayar.yasak = e.target.value.split(',').map(x => x.trim().toLocaleLowerCase('tr')).filter(x => x.length > 1).slice(0, 200); ayarYaz(); yasakSay(); };
+  $('yasak').onchange = yasakUygula;
+  $('mod-ac').onclick = () => { sekmeSec('yayin'); $('mod-grup').scrollIntoView({ block: 'nearest' }); const b = $('mod-liste').querySelector('button'); (b || $('sekme-yayin')).focus(); };
+  $('mod-liste').onclick = e => { const b = e.target.closest('button'), li = b && b.closest('li'); if (!li)
+    return; if (li.dataset.tur === 'cikan')
+    izleyiciGeriAl(li.dataset.id);
+  else
+    izleyiciGoster(li.dataset.id); const ilk = $('mod-liste').querySelector('button'); (ilk || $('mod-ac')).focus(); };
+  $('mod-temizle').onclick = () => { for (const x of [...ayar.gizli])
+    izleyiciGoster(x.id); for (const x of [...ayar.cikan])
+    izleyiciGeriAl(x.id); };
+  // Sahnedekiler ve olay akışındaki Gizle / Çıkar düğmeleri (tek dinleyici; satırlar sık yenilenir).
+  $('kisi-liste').onclick = e => {
+    const b = e.target.closest('button'), li = b && b.closest('li');
+    if (!li || !li.dataset.id)
+      return;
+    const id = li.dataset.id, sonraki = li.nextElementSibling || li.previousElementSibling;
+    if (b.classList.contains('k-cikar')) {
+      izleyiciCikar(id);
+      const yeni = sonraki && sonraki.isConnected && sonraki.querySelector('.k-cikar');
+      (yeni || $('kisi-ara')).focus();
+    }
+    else if (modKume.gizli.has(id))
+      izleyiciGoster(id);
+    else
+      izleyiciGizle(id);
+  };
+  $('kisi-ara').oninput = () => kisilerYaz();
+  $('gunluk').onclick = e => {
+    const b = e.target.closest('button'), li = b && b.closest('li');
+    if (!li || !li.dataset.id)
+      return;
+    const ad = li.querySelector('.ad').textContent;
+    if (b.classList.contains('g-cikar'))
+      izleyiciCikar(li.dataset.id, ad);
+    else
+      izleyiciGizle(li.dataset.id, ad);
+    // Fareyle basıldıysa odak bırakılır (yoksa akış durmuş kalır); klavyede gizlenen düğmeden listeye geçer.
+    if (e.detail)
+      b.blur();
+    else if (!b.offsetParent)
+      $('gunluk').focus();
+  };
+  // Fare ya da odak akıştayken satırlar kaymaz (25-yazilar.js: gunlukDur); çıkınca bekleyenler yazılır.
+  const akis = $('gunluk'), akisDur = () => { gunlukDur = akis.matches(':hover') || akis.contains(document.activeElement); };
+  akis.addEventListener('pointerenter', () => { gunlukDur = true; });
+  akis.addEventListener('pointerleave', () => setTimeout(akisDur, 0));
+  akis.addEventListener('focusin', () => { gunlukDur = true; });
+  akis.addEventListener('focusout', () => setTimeout(akisDur, 0));
+  // sekmeler: tıkla ya da ok tuşlarıyla gez
+  $('sekmeler').onclick = e => { const t = e.target.closest('[role=tab]'); if (t)
+    sekmeSec(t.dataset.sekme); };
+  $('sekmeler').onkeydown = e => {
+    const s = [...$('sekmeler').children], i = s.indexOf(document.activeElement);
+    if (i < 0)
+      return;
+    const j = e.key === 'ArrowRight' ? (i + 1) % s.length : e.key === 'ArrowLeft' ? (i + s.length - 1) % s.length : e.key === 'Home' ? 0 : e.key === 'End' ? s.length - 1 : -1;
+    if (j < 0)
+      return;
+    e.preventDefault();
+    sekmeSec(s[j].dataset.sekme, true);
+  };
   $('ses-dugme').onclick = () => { dokunuldu = true; sesDegistir(!muzik.acik); };
   $('ses-cagri').onclick = () => { dokunuldu = true; sesDegistir(true); };
   $('ses-duzey').oninput = e => muzik.duzeyAyarla(e.target.value / 100 * 0.7);
@@ -167,6 +495,7 @@ function baslat(kayit) {
       });
       $('hazir-kutu').hidden = false;
       $('hava-sec').hidden = true;
+      $('hava-grup').hidden = true;
       $('sirayla').parentElement.hidden = true;
       muzik.kaynakSec('hazir').then(kaynakYaz);
     };
@@ -174,8 +503,15 @@ function baslat(kayit) {
   }
   $('yayin-gor').onclick = () => yayinModu(true);
   $('cik-yayin').onclick = () => yayinModu(false);
-  addEventListener('keydown', e => { if (e.key === 'Escape' && document.body.classList.contains('yayin'))
-    yayinModu(false); });
+  addEventListener('keydown', e => {
+    if (e.key === 'Escape' && document.body.classList.contains('yayin'))
+      yayinModu(false);
+    // B: yorum balonlarını aç / kapa. Yalnız sahne görünümünde de çalışır (panel gizliyken tek yol budur).
+    else if ((e.key === 'b' || e.key === 'B') && !e.ctrlKey && !e.metaKey && !e.altKey && !e.repeat && !yaziAlani(e.target)) {
+      e.preventDefault();
+      balonAyarla(!ayar.balon);
+    }
+  });
   addEventListener('hashchange', () => yayinModu(location.hash === '#yayin'));
   $('bag-dugme').onclick = () => { if (Yayin.ws) {
     Yayin.kes();
@@ -187,9 +523,10 @@ function baslat(kayit) {
   if (window.ResizeObserver)
     new ResizeObserver(boyutla).observe(document.documentElement);
   // Başlangıç kalabalığı: sayfa boş açılmasın. Gerçek yayında sahte ad olmaz; saklanan sıra geri gelir.
+  // Yayıncının çıkardığı kişi geri gelmez, adını gizlediği kişi misafir yazılır.
   const eski = kayit && Array.isArray(kayit.oyuncular) ? kayit.oyuncular : KOPRU ? (siraOku() || []) : null;
   const tohum = eski || (OYUN.tohum || []).map(([ad, jeton]) => ({ id: 'sahte:' + ad, ad, jeton }));
-  tohum.forEach((t, i) => { const k = karakterYap(String(t.id), String(t.ad)); k.jeton = +t.jeton || 0; k.katilim = i * 0.001; D.oy.set(k.id, k); });
+  tohum.filter(t => !modKume.cikan.has(String(t.id))).forEach((t, i) => { const k = karakterYap(String(t.id), modKume.gizli.has(String(t.id)) ? 'misafir' : String(t.ad)); k.jeton = +t.jeton || 0; k.katilim = i * 0.001; D.oy.set(k.id, k); });
   siraImza = '?';
   siraGuncelle();
   oyunBaslat(kayit);
@@ -212,12 +549,16 @@ function baslat(kayit) {
     Yayin.surekli = true;
     Yayin.baglan(KOPRU);
     Yayin.surekli = true;
-    $('panel-not').textContent = 'Bu sayfayı köprü programı açtı. Yorum ve hediyeler gerçek yayından gelir. Aşağıdaki sahte izleyici düğmeleri yalnızca deneme içindir; yayın sırasında basma.';
+    $('panel-not').textContent = 'Bu sayfayı köprü programı açtı. Yorum ve hediyeler gerçek yayından gelir. Deneme sekmesindeki sahte izleyici düğmeleri yalnızca deneme içindir; yayın sırasında basma.';
+    $('deneme-uyari').hidden = false;
+    sekmeSec('yayin');
     setInterval(siraSakla, 5000);
   }
   if (KOPRU || location.hash === '#yayin')
     muzik.sesAc(true).then(ok => { if (ok)
       sesDegistir(true); });
+  modYaz();
+  setInterval(masaYaz, 250);
   requestAnimationFrame(t => { sonKare = t; kare(t); });
 }
 

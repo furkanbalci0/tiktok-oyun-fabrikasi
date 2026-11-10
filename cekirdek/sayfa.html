@@ -19,91 +19,149 @@
     </div>
   </div>
 
-  <div class="panel" id="panel">
-    <div>
-      <h1>Deneme paneli</h1>
-      <p class="not" id="panel-not">Yayın bağlı değil. Buradaki yorum, beğeni ve hediyelerin hepsi sahte izleyiciden gelir. Sahne, yayında izleyicinin göreceği görüntüdür.</p>
-    </div>
+  <div class="panel" id="panel" role="region" aria-label="Yayın masası">
+    <header class="masa-bas">
+      <div class="masa-ad">
+        <span class="masa-oyun" id="masa-oyun"></span>
+        <h1>Yayın masası</h1>
+      </div>
+      <p class="not" id="panel-not">Yayın bağlı değil. Yorum, beğeni ve hediyelerin hepsi sahte izleyiciden gelir. Soldaki sahne, yayında izleyicinin göreceği görüntüdür.</p>
+      <button class="dugme ana yayin-gor" id="yayin-gor" type="button">Yalnızca sahneyi göster<small>Esc ile panele dönülür</small></button>
+    </header>
 
-    <div class="bolum">
-      <h2>Sahte izleyici</h2>
-      <div class="alan">
-        <label for="sahte-ad">İzleyici adı (boş bırakırsan rastgele biri gelir)</label>
-        <input type="text" id="sahte-ad" maxlength="18" placeholder="örn. kendi adın" autocomplete="off">
-      </div>
-      <div class="satir">
-        <button class="dugme" id="s-yorum" type="button">Yorum yaz<small id="s-yorum-not">sahneye girer</small></button>
-        <button class="dugme" id="s-begeni" type="button">15 beğeni<small>coşku artar</small></button>
-        <button class="dugme" id="s-takip" type="button">Takip et<small id="s-takip-not">sahneye girer</small></button>
-      </div>
-      <span class="etiket">Hediye gönder</span>
-      <div class="hediyeler" id="hediyeler"></div>
-      <div class="satir">
-        <button class="dugme secili" id="oto" type="button" aria-pressed="true">Otomatik izleyici: açık</button>
-        <span class="etiket">Kalabalık</span>
-        <span class="satir" id="hiz-sec" role="group" aria-label="Kalabalık hızı"></span>
-      </div>
-      <div class="satir">
-        <button class="dugme" id="bosalt" type="button">Sahneyi boşalt</button>
-        <button class="dugme" id="yayin-gor" type="button">Yalnızca sahneyi göster</button>
-      </div>
-    </div>
+    <section class="durum-serit" aria-label="Canlı durum">
+      <div class="hucre bag" id="d-bag-hucre" data-durum="deneme"><span class="etk">Bağlantı</span><span class="deger" id="d-bag" aria-live="polite">Deneme</span><span class="alt" id="d-bag-alt"></span></div>
+      <div class="hucre"><span class="etk">Sahnede</span><span class="deger" id="d-kisi">0</span><span class="alt" id="d-kisi-alt"></span></div>
+      <div class="hucre"><span class="etk">Jeton</span><span class="deger" id="d-jeton">0</span><span class="alt">sahnedekiler</span></div>
+      <div class="hucre lider"><span class="etk">Lider</span><span class="deger" id="d-lider">-</span><span class="alt" id="d-lider-alt"></span></div>
+      <div class="hucre"><span class="etk">Vuruş/dk</span><span class="deger" id="d-bpm">-</span><span class="alt" id="d-hava"></span></div>
+      <div class="hucre kare" id="d-kare-hucre"><span class="etk">Kare</span><span class="deger" id="d-kare">-</span><span class="alt">ms, sınır 33</span></div>
+    </section>
 
-    <div class="bolum">
-      <h2>Müzik</h2>
-      <div class="satir">
-        <button class="dugme ana" id="ses-dugme" type="button">Sesi aç</button>
-        <input type="range" id="ses-duzey" min="0" max="100" value="86" aria-label="Ses düzeyi">
+    <section class="kalkan" aria-labelledby="kalkan-baslik">
+      <div class="kalkan-ad">
+        <h2 id="kalkan-baslik">Yayın güvenliği</h2>
+        <p>Adres ve telefon numarası balonda kendiliğinden gizlenir.</p>
       </div>
-      <div class="satir" id="hava-sec" role="group" aria-label="Hava seçimi"></div>
-      <div class="satir"><button class="dugme secili" id="sirayla" type="button" aria-pressed="true">Havaları sırayla çal: açık</button></div>
-      <div class="alan" id="hazir-kutu" hidden>
-        <span class="etiket">Parçalar (muzik klasöründen; sırayla çalar)</span>
-        <div class="satir" id="parca-sec" role="group" aria-label="Parça seçimi"></div>
+      <div class="kalkan-balon">
+        <button class="anahtar buyuk" id="balon-dugme" type="button" aria-pressed="true" aria-keyshortcuts="B">Yorum balonları</button>
+        <span class="kisayol"><kbd>B</kbd> tuşu da açar, kapatır</span>
       </div>
-    </div>
-
-    <div class="bolum">
-      <h2>Gelen olaylar</h2>
-      <ul class="gunluk" id="gunluk" aria-live="off"></ul>
-    </div>
-
-    <div class="bolum">
-      <h2>Yayın ayarları</h2>
-      <div class="satir"><button class="dugme secili" id="balon-dugme" type="button" aria-pressed="true">Yorum balonları: açık</button></div>
-      <div class="alan">
-        <label for="yasak">Balonlarda ve adlarda gizlenecek kelimeler (virgülle ayır)</label>
-        <input type="text" id="yasak" autocomplete="off" spellcheck="false" placeholder="örn. kelime1, kelime2">
+      <div class="alan yasak-alan">
+        <label for="yasak">Gizlenecek kelimeler <span class="sayac" id="yasak-say"></span></label>
+        <input type="text" id="yasak" autocomplete="off" spellcheck="false" placeholder="virgülle ayır: kelime1, kelime2">
       </div>
-      <p class="aciklama">Bağlantı adresleri ve telefon numarası gibi uzun rakam dizileri balonlarda kendiliğinden gizlenir.</p>
-    </div>
+      <button class="dugme mod-ac" id="mod-ac" type="button">Çıkarılanlar<small id="mod-ozet">kimse yok</small></button>
+    </section>
 
-    <div class="bolum">
-      <h2>Gerçek yayın bağlantısı</h2>
-      <div class="satir"><span class="rozet" id="bag-rozet">Bağlı değil</span></div>
-      <p class="aciklama">TikTok, canlı yayındaki yorum ve hediyeleri okumak için resmi bir açık API sunmuyor. Oyun bu yüzden TikTok'a doğrudan değil, bilgisayarında çalışan köprü programına bağlanır. Paketteki köprüyü çalıştırınca açılan sayfa kendiliğinden bağlanır. Köprü yayını yalnızca okur; şifre ya da hesap girişi istemez.</p>
-      <div class="satir">
-        <div class="alan">
-          <label for="bag-adres">Köprü adresi</label>
-          <input type="text" id="bag-adres" placeholder="ws://localhost:PORT" autocomplete="off" spellcheck="false">
+    <div class="masa-govde">
+      <section class="kart kisiler" aria-labelledby="kisiler-baslik">
+        <div class="kart-bas">
+          <h2 id="kisiler-baslik">Sahnedekiler</h2>
+          <input type="search" id="kisi-ara" placeholder="Ad ara" aria-label="Sahnedekiler arasında ad ara" autocomplete="off" spellcheck="false">
         </div>
-        <button class="dugme" id="bag-dugme" type="button">Bağlan</button>
-      </div>
-      <p class="aciklama" id="bag-ileti"></p>
-      <table>
-        <thead><tr><th>Hediye değeri</th><th>Sahnede olan</th></tr></thead>
-        <tbody id="kademe-tablo"></tbody>
-      </table>
-      <details>
-        <summary>Köprünün göndermesi gereken ileti biçimi</summary>
-        <pre>{"event":"chat","data":{"uniqueId":"ayse","nickname":"Ayşe","comment":"selam!"}}
+        <ol class="kisi-liste" id="kisi-liste" aria-label="Jetona göre sıra"></ol>
+        <p class="kart-not" id="kisi-not"></p>
+      </section>
+
+      <section class="kart akis" aria-labelledby="akis-baslik">
+        <div class="kart-bas">
+          <h2 id="akis-baslik">Olay akışı</h2>
+          <span class="akis-dur" id="akis-dur" hidden></span>
+          <span class="sayac akis-ipucu">en yenisi üstte</span>
+        </div>
+        <ul class="gunluk" id="gunluk" aria-live="off" tabindex="-1"></ul>
+      </section>
+
+      <section class="kart kontrol" aria-label="Masa bölümleri">
+        <div class="sekmeler" id="sekmeler" role="tablist" aria-label="Masa bölümleri">
+          <button type="button" role="tab" id="sekme-deneme" data-sekme="deneme" aria-controls="bolum-deneme" aria-selected="true">Deneme</button>
+          <button type="button" role="tab" id="sekme-yayin" data-sekme="yayin" aria-controls="bolum-yayin" aria-selected="false" tabindex="-1">Yayın</button>
+          <button type="button" role="tab" id="sekme-muzik" data-sekme="muzik" aria-controls="bolum-muzik" aria-selected="false" tabindex="-1">Müzik</button>
+          <button type="button" role="tab" id="sekme-kademe" data-sekme="kademe" aria-controls="bolum-kademe" aria-selected="false" tabindex="-1">Hediyeler</button>
+        </div>
+
+        <div class="sekme-icerik" role="tabpanel" id="bolum-deneme" aria-labelledby="sekme-deneme">
+          <p class="uyari" id="deneme-uyari" hidden>Yayın açık. Bu düğmeler sahte izleyici gönderir ve sahnede gerçek izleyicilerle karışır.</p>
+          <div class="alan">
+            <label for="sahte-ad">Sahte izleyicinin adı</label>
+            <input type="text" id="sahte-ad" maxlength="18" placeholder="boş bırakırsan rastgele biri gelir" autocomplete="off">
+          </div>
+          <div class="eylemler">
+            <button class="dugme karo" id="s-yorum" type="button">Yorum yaz<small id="s-yorum-not">sahneye girer</small></button>
+            <button class="dugme karo" id="s-begeni" type="button">15 beğeni<small>coşku artar</small></button>
+            <button class="dugme karo" id="s-takip" type="button">Takip et<small id="s-takip-not">sahneye girer</small></button>
+          </div>
+          <div class="grup">
+            <span class="etiket">Hediye gönder</span>
+            <div class="hediyeler" id="hediyeler"></div>
+          </div>
+          <div class="grup">
+            <span class="etiket">Otomatik kalabalık</span>
+            <div class="satir">
+              <button class="anahtar" id="oto" type="button" aria-pressed="true">Otomatik izleyici</button>
+              <span class="secim" id="hiz-sec" role="group" aria-label="Kalabalık hızı"></span>
+            </div>
+          </div>
+          <div class="satir son-satir"><button class="dugme tehlike" id="bosalt" type="button">Sahneyi boşalt</button></div>
+        </div>
+
+        <div class="sekme-icerik" role="tabpanel" id="bolum-yayin" aria-labelledby="sekme-yayin" hidden>
+          <div class="grup">
+            <span class="etiket">Köprü bağlantısı</span>
+            <div class="satir bag-satir">
+              <span class="rozet" id="bag-rozet">Bağlı değil</span>
+              <div class="alan">
+                <label for="bag-adres" class="gorunmez">Köprü adresi</label>
+                <input type="text" id="bag-adres" placeholder="ws://localhost:PORT" autocomplete="off" spellcheck="false">
+              </div>
+              <button class="dugme" id="bag-dugme" type="button">Bağlan</button>
+            </div>
+            <p class="aciklama ileti" id="bag-ileti"></p>
+          </div>
+          <div class="grup" id="mod-grup">
+            <span class="etiket" id="mod-baslik">Çıkarılanlar ve adı gizlenenler</span>
+            <ul class="mod-liste" id="mod-liste" aria-labelledby="mod-baslik"></ul>
+            <div class="satir"><button class="dugme" id="mod-temizle" type="button">Hepsini geri al</button></div>
+          </div>
+          <p class="aciklama">TikTok, canlı yayındaki yorum ve hediyeleri okumak için resmî bir açık API sunmuyor. Oyun bu yüzden bilgisayarında çalışan köprü programına bağlanır. Paketteki köprüyü çalıştırınca açılan sayfa kendiliğinden bağlanır. Köprü yayını yalnızca okur; şifre ya da hesap girişi istemez.</p>
+          <details>
+            <summary>Köprünün göndermesi gereken ileti biçimi</summary>
+            <pre>{"event":"chat","data":{"uniqueId":"ayse","nickname":"Ayşe","comment":"selam!"}}
 {"event":"gift","data":{"uniqueId":"ayse","nickname":"Ayşe","diamondCount":5,"repeatCount":3,"giftType":1,"repeatEnd":true}}
 {"event":"like","data":{"uniqueId":"ayse","nickname":"Ayşe","likeCount":15}}
 {"event":"follow","data":{"uniqueId":"ayse","nickname":"Ayşe"}}
 
 ya da doğrudan sayfadan:
 CanliOyun.olay({tip:"hediye", kullanici:{id:"ayse", ad:"Ayşe"}, jeton:50})</pre>
-      </details>
+          </details>
+        </div>
+
+        <div class="sekme-icerik" role="tabpanel" id="bolum-muzik" aria-labelledby="sekme-muzik" hidden>
+          <div class="satir ses-satir">
+            <button class="dugme ana" id="ses-dugme" type="button">Sesi aç</button>
+            <input type="range" id="ses-duzey" min="0" max="100" value="86" aria-label="Ses düzeyi">
+          </div>
+          <div class="grup" id="hava-grup">
+            <span class="etiket">Hava</span>
+            <div class="secim" id="hava-sec" role="group" aria-label="Hava seçimi"></div>
+          </div>
+          <div class="satir"><button class="anahtar" id="sirayla" type="button" aria-pressed="true">Havaları sırayla çal</button></div>
+          <div class="grup" id="hazir-kutu" hidden>
+            <span class="etiket">Parçalar (muzik klasöründen; sırayla çalar)</span>
+            <div class="secim" id="parca-sec" role="group" aria-label="Parça seçimi"></div>
+          </div>
+          <p class="aciklama">Tarayıcılar, sayfaya bir kez tıklanmadan ses çalmaya izin vermez. Müzik, coşku arttıkça hızlanır.</p>
+        </div>
+
+        <div class="sekme-icerik" role="tabpanel" id="bolum-kademe" aria-labelledby="sekme-kademe" tabindex="0" hidden>
+          <table class="kademe">
+            <thead><tr><th scope="col">Jeton</th><th scope="col">Kademe</th><th scope="col">Sahnede olan</th></tr></thead>
+            <tbody id="kademe-tablo"></tbody>
+          </table>
+          <p class="aciklama">Bir hediye, değerinin yettiği en büyük kademeyi tetikler. Art arda gönderilen seri hediyeler seri bitince bir kez sayılır.</p>
+        </div>
+      </section>
     </div>
   </div>
 </div>

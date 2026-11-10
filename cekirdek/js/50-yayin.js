@@ -1,7 +1,8 @@
 /* GERÇEK YAYIN BAĞLANTISI — köprü programına WebSocket ile bağlanır, iletileri olay(o)'ya çevirir.
  * KOPRU: sayfayı köprü açtıysa dolu gelir (kopru.js sayfaya window.OYUN_KOPRU yazar)
  * Yayin.cevir: dış ileti → oyun olayı · Yayin.baglan / kes · kopunca 3 sn'de bir yeniden dener
- * siraSakla / siraOku: jeton sıralamasını tarayıcıda 3 saat saklar · ayarOku / ayarYaz: balon ve süzgeç ayarı
+ * siraSakla / siraOku: jeton sıralamasını tarayıcıda 3 saat saklar · ayarOku / ayarYaz: balon, süzgeç ve
+ * yayıncının çıkardığı / adını gizlediği izleyiciler
  * Bu dosya TikTok'a doğrudan bağlanmaz ve hiçbir kimlik bilgisi tutmaz.
  */
 const KOPRU = typeof window.OYUN_KOPRU === 'string' ? window.OYUN_KOPRU : null; // sayfayı köprü programı açtıysa dolu gelir
@@ -116,14 +117,18 @@ function siraOku() { try {
 catch (e) {
   return null;
 } }
+// Saklanan çıkarılan / gizlenen kaydı: yalnız { id, ad } metinleri, en çok 300 kişi.
+const modKayit = a => Array.isArray(a) ? a.filter(x => x && typeof x.id === 'string' && x.id).slice(-300).map(x => ({ id: x.id.slice(0, 64), ad: String(x.ad || x.id).slice(0, 64) })) : [];
 function ayarOku() { try {
   const v = JSON.parse(localStorage.getItem(AYAR_SAKLA) || 'null');
   if (v) {
     ayar.balon = v.balon !== false;
     ayar.yasak = Array.isArray(v.yasak) ? v.yasak.filter(x => typeof x === 'string' && x) : [];
+    ayar.gizli = modKayit(v.gizli);
+    ayar.cikan = modKayit(v.cikan);
   }
 }
-catch (e) { } }
+catch (e) { } modKur(); }
 function ayarYaz() { try {
   localStorage.setItem(AYAR_SAKLA, JSON.stringify(ayar));
 }

@@ -21,12 +21,14 @@ Bu rehber, programcı olmayan bir yayıncı içindir. Elinde bir oyun paketi kla
 1. Paket klasöründeki `BASLAT.bat` dosyasına çift tıkla.
 2. İlk seferde gereken kütüphane iner. Bu bir kez olur, internet ister.
 3. Ekranda TikTok kullanıcı adın sorulur. Başında `@` olmadan yaz ve Enter'a bas.
-4. Oyun tarayıcıda açılır. Yayın açıksa yorumlar, beğeniler ve hediyeler oyuna akmaya başlar.
+4. Oyun tarayıcıda açılır. Solda sahne, sağda yayın masası (panel) vardır. Masanın en üstündeki şeritte Bağlantı
+   kutusu **Canlı** yazıyorsa yorumlar, beğeniler ve hediyeler oyuna akıyor demektir. Yanında kaç olay alındığı yazar.
 5. Sayfada bir kez herhangi bir yere tıkla ya da başlat düğmesine bas. Tarayıcılar, kullanıcı tıklamadan ses çalmaya izin vermez.
 
 ## TikTok LIVE Studio'ya ekleme
 
-1. Tarayıcıdaki adresin sonuna `#yayin` ekle ve Enter'a bas. Panel gizlenir, yalnızca sahne görünür.
+1. Masanın sağ üstündeki **Yalnızca sahneyi göster** düğmesine bas (ya da adresin sonuna `#yayin` ekleyip Enter'a
+   bas). Panel gizlenir, yalnızca sahne görünür. Panele dönmek için `Esc` tuşuna bas.
 2. LIVE Studio'da yeni bir kaynak ekle ve **pencere yakalama** seç.
 3. Listeden oyunun açık olduğu tarayıcı penceresini seç.
 4. Pencereyi yayın düzenindeki yerine yerleştir ve boyutlandır.
@@ -37,12 +39,24 @@ Yakalama sırasında tarayıcı penceresi küçültülmemeli. Küçültülmüş 
 
 ## Güvenlik
 
-İzleyicilerin yorumları ekranda yazıldığı gibi görünür. Kötü bir yorum doğrudan yayına çıkabilir. İki seçeneğin var, ikisi de oyunun panelinde:
+İzleyicilerin adları ve yorumları ekranda görünür. Kötü bir yorum ya da ad doğrudan yayına çıkabilir. Masadaki
+**Yayın güvenliği** şeridi ve listeler bunun içindir:
 
-- Konuşma balonlarını kapat. Yorumlar ekranda görünmez, yine de izleyiciyi oyuna sokar.
-- Yasaklı kelime listesini doldur. Listedeki kelimeleri içeren yorumlar gösterilmez.
+- **Yorum balonları** anahtarı: kapatınca ekrandaki balonlar da hemen silinir. Yorumlar ekranda görünmez, yine de
+  izleyiciyi oyuna sokar. Klavyede `B` tuşu da balonları açıp kapatır; yalnızca sahne görünümündeyken (panel gizliyken)
+  de çalışır. Önce oyun penceresine bir kez tıkla.
+- **Gizlenecek kelimeler:** virgülle ayırarak yaz. Bu kelimeleri içeren yorum balon olmaz, adında geçen izleyici
+  `misafir` yazılır. Alandan çıkınca sahnede o an eşleşen ad ve balonlar da gizlenir.
+- **Sahnedekiler** listesinde ya da **Olay akışında** bir adın üstüne gel:
+  - **Gizle:** o izleyicinin adı hemen ve kalıcı olarak `misafir` olur.
+  - **Çıkar:** izleyici sahneden gider; geri alana kadar yorumu, hediyesi ve beğenisi oyuna işlenmez.
+  - Fare olay akışının üstündeyken akış durur, satırlar kaymaz. Kaç yeni olay beklediği başlıkta yazar.
+- Çıkardıkların ve adını gizlediklerin **Yayın** sekmesinde listelenir; oradan tek tek ya da hepsini geri alabilirsin.
+  Liste bu bilgisayarda saklanır, sonraki yayında da geçerlidir.
 
-Yayına çıkmadan önce panelden birini seç. Panel `#yayin` ile gizlendiği için ayarı önce yap.
+Ayarları yayına çıkmadan önce yap: yalnızca sahne görünümünde panel gizlidir, orada yalnız `B` tuşu çalışır.
+Paneli de açık tutmak istersen yakalamada pencereyi yalnız sahneyi gösterecek şekilde kırpabilirsin; LIVE Studio'nun
+buna izin verip vermediği denenmedi.
 
 ## Sorun giderme
 
@@ -54,7 +68,7 @@ Yayına çıkmadan önce panelden birini seç. Panel `#yayin` ile gizlendiği i�
 | Kapı dolu (port meşgul) | Köprü zaten başka bir pencerede açık olabilir; onu kapat. Olmazsa komut satırında `node kopru.js <kullanıcı_adı> --port 9000 --ac` çalıştır. |
 | Ses yok | Tarayıcılar tıklamadan ses açmaz. Sayfada başlat düğmesine bas. Pencere yakalama bilgisayar sesini ayrıca almıyorsa LIVE Studio'da ses kaynağını kontrol et. |
 | LIVE Studio'da oyun görünmüyor | Tarayıcı kaynağı yerine pencere yakalama kullan. Pencerenin küçültülmediğinden emin ol. |
-| Oyun açık ama yorumlar gelmiyor | Pencerede köprü bağlantı durumunu oku. Yayın açıksa ve yorum yazılıyorsa kütüphaneyi güncelle (403 satırı). |
+| Oyun açık ama yorumlar gelmiyor | Masanın üstündeki Bağlantı kutusuna bak; ayrıntı Yayın sekmesinde yazar. Yayın açıksa ve yorum yazılıyorsa kütüphaneyi güncelle (403 satırı). |
 
 ## Doğrulama durumu (10 Kasım 2026)
 

@@ -37,8 +37,9 @@ function baslat(klasor, args) { const c = spawn(process.execPath, ['kopru.js', .
   let k = baslat(KOK, ['--deneme', '--oyun', OYUN_AD, '--port', '8791']); await bekle(900);
   const ctx = await b.newContext({ viewport: { width: 1280, height: 800 } });
   let p = await sayfaAc(ctx, 'http://127.0.0.1:8791/'); await bekle(7000);
-  let d = await p.evaluate(() => ({ ...CanliOyun.durum(), rozet: document.getElementById('bag-rozet').textContent, ileti: document.getElementById('bag-ileti').textContent, oto: document.getElementById('oto').textContent, not: document.getElementById('panel-not').textContent, adres: document.getElementById('bag-adres').value }));
+  let d = await p.evaluate(() => ({ ...CanliOyun.durum(), rozet: document.getElementById('bag-rozet').textContent, ileti: document.getElementById('bag-ileti').textContent, oto: document.getElementById('oto').textContent, not: document.getElementById('panel-not').textContent, adres: document.getElementById('bag-adres').value, serit: document.getElementById('d-bag').textContent, sekme: document.getElementById('bolum-yayin').hidden === false, uyari: document.getElementById('deneme-uyari').hidden === false }));
   kontrol('Köprüden açılan sayfa kendiliğinden bağlanır', d.bagli && d.rozet === 'Bağlı' && d.adres === 'ws://127.0.0.1:8791/olay', { rozet: d.rozet, adres: d.adres, ileti: d.ileti });
+  kontrol('Köprü kipinde masa: durum şeridi Canlı yazar, Yayın sekmesi açık, Deneme sekmesinde uyarı var', d.serit === 'Canlı' && d.sekme && d.uyari, { serit: d.serit, sekme: d.sekme, uyari: d.uyari });
   kontrol('Köprüden gelen olaylar oyuna işlenir', d.alinan > 8 && d.kisi >= 3, { alinan: d.alinan, kisi: d.kisi });
   kontrol('Gerçek yayın kipinde sahte izleyici kapalı ve sahte ad yok', /kapalı/.test(d.oto) && d.sira.every(x => x[0].startsWith('D. ')), { oto: d.oto, adlar: d.sira.map(x => x[0]) });
   kontrol('Süren seri sayılmadı: jetonlar 15\'in katı', d.sira.every(x => x[1] % 15 === 0) && d.sira.some(x => x[1] >= 15), d.sira.map(x => x[1]));
@@ -57,8 +58,8 @@ function baslat(klasor, args) { const c = spawn(process.execPath, ['kopru.js', .
   await p.locator('#sahne').screenshot({ path: S + '/k-deneme.png' });
   // ---- 3. köprü kapanıp açılınca
   k.kill('SIGKILL'); await bekle(2500);
-  d = await p.evaluate(() => ({ bagli: CanliOyun.durum().bagli, rozet: document.getElementById('bag-rozet').textContent, ileti: document.getElementById('bag-ileti').textContent, kisi: CanliOyun.durum().kisi }));
-  kontrol('Köprü kapanınca oyun durmaz, durumu bildirir', !d.bagli && /koptu/.test(d.ileti) && d.kisi >= 3, d);
+  await bekle(300); d = await p.evaluate(() => ({ bagli: CanliOyun.durum().bagli, rozet: document.getElementById('bag-rozet').textContent, ileti: document.getElementById('bag-ileti').textContent, kisi: CanliOyun.durum().kisi, serit: document.getElementById('d-bag').textContent }));
+  kontrol('Köprü kapanınca oyun durmaz, durumu bildirir (şeritte de)', !d.bagli && /koptu/.test(d.ileti) && d.kisi >= 3 && /Koptu|Bağlanıyor/.test(d.serit), d);
   const onceAlinan = await p.evaluate(() => CanliOyun.durum().alinan);
   k = baslat(KOK, ['--deneme', '--oyun', OYUN_AD, '--port', '8791']); await bekle(7000);
   d = await p.evaluate(() => ({ bagli: CanliOyun.durum().bagli, alinan: CanliOyun.durum().alinan, rozet: document.getElementById('bag-rozet').textContent }));
