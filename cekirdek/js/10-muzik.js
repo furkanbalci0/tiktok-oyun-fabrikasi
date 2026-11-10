@@ -55,6 +55,13 @@ function havaHazirla(h) {
     }
   }
   h.formAdim = h.harita.length;
+  // her adımda geçerli akor (eşlik notası ileri doldurulur): ses açılınca ya da saat atlayınca da bas doğru kökte girer
+  if (h.eslikHarita) {
+    h.akorHarita = [];
+    let son = { deg: 0, sus: false };
+    for (let i = 0; i < h.formAdim; i++)
+      h.akorHarita[i] = son = h.eslikHarita[i] || son;
+  }
   h.sent = d => { const o = Math.floor(d / 7), i = ((d % 7) + 7) % 7; return h.dizi[i] + 1200 * o; };
   h.frek = d => h.tonik * Math.pow(2, h.sent(d) / 1200);
   return h;
@@ -714,9 +721,8 @@ class Muzik {
     }
     // takımın ek satırları: üst (zil, hi-hat), bas, akor
     if (T.satirlar.length) {
-      const e = h.eslikHarita && h.eslikHarita[this.adim];
-      if (e)
-        this.akor = e;
+      if (h.akorHarita)
+        this.akor = h.akorHarita[this.adim];
       for (const ad of T.satirlar) {
         const r = h[ad];
         if (!r || (solo && ad !== 'ust'))
