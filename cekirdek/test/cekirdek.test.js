@@ -221,25 +221,27 @@ const { sonuc, kontrol } = kontrolcu();
   await p.locator('#sahne').screenshot({ path: CIKTI + '/t-sel.png' });
 
   // ---------- MÜZİK SAATİ ----------
-  const saat = await p.evaluate(async () => {
+  // Oyunun kendi havaları (OYUN.muzik): ikinci ve üçüncü havanın düğmesine basılır (iki havalı oyunda üçüncü = ilk).
+  const HV = await p.evaluate(() => CanliOyun._test.HAVALAR.map(h => h.id));
+  const saat = await p.evaluate(async HV => {
     const T = CanliOyun._test, ornek = []; let dur = false;
     const al = () => { ornek.push([performance.now(), CanliOyun.durum().vurus]); if (!dur) requestAnimationFrame(al); }; al();
     const bekle = ms => new Promise(r => setTimeout(r, ms));
     await bekle(1500); document.getElementById('ses-dugme').click(); await bekle(2500);
-    document.getElementById('hava-toz').click(); await bekle(4000);
+    document.getElementById('hava-' + HV[1 % HV.length]).click(); await bekle(4000);
     document.getElementById('ses-dugme').click(); await bekle(1500);
-    document.getElementById('hava-cifte').click(); await bekle(3500);
+    document.getElementById('hava-' + HV[2 % HV.length]).click(); await bekle(3500);
     document.getElementById('ses-dugme').click(); await bekle(2500);
     for (let i = 0; i < 5; i++) { document.getElementById('ses-dugme').click(); await bekle(150); }
     await bekle(1500); dur = true;
     let geri = 0, sicrama = 0, enGeri = 0, enIleri = 0;
     for (let i = 1; i < ornek.length; i++) { const db = ornek[i][1] - ornek[i - 1][1], dtt = (ornek[i][0] - ornek[i - 1][0]) / 1000; if (db < -0.02) { geri++; enGeri = Math.min(enGeri, db); } if (db > dtt * 4.5 + 0.25) { sicrama++; enIleri = Math.max(enIleri, db); } }
     return { ornek: ornek.length, geri, sicrama, enGeri, enIleri, hava: CanliOyun.durum().hava, ses: CanliOyun.durum().ses, toplamVurus: ornek[ornek.length - 1][1] - ornek[0][1], sure: (ornek[ornek.length - 1][0] - ornek[0][0]) / 1000 };
-  });
+  }, HV);
   kontrol('Ses aç/kapa ve hava değişiminde vuruş saati geri gitmez, sıçramaz', saat.geri === 0 && saat.sicrama === 0, saat);
-  kontrol('Seçilen havaya geçilir', saat.hava === 'cifte', saat.hava);
+  kontrol('Seçilen havaya geçilir', saat.hava === HV[2 % HV.length], saat.hava);
   const dongu = await p.evaluate(() => { const { Muzik, HAVALAR } = CanliOyun._test, m = new Muzik(); m.sonraki = 0; const gecis = [[0, m.hava.id]]; let son = m.hava.id; while (m.sonraki < 420) { m.adimCal(); if (m.hava.id !== son) { son = m.hava.id; gecis.push([Math.round(m.sonraki), son]); } } const bar = HAVALAR.map(h => [h.id, h.formAdim / h.bar, h.formAdim % h.bar]); return { gecis, bar }; });
-  kontrol('Havalar kendiliğinden sırayla döner (7 dakikada)', dongu.gecis.length >= 4 && dongu.gecis[1][1] === 'toz' && dongu.gecis[2][1] === 'cifte' && dongu.gecis[3][1] === 'harman', dongu.gecis);
+  kontrol('Havalar kendiliğinden sırayla döner (7 dakikada)', dongu.gecis.length >= 4 && [1, 2, 3].every(k => dongu.gecis[k][1] === HV[k % HV.length]), dongu.gecis);
   kontrol('Her havanın bölümleri ölçüye tam oturur', dongu.bar.every(x => x[2] === 0), dongu.bar);
 
   // ---------- SES ÖLÇÜMÜ ----------
@@ -248,47 +250,50 @@ const { sonuc, kontrol } = kontrolcu();
     const isle = async (hi, sn, ayar) => { const oc = new OfflineAudioContext(1, SR * sn, SR), m = new Muzik(); m.hava = HAVALAR[hi]; m.sirayla = false; m.sesKur(oc); m.acik = true; m.sonraki = 0.05; ayar && ayar(m); const olay = []; while (m.sonraki < sn - 0.6) { const t = m.sonraki, a = m.adim, bd = 60 / (m.hava.bpm * m.carpan) / m.hava.spb; m.adimCal(); const n = m.hava.harita[a]; if (n) olay.push({ t, uz: n.len * bd, n }); } const vur = m.olaylar.filter(o => o.tip === 'dum' || o.tip === 'tek').map(o => [o.t, o.tip]); const buf = await oc.startRendering(); return { d: buf.getChannelData(0), olay, vur, m }; };
     const rms = (d, a, b) => { let q = 0; a = Math.max(0, a | 0); b = Math.min(d.length, b | 0); for (let i = a; i < b; i++) q += d[i] * d[i]; return Math.sqrt(q / Math.max(1, b - a)); };
     const perde = (d, orta) => { const N = 2048, s0 = (orta * SR - N / 2) | 0; let enIyi = 0, enLag = 0; const kor = lag => { let q = 0; for (let i = 0; i < N; i++) q += d[s0 + i] * d[s0 + i + lag]; return q; }; for (let lag = Math.floor(SR / 1500); lag <= Math.ceil(SR / 230); lag++) { const q = kor(lag); if (q > enIyi * 1.02) { enIyi = q; enLag = lag; } } const a = kor(enLag - 1), b2 = kor(enLag), c = kor(enLag + 1), kay = (a - c) / (2 * (a - 2 * b2 + c) || 1); return SR / (enLag + kay); };
-    for (let hi = 0; hi < 3; hi++) {
+    const kapat = (m, ...k) => { for (const x of k) m.ses.kanal[x].value = 0; };
+    for (let hi = 0; hi < HAVALAR.length; hi++) {
       const h = HAVALAR[hi], sn = 24;
-      // yalnız zurna: perde doğruluğu
-      const z = await isle(hi, sn, m => { m.ses.davul.gain.value = 0; m.ses.dem.cik.value = 0; m.ses.yanki.value = 0; });
+      // yalnız ezgi: perde doğruluğu
+      const z = await isle(hi, sn, m => kapat(m, 'davul', 'eslik', 'yanki'));
       const sapma = []; let olculen = 0;
       for (const o of z.olay) { if (o.n.sus || o.n.tril || o.uz < 0.14) continue; const beklenen = h.tonik * Math.pow(2, h.sent(o.n.deg) / 1200), f = perde(z.d, o.t + Math.min(0.1, o.uz * 0.62)); let c = 1200 * Math.log2(f / beklenen); if (Math.abs(c - 1200) < 60) c -= 1200; if (Math.abs(c + 1200) < 60) c += 1200; sapma.push(c); olculen++; }
       const mutlak = sapma.map(Math.abs).sort((a, b) => a - b);
       // yalnız davul: vuruş zamanlaması
-      const dv = await isle(hi, sn, m => { m.ses.zurna.cik.value = 0; m.ses.dem.cik.value = 0; m.ses.yanki.value = 0; });
+      const dv = await isle(hi, sn, m => kapat(m, 'ezgi', 'eslik', 'yanki'));
       // Sıkıştırıcı tüm sese sabit ~6 ms gecikme ekler; önemli olan vuruşların kendi içinde tutarlı olması.
       let gec = 0, enGec = 0, sessiz = 0; const baslar = { dum: [], tek: [] };
       for (let vi = 0; vi < dv.vur.length; vi++) { const [t, tip] = dv.vur[vi], i0 = (t * SR) | 0; let tepe = 0; for (let i = i0; i < i0 + SR * 0.03; i++) tepe = Math.max(tepe, Math.abs(dv.d[i])); if (tepe < 0.02) { sessiz++; continue; }
         if (vi && t - dv.vur[vi - 1][0] < 0.5 && dv.vur[vi - 1][1] === 'dum') continue; // önceki dümün kuyruğu ölçümü bozar
         let bas = -1; for (let i = i0; i < i0 + SR * 0.03; i++) if (Math.abs(dv.d[i]) > tepe * 0.25) { bas = i; break; } const ms = (bas - i0) / SR * 1000; baslar[tip].push(ms); if (ms > 13) gec++; enGec = Math.max(enGec, ms); }
       const yayilim = Math.max(Math.max(...baslar.dum) - Math.min(...baslar.dum), Math.max(...baslar.tek) - Math.min(...baslar.tek)); if (yayilim > 3) gec++;
-      const dm = await isle(hi, sn, m => { m.ses.zurna.cik.value = 0; m.ses.davul.gain.value = 0; m.ses.yanki.value = 0; });
+      const dm = await isle(hi, sn, m => kapat(m, 'ezgi', 'davul', 'yanki'));
       const tam = await isle(hi, sn);
       let tepe = 0, kirpik = 0; for (const v of tam.d) { const a = Math.abs(v); if (a > tepe) tepe = a; if (a >= 0.999) kirpik++; }
-      // solo bölümünde zurna gerçekten susuyor mu
-      const soloBol = h.bolumBas.find(b => b.ad === 'D'), adimSn = 60 / h.bpm / h.spb, sB = 0.05 + soloBol.bas * adimSn, sS = sB + soloBol.uz * adimSn;
+      // solo bölümünde ezgi gerçekten susuyor mu
+      const soloBol = h.bolumBas.find(b => b.ad === 'D'), adimSn = 60 / h.bpm / h.spb, sB = soloBol ? 0.05 + soloBol.bas * adimSn : sn, sS = soloBol ? sB + soloBol.uz * adimSn : sn;
       const soloZ = sS < sn - 0.7 ? rms(z.d, (sB + 0.4) * SR, (sS - 0.05) * SR) : null;
-      // spektrum: zurnanın parlaklığı (1–3,5 kHz bandının payı)
+      // spektrum: ezginin parlaklığı (1–3,5 kHz bandının payı)
       const goertzel = (d, s0, N, f) => { const w = 2 * Math.PI * f / SR, cw = 2 * Math.cos(w); let a = 0, b = 0; for (let i = 0; i < N; i++) { const x = d[s0 + i] * (0.5 - 0.5 * Math.cos(2 * Math.PI * i / N)) + cw * a - b; b = a; a = x; } return Math.sqrt(a * a + b * b - cw * a * b); };
       let alt = 0, orta = 0, ust = 0; for (let f = 200; f < 8000; f += 50) { const g = goertzel(z.d, SR * 3, 16384, f); if (f < 1000) alt += g * g; else if (f < 3500) orta += g * g; else ust += g * g; }
-      sonuc.push({ hava: h.id, olculenNota: olculen, ortancaSapma: +mutlak[mutlak.length >> 1].toFixed(1), yuzde90: +mutlak[Math.floor(mutlak.length * 0.9)].toFixed(1), enBuyuk: +mutlak[mutlak.length - 1].toFixed(1), vurus: dv.vur.length, gecVurus: gec, sessizVurus: sessiz, enGecMs: +enGec.toFixed(2), yayilimMs: +yayilim.toFixed(2), olculenVurus: baslar.dum.length + baslar.tek.length, rmsZurna: +rms(z.d, SR, SR * 12).toFixed(3), rmsDavul: +rms(dv.d, SR, SR * 12).toFixed(3), rmsDem: +rms(dm.d, SR, SR * 12).toFixed(3), tepe: +tepe.toFixed(3), kirpilan: kirpik, soloZurnaRms: soloZ === null ? null : +soloZ.toFixed(4), bant: { alt: +(alt / (alt + orta + ust)).toFixed(2), orta: +(orta / (alt + orta + ust)).toFixed(2), ust: +(ust / (alt + orta + ust)).toFixed(2) } });
-      if (hi === 0) { const kisa = tam.d.subarray(0, SR * 14), i16 = new Int16Array(kisa.length); for (let i = 0; i < kisa.length; i++) i16[i] = Math.max(-1, Math.min(1, kisa[i])) * 32767; let ikili = ''; const u8 = new Uint8Array(i16.buffer); for (let i = 0; i < u8.length; i += 8192) ikili += String.fromCharCode.apply(null, u8.subarray(i, i + 8192)); window.__wav = btoa(ikili); }
+      sonuc.push({ hava: h.id, olculenNota: olculen, ortancaSapma: +mutlak[mutlak.length >> 1].toFixed(1), yuzde90: +mutlak[Math.floor(mutlak.length * 0.9)].toFixed(1), enBuyuk: +mutlak[mutlak.length - 1].toFixed(1), vurus: dv.vur.length, gecVurus: gec, sessizVurus: sessiz, enGecMs: +enGec.toFixed(2), yayilimMs: +yayilim.toFixed(2), olculenVurus: baslar.dum.length + baslar.tek.length, rmsEzgi: +rms(z.d, SR, SR * 12).toFixed(3), rmsDavul: +rms(dv.d, SR, SR * 12).toFixed(3), rmsEslik: +rms(dm.d, SR, SR * 12).toFixed(3), tepe: +tepe.toFixed(3), kirpilan: kirpik, soloEzgiRms: soloZ === null ? null : +soloZ.toFixed(4), bant: { alt: +(alt / (alt + orta + ust)).toFixed(2), orta: +(orta / (alt + orta + ust)).toFixed(2), ust: +(ust / (alt + orta + ust)).toFixed(2) } });
+      if (hi === 0) { window.__wavAd = h.id; const kisa = tam.d.subarray(0, SR * 14), i16 = new Int16Array(kisa.length); for (let i = 0; i < kisa.length; i++) i16[i] = Math.max(-1, Math.min(1, kisa[i])) * 32767; let ikili = ''; const u8 = new Uint8Array(i16.buffer); for (let i = 0; i < u8.length; i += 8192) ikili += String.fromCharCode.apply(null, u8.subarray(i, i + 8192)); window.__wav = btoa(ikili); }
     }
     return sonuc;
   });
   for (const s of ses) {
-    kontrol('Ses [' + s.hava + ']: zurna notaları doğru perdede', s.olculenNota > 20 && s.ortancaSapma < 12 && s.yuzde90 < 30, { nota: s.olculenNota, ortancaSent: s.ortancaSapma, yuzde90Sent: s.yuzde90, enBuyukSent: s.enBuyuk });
+    kontrol('Ses [' + s.hava + ']: ezgi notaları doğru perdede', s.olculenNota > 20 && s.ortancaSapma < 12 && s.yuzde90 < 30, { nota: s.olculenNota, ortancaSent: s.ortancaSapma, yuzde90Sent: s.yuzde90, enBuyukSent: s.enBuyuk });
     kontrol('Ses [' + s.hava + ']: davul vuruşları zamanında', s.vurus > 30 && s.gecVurus === 0 && s.sessizVurus === 0, { vurus: s.vurus, olculen: s.olculenVurus, sessiz: s.sessizVurus, enGecMs: s.enGecMs, yayilimMs: s.yayilimMs });
     kontrol('Ses [' + s.hava + ']: kırpılma yok, tepe güvenli', s.kirpilan === 0 && s.tepe < 0.95, { tepe: s.tepe });
-    kontrol('Ses [' + s.hava + ']: davul / zurna / dem dengesi', s.rmsZurna > 0.04 && s.rmsDavul > s.rmsZurna * 0.6 && s.rmsDem < s.rmsZurna * 0.4, { zurna: s.rmsZurna, davul: s.rmsDavul, dem: s.rmsDem, bant: s.bant });
-    if (s.soloZurnaRms !== null) kontrol('Ses [' + s.hava + ']: davul solosunda zurna susar', s.soloZurnaRms < 0.01, s.soloZurnaRms);
+    // Denge burada kaba ölçülür (ham RMS: ezgi duyulur, davul var); algılanan ses yüksekliğiyle ayrıntılı denge ve
+    // oyunlar arası fark cekirdek/test/muzik.test.js'te.
+    kontrol('Ses [' + s.hava + ']: ezgi duyulur, davul da var', s.rmsEzgi > 0.04 && s.rmsDavul > s.rmsEzgi * 0.4, { ezgi: s.rmsEzgi, davul: s.rmsDavul, eslik: s.rmsEslik, bant: s.bant });
+    if (s.soloEzgiRms !== null) kontrol('Ses [' + s.hava + ']: davul solosunda ezgi susar', s.soloEzgiRms < 0.01, s.soloEzgiRms);
   }
-  const enYuksek = await p.evaluate(async () => { const { Muzik, HAVALAR } = CanliOyun._test, SR = 44100, cik = []; for (let hi = 0; hi < 3; hi++) { const oc = new OfflineAudioContext(1, SR * 16, SR), m = new Muzik(); m.hava = HAVALAR[hi]; m.sirayla = false; m.duzey = 0.7; m.sesKur(oc); m.acik = true; m.sonraki = 0.05; m.sov = true; m.cosku = 1; m.carpan = 1.38; while (m.sonraki < 15.4) m.adimCal(); const d = (await oc.startRendering()).getChannelData(0); let tepe = 0; for (const v of d) tepe = Math.max(tepe, Math.abs(v)); cik.push(+tepe.toFixed(3)); } return cik; });
+  const enYuksek = await p.evaluate(async () => { const { Muzik, HAVALAR } = CanliOyun._test, SR = 44100, cik = []; for (let hi = 0; hi < HAVALAR.length; hi++) { const oc = new OfflineAudioContext(1, SR * 16, SR), m = new Muzik(); m.hava = HAVALAR[hi]; m.sirayla = false; m.duzey = 0.7; m.sesKur(oc); m.acik = true; m.sonraki = 0.05; m.sov = true; m.cosku = 1; m.carpan = 1.38; while (m.sonraki < 15.4) m.adimCal(); const d = (await oc.startRendering()).getChannelData(0); let tepe = 0; for (const v of d) tepe = Math.max(tepe, Math.abs(v)); cik.push(+tepe.toFixed(3)); } return cik; });
   kontrol('Ses en yüksek düzeyde, en hızlı tempoda ve davul şovunda da kırpılmaz', enYuksek.every(x => x < 0.99), enYuksek);
-  const wav = Buffer.from(await p.evaluate(() => window.__wav), 'base64'), bas = Buffer.alloc(44);
+  const wav = Buffer.from(await p.evaluate(() => window.__wav), 'base64'), wavAd = await p.evaluate(() => window.__wavAd), bas = Buffer.alloc(44);
   bas.write('RIFF', 0); bas.writeUInt32LE(36 + wav.length, 4); bas.write('WAVEfmt ', 8); bas.writeUInt32LE(16, 16); bas.writeUInt16LE(1, 20); bas.writeUInt16LE(1, 22); bas.writeUInt32LE(44100, 24); bas.writeUInt32LE(88200, 28); bas.writeUInt16LE(2, 32); bas.writeUInt16LE(16, 34); bas.write('data', 36); bas.writeUInt32LE(wav.length, 40);
-  fs.writeFileSync(CIKTI + '/harman.wav', Buffer.concat([bas, wav]));
+  fs.writeFileSync(CIKTI + '/' + wavAd + '.wav', Buffer.concat([bas, wav])); // oyunun ilk havası, 14 sn (dinleme önizlemesi muzik.test.js'te)
 
   // ---------- HAZIR PARÇALAR (isteğe bağlı müzik klasörü) ----------
   // Depoda ses dosyası yoktur; test, sayfanın içinde 120 vuruş/dk'lık 4 saniyelik bir tık sesi üretip onu çaldırır.
