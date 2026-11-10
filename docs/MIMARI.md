@@ -1,95 +1,178 @@
 # Mimari
 
+Bu belge çekirdeğin nasıl çalıştığını anlatır. Oyunun dolduracağı kancalar `docs/KANCALAR.md` içindedir, olay
+biçimi `docs/OLAYLAR.md` içindedir; burada tekrarlanmaz.
+
 ## Büyük resim
 
-```mermaid
-flowchart LR
-  T[TikTok canlı yayını] -- yalnız okuma --> K[kopru.js]
-  K -- WebSocket: oyun olayları --> O[mendil-kimde.html]
-  S[Sahte izleyici paneli] --> O
-  O -- pencere yakalama --> Y[Yayın programı]
-  Y --> T
+```
+TikTok canlı yayını
+   |  yalnız okuma
+   v
+kopru.js (127.0.0.1) --WebSocket--> Yayin.cevir --> olay(o) --> D (oyun durumu)
+                                                       ^             |
+          sahte izleyici (panel, otomatik) ------------+             v
+                                                kare(): müzik saati B, oyun, kamera, çizim
+                                                                     |
+                                                                     v
+                                                  tuval 720×1280 --> yayın programı
 ```
 
-Oyun bir tarayıcı sayfasıdır; yayın programı (TikTok LIVE Studio, OBS) o pencereyi yayına verir. Köprü
-olmadan da çalışır: o zaman olaylar paneldeki sahte izleyiciden gelir.
+Oyun tek bir tarayıcı sayfasıdır; yayın programı (TikTok LIVE Studio, OBS) o pencereyi yayına verir. Köprü
+olmadan da çalışır: o zaman olaylar paneldeki sahte izleyiciden gelir. Üç kaynak da aynı kapıya, `olay(o)`ya
+girer. Oyun `D`'yi başka yoldan değiştirmez.
 
-## Bir karede olanlar (`src/js/33-kare.js`)
+## Çekirdek dosyaları (`cekirdek/js/`)
 
-1. **Saat.** `muzik.planla()` önümüzdeki 0,2 saniyenin notalarını zamanlar; `muzik.beatAt()` şu anki vuruşu
-   (`B`) verir.
-2. **Oyun.** Coşku söner, süresi dolan hareket ve solo biter, sessiz kalanlar çıkarılır.
-3. **Hareket.** Her karakter yaydaki yerine doğru yürür (`karakterHareket`).
-4. **Kamera.** Kalabalığın kapladığı alana göre uzaklık ve hedef ayarlanır.
-5. **İskelet.** Her karakterin eklemleri hesaplanır (`iskelet`, sonra `kollar`).
-6. **Çizim.** Zemin → gölgeler → derinliğe göre sıralı gövde parçaları → ampuller → adlar ve balonlar →
-   konfeti.
+| Dosya | Ne yapar |
+| --- | --- |
+| `00-yardimci.js` | Sayı yardımcıları (`clamp`, `lerp`, `yumusak`, `basamak`), addan tekrarlanabilir rastgelelik (`ozet`, `rastgeleUret`), `aciFark`, `azHareket`, `$`. |
+| `10-muzik.js` | `HAVALAR` (üç üretilen ezgi), `Muzik` sınıfı ve tek örneği `muzik`: zamanlayıcı, ses zinciri, vuruş saati, hazır parça kipi. |
+| `20-oyuncular.js` | `OYUN` eksiklerini doldurur; `KADEME`, `MAKS`, `D`, `karakterYap`, `gorunumUret`, `katil`, `cikar`, `siraGuncelle`, `olay`. |
+| `25-yazilar.js` | Sıra kutusu, bildirim satırı, pankart, paneldeki olay günlüğü. Hepsi `textContent`. |
+| `30-sahne.js` | Tuval, `RENK`, kamera (`kam`, `kamKur`, `pr`), `ik`, çizim listesi (`kap`, `top`, `ozel`, `listeCiz`), `kameraSigdir`, `golge`, `etiketCiz`, `kenarKarart`. |
+| `31-insan.js` | İnsan takımı: `iskeletKur`, `kolKur`, `pozBekle`, `insanEkle`, `kafaCiz`. |
+| `32-parcacik.js` | `konfeti`, `kalpAt`, `parcaCiz`: ekran koordinatında uçan parçacıklar. |
+| `35-kare.js` | `kare()`: her karenin sırası ve ölçümü. |
+| `40-sahte-izleyici.js` | Deneme için uydurma ad, yorum, beğeni, hediye üreten otomatik izleyici. |
+| `50-yayin.js` | `Yayin`: köprüye WebSocket bağlantısı, dış iletiyi olaya çevirme, sıra ve ayar saklama. |
+| `60-panel.js` | Sayfa yazıları, panel düğmeleri, `boyutla`, yayın görünümü, açılış (`baslat`), `window.CanliOyun`. |
 
-## Vuruş saati (`src/js/10-muzik.js`)
+## Olay kapısı ve izleyici kaydı (`20-oyuncular.js`)
 
-Müzik "adım" adım zamanlanır (bir adım = onaltılık nota; 6/8'lik havada sekizlik). Her adım için
-`{ t, beat, bd }` kaydı tutulur: adımın zamanı, vuruş numarası, o andaki vuruş süresi. `beatAt(t)` en son
-kaydı bulup doğrusal ilerletir.
+`olay(o)` önce kimliği süzer: kimlik ve ad kontrol karakterlerinden arındırılır, boşlukları sadeleşir; kimlik 64,
+ad 18 karaktere kısalır. Kimliği boş olay düşer. Yasaklı kelime geçen ad `misafir` olur.
 
-Ses kapalıyken zaman `performance.now()`'dan, ses açıkken `AudioContext.currentTime`'dan okunur. Geçişte
-(`tabanDegistir`) eski saatte sıradaki adımın vuruşu korunur ve araya, yeni saatte o adıma tam vuruşunda
-varan bir köprü kaydı konur. `beatAt` ayrıca hiçbir zaman öncekinden küçük değer döndürmez.
+- **Yorum:** izleyici sahneye girer (`katil`), `k.son` tazelenir. Metin 200 karaktere kısalır; yasaklı kelime,
+  adres ve telefon süzülünce 30 karakterlik konuşma balonu olur. Balonlar panelden kapatılabilir.
+- **Beğeni:** adet 1 ile 500 arasına sıkışır; `D.begeni` ve coşku (adet × 0,006) artar, kalpler uçar. Sahnede
+  olmayanı sahneye almaz; olan varsa `k.son` tazelenir.
+- **Takip:** izleyici girer, adı 3 sn yeşil yazılır, "takip etti, hoş geldin" bildirimi çıkar.
+- **Paylaşım:** coşku 0,05 artar. **Katılım:** yalnız günlüğe yazılır.
+- **Hediye:** jeton ile adet çarpılır. Gönderen, yer yoksa da girer (`katil(…, zorla)`). Sırayla: jeton eklenir,
+  coşku artar (en çok 0,35), `KADEME` içinde jetonu karşılayan en büyük kademe bulunur, sevinç aralığı kurulur
+  (`k.zip0`, `k.zip1`: sonraki yarım vuruştan başlayıp 4 vuruş), bildirim ve zil sesi çıkar, `oyunHediye`
+  çağrılır, sıra yenilenir. Lider değiştiyse `oyunLiderDegisti` çağrılır.
 
-Tempo: `bpm × carpan`. `carpan`, coşkuya göre 1,0–1,3 arasıdır; davulcu şovunda 0,08 eklenir.
+**Sıra:** `siraGuncelle` sahnedekileri jetona göre azalan, eşitse önce katılana göre dizer; ilki liderdir. Sonra
+`oyunYerlesim` çağrılır ve sıra kutusu yenilenmek üzere işaretlenir.
 
-Ses zinciri: davul ve zurna → `ana` → sıkıştırıcı → `son` (ses düzeyi) → çıkış. Düzey sıkıştırıcıdan sonra
-ayarlanır; böylece düzey artınca kırpılma olmaz.
+**Kapasite:** sahne `kapasite` (`MAKS`, varsayılan 36) kadar kişi alır. Yer dolunca yeni gelen, jetonu en az olan
+ve en uzun süredir sessiz kalanın yerini alır. Lider ve `k.yildiz` olanlar atılmaz. Yorumcu, hediye atmış birini
+yerinden edemez; hediye atan edebilir. Atılacak kimse yoksa yeni gelen girmez.
 
-## Yerleşim (`yerlesimHesapla`, `src/js/20-kurallar.js`)
+**Boşta kalan:** 45 karede bir en çok bir kişi `cikar`ılır. Eşik sahnede 24 kişiden fazlaysa 75 sn, değilse
+240 sn; buna `jeton × 4` sn (en çok 600) eklenir. Çıkan, 1,7 sn sonra ya da oyun `k.gitti` deyince silinir.
 
-Oynayanlar merkezi (0, 0) olan bir çemberin yayına, 0,54 m arayla dizilir. Yarıçap en az 2,2 m'dir; yay en
-çok 5,2 radyan açılır, kalabalık bundan fazlaysa yarıçap büyür. Açı 0, kameranın tam karşısıdır (arka); yay
-arkada ortalanır, açıklığı hep kameraya bakar. Halay başı yayın negatif ucundadır (ekranda sol); boşta kalan
-eli mendil sallar. Kalabalık arttıkça yay öne doğru sarar ve halkaya döner.
+## Tek saat: müzik vuruşu `B` (`10-muzik.js`)
 
-Herkes kameraya döner, halkanın içine doğru hafifçe kırılır (`karakterHareket`): yayın neresinde durursa
-dursun yüzü görünür. Bu yüzden komşunun sağda mı solda mı kaldığı konuma göre değişir; `kollar` bunu her
-karede hesaplar.
+Oyundaki her hareket ve süre `B`'ye bağlıdır. `muzik.beatAt()` öncekinden küçük değer döndürmez. Ses kapalıyken
+saat `performance.now()`'dan, açıkken `AudioContext.currentTime`'dan okunur; geçişte (`tabanDegistir`) vuruş
+korunur. Üretilen müzik adım adım zamanlanır, her adımın vuruş kaydı `iz` dizisinde durur. Davul vuruşları ve
+zurna notaları `olaylar` kuyruğuna yazılır; kare bunları `calgi.dumP`, `calgi.tekP` nabzına ve `calgi.perde`ye
+çevirir. Hazır parçada vuruş, parçanın önceden ölçülmüş vuruş listesinden okunur (`hazirVurus`); çalgıcı
+olayları o zaman vuruşa bakılarak yapay üretilir.
 
-Çalgıcılar (`33-kare.js`): bir avuç kişiyken dizinin iki yanında, kalabalıklaşınca yayın önünde, halka
-kapanınca tam ortada durur. Solo yapan onların önüne çıkar, çalgıcılar iki yana açılır.
+Tempo `bpm × carpan`'dır. `carpan` hedefi `1 + 0,3 × coşku`'dur (oyun `muzik.sov`'u açarsa +0,08) ve yumuşakça
+yaklaşılır. Üretilen müzikte hava yaklaşık 100 sn sonra, form başında sırayla değişir. Ses zinciri: davul,
+zurna ve dem, `ana`, sıkıştırıcı, `son` (düzey), çıkış; düzey sıkıştırıcıdan sonra ayarlanır. Nota yazımı,
+hazır parça ekleme ve `muzik-hazirla.py` için `docs/MUZIK.md`'ye bak.
 
-## Karakter (`src/js/30-iskelet.js`, `31-cizim.js`)
+## Sahne (`30-sahne.js`, `31-insan.js`)
 
-Karakter 15 eklemden oluşur: kalça, göğüs, baş, iki omuz, iki dirsek, iki el, iki kalça eklemi, iki diz,
-iki ayak. Ayak hedefleri halay adımından (`ayakSag`, `ayakSol`; 4 vuruşluk döngü) gelir, dizler ters
-kinematikle (`ik`) bulunur. Komşu iki oynayanın eli, kalçalarının orta noktasında buluşur.
+Çizim 720×1280 sanal ölçekte yapılır (`GW`, `GH`); tuvalin gerçek boyutunu `boyutla` belirler, `kare` başında
+ölçek `setTransform` ile uyarlanır. Eksenler: x sağ, y yukarı, z kameradan uzağa.
 
-Karakterler iri başlı, kısa gövdelidir (baş boyun yarısını tutar): kalabalıkta da yüzler okunur. Ölçüler
-`30-iskelet.js` başındaki sabitlerdedir (`KALCA`, `KAFA_R`, `BACAK`, `KOL`).
+**Kamera.** Yüksekten bakan, dar açılı bir bakıştır: eğim 0,62 rad, `F` = 1400. `kamKur` konum ve eksenleri
+hesaplar. `pr([x, y, z])` noktayı `{ x, y, s, d, ok }` olarak ekrana düşürür (`s`: metre başına piksel, `d`:
+derinlik; kameradan 0,35 m'den yakın nokta görünmez sayılır). Oyun `OYUN.kamera` ile eğim, `F`, `enYakin`,
+`ustPay`, `altPay` değerlerini ezebilir.
 
-Gövde parçaları iki ucu farklı yarıçaplı kapsüllerdir (`kap`). Baş bir dairedir; yüz hatları başın yerel
-yönüne göre kaydırılır, arkadan bakınca saç ya da yazma yüzü örter (`kafaCiz`). Kamera yukarıdan baktığı
-hâlde tepe değil yüz görünsün diye yüz hatları gerçek eğimin üçte biriyle yerleştirilir (`kam.bf`, `kam.bu`).
+**Sığdırma.** `kameraSigdir`, oyunun verdiği `[x, z]` noktalarını `ALAN_UST`–`ALAN_ALT` (505–1006) şeridine
+sığacak kadar uzaklaşır; genişlikte her nokta kendi derinliğiyle sayılır. Sonuç yumuşakça yaklaşır. Kamera
+x = 0'a bakar, yalnız `|x|` önemlidir. Yatay açı çok hafif salınır; hediye sarsıntısı (`D.sarsinti`) her karede
+söner. `kam.son` (`enX`, `hd`) oyunun zemini kalabalığa göre büyütmesi içindir.
 
-Görünüm (`gorunumUret`) izleyicinin kimliğinin özetinden üretilir: aynı kişi her yayında aynı görünür.
+**Çizim listesi.** `kap` (iki ucu farklı yarıçaplı kapsül), `top` (daire) ve `ozel` (serbest çizim) parçaları
+listeye ekler. `listeCiz` listeyi derinliğe göre uzaktan yakına sıralar; eşit derinlikler eklenme sırasıyla
+çizilir. Zemin ve gölge listeye girmez; `oyunZemin` onları doğrudan çizer.
 
-## Kamera ve izdüşüm
+**Ad etiketleri.** `insanEkle` her oyuncunun `k.et`'ini kurar (başın tepesi, ölçek, derinlik). `etiketCiz`
+önceliğe göre sıralar: lider, `k.yildiz`, `k.ozel`, son 6 sn içinde konuşan, ilk beş, sonra öne yakın olanlar.
+Punto ölçekten gelir (13–18, lider +4). Çakışan etiket en çok iki kat yukarı kayar; sığmayan ve önceliği düşük
+olan çizilmez. Yorum balonu 3,4 sn görünür. Lider vurgu renginde ve tacıyla yazılır.
 
-`kam`: hedef noktası, uzaklık (`D`), sabit eğim (0,62 rad), dar görüş açısı (`F` = 1400) ve çok hafif
-salınan yatay açı. Dar açı, halkanın önündeki ile arkasındaki arasındaki boy farkını azaltır.
-`pr([x, y, z])` noktayı 720×1280 sanal tuvale düşürür ve `{ x, y, s, d, ok }` döner: ekran konumu, metre
-başına piksel, derinlik, görünür mü.
+**İnsan takımı.** Oyun izleyiciyi insan çizecekse kullanır. `gorunumUret(id)` görünümü kimlikten türetir: aynı
+izleyici her yayında aynı kıyafetle gelir. `iskeletKur(k, poz)` pozdan eklemleri kurar, `kolKur` kolları ellere
+uzatır (ters kinematik `ik`), `pozBekle` vuruşla sallanan bekleme pozudur, `insanEkle` gövdeyi ve başı listeye
+ekler, `kafaCiz` yüzü, saçı, yazmayı, kasketi çizer. Ölçüler iri başlı, kısa gövdelidir ki kalabalıkta yüzler
+okunsun (`31-insan.js` başındaki sabitler). Alanlar ve poz biçimi için `docs/KANCALAR.md`.
 
-Uzaklık her karede yeniden hesaplanır (`kare`): oynayanlar, çalgıcılar ve solo yeri, sahnenin oyunculara
-ayrılan şeridine (`ALAN_UST`–`ALAN_ALT`; üstü sahne yazıları, altı TikTok'un yorum alanı) sığacak kadar
-uzaklaşılır. Kameraya yakın duran daha iri göründüğü için genişlikte her nokta kendi derinliğiyle sayılır.
+## Bir karenin sırası (`35-kare.js`)
 
-Kamera yüksekten baktığı için gerçek ufuk görüntünün dışındadır. Gökyüzü ve köy, sahnenin üstünde sabit bir
-fon perdesidir (`UFUK`, `32-dekor.js`); ampul dizileri onun önünde asılıdır. Meydanın ışığı ve kilim çevresi
-oynayanları ortalar (`D.meydanR`, `kam.tz`).
+1. `dt` (en çok 0,05 sn) ve `zaman` ilerler. Müzik planlanır, `B` ve çalgı nabızları okunur.
+2. Coşku söner (saniyede 0,022), boşta kalan çıkarılır.
+3. `oyunGuncelle(dt)`; çıkışı bitenler `D.oy`'dan silinir.
+4. `kameraSigdir(oyunKamera(), dt)`; tuval ölçeği ayarlanır.
+5. `oyunZemin()`, her `k.et` boşaltılır, `oyunCiz()`, `listeCiz()`, varsa `oyunUst(dt)`.
+6. `etiketCiz` (varsa `oyunEkAdlar()` ile), `parcaCiz`, `kenarKarart`.
+7. Kirliyse sıra kutusu yazılır; her 6 karede günlük, coşku çubuğu ve çalan parça bilgisi yenilenir.
+8. Karenin işlem süresi ölçülüp `D.kareMs` içinde yumuşatılır; sonraki kare istenir.
+
+Kancaların çağrılma anları için `docs/KANCALAR.md`.
+
+## Derleme (`araclar/derle.js`)
+
+Çıktı tek bir `oyun.html` olur: yayıncı dosyayı bir yere kopyalayıp açabilir, çalışırken dış bağımlılık
+istemez (yalnız Google Fonts; yüklenmezse yedek yazı tipi). `import` yoktur; bütün parçalar tek kapalı işlevin
+(`'use strict'`) içine art arda eklenir. Böylece parçalar birbirinin adlarını görür, sayfanın genel alanı
+kirlenmez.
+
+Sıra: `oyunlar/<ad>/js/00-ayar.js` (çekirdek `OYUN`u buradan okur), `cekirdek/js/*.js` (ada göre), oyunun diğer
+dosyaları (ada göre). Derleme, on zorunlu kancanın işlev bildirimi olarak yazıldığını denetler; eksik varsa
+adını yazıp durur. Sayfa iskeleti `cekirdek/sayfa.html`, stili `cekirdek/stil.css`'dir. `--denetle` depodaki
+`oyun.html` güncel değilse 1 ile çıkar; `--parca` başka sayfaya gömülecek etiketsiz parça üretir.
+
+## Yayın görünümü, panel, sahte izleyici (`60-panel.js`, `40-sahte-izleyici.js`)
+
+- **Yayın görünümü:** adrese `#yayin` eklenir ya da panelden "Yalnızca sahneyi göster" seçilir. Panel gizlenir,
+  sahne pencereyi 9:16 doldurur, tuval en çok 1080×1920 olur. Esc ya da sahne köşesindeki düğme paneli geri
+  getirir. `#yayin` ya da köprüyle açılınca ses, tarayıcı izin verirse beklemeden açılmayı dener.
+- **Deneme paneli:** sahte yorum, beğeni, takip ve her kademe için hediye düğmeleri; otomatik izleyicinin hızı;
+  boşaltma; ses ve hava seçimi; balon ve yasaklı kelime ayarı; köprü adresi. Düğmeler de `olay(o)`ya yazar.
+- **Sahte izleyici:** adı `OYUN.sahteAd`'dan (yoksa genel listeden), yorumu `OYUN.sahteYorum`'dan alır. Hediyeyi
+  kademelerden seçer (en büyüğü %0,7, ikincisi %3,8, üçüncüsü %10,5, dördüncüsü %25). Açılıştaki kalabalık
+  `OYUN.tohum`'dan gelir.
+- **Gerçek yayın:** köprü sayfayı açarken `window.OYUN_KOPRU` adresini yazar. Bu varsa otomatik izleyici kapanır,
+  tohum kalabalık kurulmaz (3 saatten yeni saklanmış sıra varsa o yüklenir), `Yayin` bağlanır, kopunca 3 sn'de
+  bir yeniden dener. Sıra 5 sn'de bir tarayıcıya yazılır (en çok 60 kişi). Panelin sahte düğmeleri yine
+  çalışır; yayında basılmamalıdır (panel de bunu söyler).
 
 ## Köprü (`kopru.js`)
 
-- HTTP: `/` oyunu sunar ve içine `window.MENDIL_KOPRU` satırını ekler; `/durum` JSON verir.
-- WebSocket: el sıkışma ve çerçeveleme elle yazılmıştır (bağımlılık yok). Yalnız metin çerçevesi yollar;
-  istemciden yalnız kapanış ve ping'i işler.
-- Kaynak: `tiktok-live-connector` (eski sürümde `WebcastPushConnection`, yenide `TikTokLiveConnection`).
-  `cevir`, iki sürümün veri biçimini de oyunun olay biçimine indirger. Bağlantı koparsa ya da yayın kapalıysa
-  artan aralıklarla (15 sn → en çok 120 sn) yeniden dener.
-- `--deneme`: kütüphaneyi hiç yüklemeden sahte olay üretir.
+Sayfayı sunar ve içine `OYUN_KOPRU` satırını ekler; `/durum` JSON verir; `/muzik/` yalnız düz adlı `.js` ve ses
+dosyalarını sunar. WebSocket elle yazılmıştır, bağımlılık yoktur; istemciden yalnız kapanış ve ping işlenir.
+Yalnız `127.0.0.1` dinler. Kaynak `tiktok-live-connector`'dır; `cevir` kütüphanenin iki sürümünün biçimini
+olaya indirger, bağlantı koparsa artan aralıkla yeniden dener. `--deneme` kütüphaneyi yüklemeden sahte olay
+üretir. Sayfa tarafında benzer çeviri `Yayin.cevir`'dedir; seri hediye bitince bir kez sayılır.
+
+## Testler
+
+`node araclar/test.js [ad]` her oyun için üç şey çalıştırır: `derle.js --denetle`, `cekirdek/test/cekirdek.test.js`
+(olay kuralları, kapasite, bozuk girdi ve HTML, olay seli, vuruş saatinin geri gitmemesi, ses ölçümü, hazır
+parça, yayın görünümü, kare süresi, uzun çalışma) ve varsa oyunun kendi `test.js`'i. Çekirdek testleri her
+oyuna uygulanır; oyuna özgü sayılar sayfadaki `OYUN`dan okunur. En sonda köprü testi bir kez çalışır. Testler
+TikTok'a bağlanmaz: köprü testleri kütüphanenin eski ve yeni sürümünün taklitlerini geçici klasörde kurar.
+Tarayıcı `CHROME_PATH` ile ya da Playwright'ın Chromium'uyla bulunur.
+
+## Bilinen sınırlar
+
+- Müzik havaları, davul ve zurna sentezi ile kıyafet, ten ve saç paleti çekirdektedir ve halay havasındadır
+  (Harman Yeri, Toz Duman, Çifte Mendil; yazma, kasket, önlük). Başka havada bir oyun bunları çekirdekten
+  değiştirmeden uyarlayamaz.
+- Kamera sağa sola dönmez, x = 0 çevresine bakar; yanlara yayılan sahne yalnızca uzaklaşarak sığar.
+- Sahne yazıları (sıra, bildirim, pankart) sayfa iskeletinde sabit yerdedir; oyun taşıyamaz.
+- Sahte izleyici adları için genel liste Türkçe sabittir; yalnız `OYUN.sahteAd` ile değişir.
+- Konfeti ve sahte olaylar `Math.random` kullanır, tekrarlanamaz. Görünüm ise kimlikten türetilir.
+- Sıra kaydı yalnız köprü kipinde tutulur ve 3 saatte eskir.
+- TikTok LIVE Studio adımı bu depoda denenmedi (`docs/YAYIN.md`).
