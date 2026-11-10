@@ -12,7 +12,7 @@ dosyasını oku ve oradaki sırayı izle. Bu dosya deponun haritasıdır; o dosy
 | Katman | Yer | Kim değiştirir |
 | --- | --- | --- |
 | Çekirdek | `cekirdek/` | Yeni oyun yazarken DEĞİŞTİRİLMEZ. Olay kapısı, izleyici kaydı, sıralama, sahne yazıları, kamera, çizim listesi, insan takımı, müzik saati, deneme paneli, köprü istemcisi. |
-| Oyun | `oyunlar/<ad>/` | Yalnız o oyuna özgü olan: ayar, kurallar, diziliş, çizim, hediye etkileri. |
+| Oyun | `oyunlar/<ad>/` | Yalnız o oyuna özgü olan: ayar, kurallar, diziliş, çizim, hediye etkileri ve **müziği** (`OYUN.muzik`: çalgı takımı + kendi havaları). |
 
 İkisi arasındaki sınır `docs/KANCALAR.md` içindedir: oyunun dolduracağı kancalar ve çekirdeğin sunduğu adlar.
 Çekirdekte eksik bir şey görürsen oyunun içinde çöz ve raporunda "çekirdeğe şu eklenmeli" diye yaz.
@@ -43,12 +43,12 @@ cekirdek/sayfa.html   sayfa iskeleti: solda 9:16 sahne, sağda deneme paneli
 cekirdek/test/        her oyuna uygulanan testler ve köprü testleri
 oyunlar/halay/        tam örnek oyun: Mendil Kimde? (bütün kancaları kullanır)
 sablon/               en yalın oyun; yeni oyun bundan başlar
-araclar/              derle, test, yeni-oyun, kare-cek, paket, muzik-hazirla
+araclar/              derle, test, yeni-oyun, kare-cek, paket, muzik-hazirla, esitlik, ses-esitlik
 kopru.js              TikTok yayınını yalnız okuyup oyuna aktaran program
 docs/KANCALAR.md      çekirdek / oyun sözleşmesi   ← yeni oyun yazarken asıl başvuru
 docs/OLAYLAR.md       olay biçimi ve CanliOyun arayüzü
 docs/MIMARI.md        çekirdek nasıl çalışır
-docs/MUZIK.md         üretilen müzik ve kendi parçalarını çaldırma
+docs/MUZIK.md         her oyunun kendi müziği: takımlar, nota yazımı, ölçümler, oyun başına kendi parçaların
 docs/YAYIN.md         yayıncı için: nasıl yayına verilir
 ```
 
@@ -69,6 +69,8 @@ docs/YAYIN.md         yayıncı için: nasıl yayına verilir
 8. **Tek saat müziğin vuruşudur (`B`).** Hareket ve süreler vuruşla ölçülür. Saat geri gitmez.
 9. **`oyun.html` üretilir.** Kaynağı değiştir, derle, ikisini birlikte işle.
 10. **Testler TikTok'a bağlanmaz.** Köprü testleri kütüphanenin taklidini kullanır.
+11. **Her oyunun müziği kendinedir.** Oyun `OYUN.muzik` ile takımını seçer, kendi özgün havalarını yazar
+    (`docs/MUZIK.md`). Bir oyunun davul zurnası (ya da başka havası) başka oyunda "şimdilik" bırakılmaz.
 
 ## Görsel çıta
 
@@ -92,6 +94,8 @@ dosyasına kendi gözünle bak, gördüğün kusuru düzelt, yeniden bak.
   tutuyor.
 - En kalabalık hâlde, 1080×1920'de kare başına işlem 33 ms'nin altında (kare-cek yazar).
 - `node kopru.js --deneme --oyun <ad>` ile açılıp sahte olayların oyuna işlendiği görüldü.
+- Oyunun kendi müziği var (`OYUN.muzik`, derleme müzik uyarısı vermiyor); müzik testi geçti ve
+  `test/cikti/<ad>/muzik-onizleme.wav` kullanıcıya dinlemesi için verildi.
 - Kullanıcıya neyin testle, neyin gözle doğrulandığı ve neyin hiç denenmediği söylendi (ses kulakla
   dinlenmedi, gerçek yayın denenmedi gibi).
 
@@ -106,5 +110,6 @@ dosyasına kendi gözünle bak, gördüğün kusuru düzelt, yeniden bak.
 - `tiktok-live-connector` resmi değildir ve isteği imzalatmak için üçüncü bir hizmete gider; bir gün
   çalışmayabilir. 2.5.0 altı sürümler artık bağlanamıyor.
 - TikTok LIVE Studio adımı bu depoda denenmedi (`docs/YAYIN.md` içindeki doğrulama tablosu).
-- Depoda müzik dosyası yoktur. Oyunlar kendi davul zurnasını üretir; isteyen kendi parçasını ekler
-  (`docs/MUZIK.md`).
+- **Her oyunun müziği kendinedir.** Oyun `00-ayar.js` içinde `OYUN.muzik = { takim, havalar }` ile çalgı takımını
+  seçer ve kendi özgün havalarını yazar; halayın davul zurnası başka oyunda çalmaz (`docs/MUZIK.md`). Depoda müzik
+  dosyası yoktur; isteyen bir oyuna kendi kayıtlarını ekler, onlar yalnız `oyunlar/<ad>/muzik/` içinde durur.

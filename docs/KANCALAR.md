@@ -10,15 +10,18 @@ dokunmaz; burada adı geçen kancaları doldurur.
 cekirdek/
   sayfa.html, stil.css      sayfa iskeleti (sahne + yayın masası paneli); metinler OYUN ayarından doldurulur
   js/NN-*.js                çekirdek parçaları (aşağıda)
-  test/                     ortak.js, cekirdek.test.js (her oyuna uygulanır), kopru.test.js
+  test/                     ortak.js, cekirdek.test.js (her oyuna uygulanır), muzik.test.js (bütün oyunlar),
+                            kopru.test.js, araclar.test.js
 oyunlar/<ad>/
   oyun.json                 { "ad": "Görünen Ad", "paket": "dosya-adi" }
   js/00-ayar.js             const OYUN = { … }  (HER ZAMAN İLK birleştirilir)
   js/NN-*.js                oyunun kancaları ve kendi çizimi
   test.js                   (isteğe bağlı) oyuna özgü kontroller
+  muzik/                    (isteğe bağlı, depoya girmez) bu oyunun kendi hazır parçaları (docs/MUZIK.md)
   oyun.html                 ÜRETİLİR (derleme çıktısı; depoda durur)
 sablon/                     en küçük çalışan oyun; `araclar/yeni-oyun.js` bunu kopyalar
-araclar/                    derle.js, test.js, yeni-oyun.js, kare-cek.js, paket.js, muzik-hazirla.py
+araclar/                    derle.js, test.js, yeni-oyun.js, kare-cek.js, paket.js, muzik-hazirla.py,
+                            esitlik.js (piksel), ses-esitlik.js (müzik)
 kopru.js, BASLAT.bat        TikTok köprüsü ve Windows başlatıcısı
 ```
 
@@ -50,7 +53,7 @@ Diğer komutlar: `node araclar/derle.js --hepsi` (ad verilmezse de böyle), `nod
 | --- | --- |
 | `window.CanliOyun` | dışarıya açık arayüz: `olay`, `durum`, `baglan`, `kes`, `cevir`, `_test` |
 | `window.OYUN_KOPRU` | köprünün sayfaya yazdığı WebSocket adresi |
-| `window.OYUN_MUZIK` | `muzik/liste.js` içindeki hazır parça listesi |
+| `window.OYUN_MUZIK` | oyunun `muzik/liste.js` dosyasındaki hazır parça listesi (`oyunlar/<ad>/muzik/`) |
 | `window.OYUN_MUZIK_KAPALI` | doğruysa `muzik/` klasörü yok sayılır (testler kullanır) |
 
 ## Oyunun ayarı: `OYUN`
@@ -77,13 +80,33 @@ const OYUN = {
   panelRenk: {},                         // isteğe bağlı: yayın masasının renkleri ayrı (aşağıda, "Tema")
   kamera: {},                            // isteğe bağlı: { egim, F, enYakin, ustPay, altPay, ustPx, altPx, x, on, odakEn }
   etiket: {},                            // isteğe bağlı: { ustSinir, altSinir, disari, balonSira } ("Ad etiketleri")
-  sahneYazi: {}                          // isteğe bağlı: { pankart: 'alt' } ("Sahne yazıları")
+  sahneYazi: {},                         // isteğe bağlı: { pankart: 'alt' } ("Sahne yazıları")
+  muzik: { takim: 'davul-zurna', havalar: ['harman', 'toz', 'cifte'] }   // OYUNUN KENDİ MÜZİĞİ ("Müzik")
 };
 ```
 
 Yeni oyun şablonu (`sablon/js/00-ayar.js`) önerilen ayarlarla gelir: `etiket: { ustSinir: true, altSinir: true,
 disari: 'gizle' }`, `sahneYazi: { pankart: 'alt' }`. Bunlar verilmezse çekirdek eski davranışı sürdürür (var olan
 oyunlar böyle çalışır).
+
+### Müzik: `OYUN.muzik`
+
+**Her oyunun müziği kendinedir.** Halayın davul zurnası başka oyunda çalmaz. Oyun `muzik` alanında bir çalgı
+takımı seçer ve kendi havalarını yazar:
+
+```js
+muzik: {
+  takim: 'dugun',             // 'davul-zurna' (halay), 'dugun' (darbuka, def, klarnet), 'mac' (seksenler TV spor
+                              // jeneriği: davul makinesi, synth bas, bakır nefesli) ya da çekirdeğe eklenen yeni takım
+  havalar: [ { id: 'kurdele', ad: 'Kurdele', bpm: 104, spb: 4, bar: 16, tonik: 329.6, dizi: […], davul: {…},
+               bolum: {…}, form: 'AABBD' }, … ]          // en az iki ÖZGÜN hava
+}
+```
+
+Takımların tarifi, nota ve davul yazımı, yeni takım ekleme ve ölçümler `docs/MUZIK.md`'dedir. Hava temposu
+(`bpm`) oyunun hızıdır: bütün hareket vuruş saatine (`B`) bağlıdır. Bildirim yoksa oyun öntanımlı davul zurnayı
+çalar ve `derle.js` her seferinde uyarır; şablon `takim: 'SEC'` ile gelir, seçilmeden test geçmez. Oyunun kendi
+kayıtları (isteğe bağlı) yalnız `oyunlar/<ad>/muzik/` klasöründen çalar.
 
 `yazi` içinde ayrıca isteğe bağlı `bosalt` (paneldeki boşaltma düğmesi) vardır. Eksik `yazi` alanları genel
 karşılıklarıyla doldurulur. Kademeler çekirdekte büyükten küçüğe sıralanır ve en küçüğünün `min`'i 1'e çekilir.
@@ -319,7 +342,7 @@ function oyunCiz() {
 
 **Dışarıya açık arayüz:** `CanliOyun.durum()` → `{ oyun, kisi, lider, cosku, begeni, vurus, sira: [[ad, jeton]…],
 kareMs, parca, bagli, alinan, hava, ses }` ve `oyunDurum(d)`'nin ekledikleri. `CanliOyun._test` → `{ D, muzik,
-Muzik, HAVALAR, ayar, OYUN, KADEME, zamanEkle(sn), zaman(), vurusDondur(b), vurusIlerle(db), vurusCoz(), olcum(),
+Muzik, HAVALAR, TAKIMLAR, TAKIM, havalarKur, ayar, OYUN, KADEME, zamanEkle(sn), zaman(), vurusDondur(b), vurusIlerle(db), vurusCoz(), olcum(),
 cekirdek }`:
 - `vurusDondur(b)` / `vurusIlerle(db)` / `vurusCoz()`: yalnız test ve kare almak için. Kare döngüsü sürer ama `B`
   verilen değerde durur; aynı hareket evresi tekrar tekrar çizilir (`kare-cek` hareket şeridini böyle alır).

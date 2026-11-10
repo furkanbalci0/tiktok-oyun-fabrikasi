@@ -27,7 +27,7 @@ girer. Oyun `D`'yi başka yoldan değiştirmez.
 | Dosya | Ne yapar |
 | --- | --- |
 | `00-yardimci.js` | Sayı yardımcıları (`clamp`, `lerp`, `yumusak`, `basamak`), addan tekrarlanabilir rastgelelik (`ozet`, `rastgeleUret`), `aciFark`, `azHareket`, `$`. |
-| `10-muzik.js` | `HAVALAR` (üç üretilen ezgi), `Muzik` sınıfı ve tek örneği `muzik`: zamanlayıcı, ses zinciri, vuruş saati, hazır parça kipi. |
+| `10-muzik.js` | `TAKIMLAR` (çalgı takımları: `davul-zurna`, `dugun`, `mac`; ses yapı taşları `mzTon`, `mzGurultu`, `mzEzgiKur`, `mzBas`, `mzAkor`), oyunun seçtiği `TAKIM` ve `HAVALAR` (`OYUN.muzik`'ten; bildirim yoksa davul zurna), `Muzik` sınıfı ve tek örneği `muzik`: zamanlayıcı, ses zinciri, vuruş saati, hazır parça kipi. |
 | `20-oyuncular.js` | `OYUN` eksiklerini doldurur; `KADEME`, `MAKS`, `D`, `karakterYap`, `gorunumUret`, `katil`, `cikar`, `siraGuncelle`, `olay`. |
 | `25-yazilar.js` | Sıra kutusu, bildirim satırı, pankart, paneldeki olay akışı (`gunluk`, en yenisi üstte). Hepsi `textContent`. |
 | `30-sahne.js` | Tuval, `RENK` / `PANEL_RENK`, kamera (`kam`, `kamKur`, `pr`), `ik`, çizim listesi (`kap`, `top`, `ozel`, `listeCiz`), `kadrajHesap`, `kameraSigdir`, `golge`, `ETIKET`, `etiketCiz`, `kenarKarart`. |
@@ -79,9 +79,11 @@ zurna notaları `olaylar` kuyruğuna yazılır; kare bunları `calgi.dumP`, `cal
 olayları o zaman vuruşa bakılarak yapay üretilir.
 
 Tempo `bpm × carpan`'dır. `carpan` hedefi `1 + 0,3 × coşku`'dur (oyun `muzik.sov`'u açarsa +0,08) ve yumuşakça
-yaklaşılır. Üretilen müzikte hava yaklaşık 100 sn sonra, form başında sırayla değişir. Ses zinciri: davul,
-zurna ve dem, `ana`, sıkıştırıcı, `son` (düzey), çıkış; düzey sıkıştırıcıdan sonra ayarlanır. Nota yazımı,
-hazır parça ekleme ve `muzik-hazirla.py` için `docs/MUZIK.md`'ye bak.
+yaklaşılır. Üretilen müzikte hava yaklaşık 100 sn sonra, form başında sırayla değişir. Her adımda takım davul
+satırını (ve varsa üst, bas, akor satırlarını) ve ezgiyi çalar (`takim.vur`, `takim.satir`, `takim.nota`). Ses
+zinciri bütün takımlarda aynıdır: takımın kolları (davul, ezgi, eşlik), `ana`, sıkıştırıcı, `son` (düzey), çıkış;
+ortak yankı; düzey sıkıştırıcıdan sonra ayarlanır. Takımlar, nota yazımı, oyun başına hazır parça ve
+`muzik-hazirla.py` için `docs/MUZIK.md`'ye bak.
 
 ## Sahne (`30-sahne.js`, `31-insan.js`)
 
@@ -176,26 +178,27 @@ adını yazıp durur. Sayfa iskeleti `cekirdek/sayfa.html`, stili `cekirdek/stil
 
 ## Köprü (`kopru.js`)
 
-Sayfayı sunar ve içine `OYUN_KOPRU` satırını ekler; `/durum` JSON verir; `/muzik/` yalnız düz adlı `.js` ve ses
-dosyalarını sunar. WebSocket elle yazılmıştır, bağımlılık yoktur; istemciden yalnız kapanış ve ping işlenir.
+Sayfayı sunar ve içine `OYUN_KOPRU` satırını ekler; `/durum` JSON verir; `/muzik/` yalnız açılan oyunun
+`muzik/` klasöründeki (`oyunlar/<ad>/muzik/`) düz adlı `.js` ve ses dosyalarını sunar; ortak bir müzik klasörü yoktur. WebSocket elle yazılmıştır, bağımlılık yoktur; istemciden yalnız kapanış ve ping işlenir.
 Yalnız `127.0.0.1` dinler. Kaynak `tiktok-live-connector`'dır; `cevir` kütüphanenin iki sürümünün biçimini
 olaya indirger, bağlantı koparsa artan aralıkla yeniden dener. `--deneme` kütüphaneyi yüklemeden sahte olay
 üretir. Sayfa tarafında benzer çeviri `Yayin.cevir`'dedir; seri hediye bitince bir kez sayılır.
 
 ## Testler
 
-`node araclar/test.js [ad]` her oyun için üç şey çalıştırır (sonda bir kez köprü ve araç testleri): `derle.js --denetle`, `cekirdek/test/cekirdek.test.js`
+`node araclar/test.js [ad]` her oyun için üç şey çalıştırır (sonda bir kez köprü, müzik ve araç testleri): `derle.js --denetle`, `cekirdek/test/cekirdek.test.js`
 (olay kuralları, kapasite, bozuk girdi ve HTML, olay seli, vuruş saatinin geri gitmemesi, ses ölçümü, hazır
 parça, yayın görünümü, kare süresi, uzun çalışma) ve varsa oyunun kendi `test.js`'i. Çekirdek testleri her
-oyuna uygulanır; oyuna özgü sayılar sayfadaki `OYUN`dan okunur. En sonda köprü testi bir kez çalışır. Testler
+oyuna uygulanır; oyuna özgü sayılar sayfadaki `OYUN`dan okunur. En sonda köprü testi ve bütün oyunları birlikte ölçen müzik testi (`muzik.test.js`: düzey, denge, oyunlar arası
+fark, dinleme önizlemesi) bir kez çalışır. Testler
 TikTok'a bağlanmaz: köprü testleri kütüphanenin eski ve yeni sürümünün taklitlerini geçici klasörde kurar.
 Tarayıcı `CHROME_PATH` ile ya da Playwright'ın Chromium'uyla bulunur.
 
 ## Bilinen sınırlar
 
-- Müzik havaları, davul ve zurna sentezi ile kıyafet, ten ve saç paleti çekirdektedir ve halay havasındadır
-  (Harman Yeri, Toz Duman, Çifte Mendil; yazma, kasket, önlük). Başka havada bir oyun bunları çekirdekten
-  değiştirmeden uyarlayamaz.
+- Kıyafet, ten ve saç paleti çekirdektedir ve halay havasındadır (yazma, kasket, önlük). Başka havada bir oyun
+  bunları çekirdekten değiştirmeden uyarlayamaz. Müzik artık oyunundur (`OYUN.muzik`); oyunun dünyasına uyan
+  takım yoksa çekirdeğe yeni takım eklenir (`docs/MUZIK.md`).
 - Kamera sağa sola dönmez (yaw yalnız hafif salınım); bakılan x kayar ama perspektif hep önden bakar.
 - Sahne yazıları (sıra, bildirim, pankart) sayfa iskeletinde sabit yerdedir; oyun yalnız pankartı sıralama
   kutusunun altına alabilir (`OYUN.sahneYazi.pankart = 'alt'`).

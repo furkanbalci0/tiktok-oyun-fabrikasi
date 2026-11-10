@@ -9,7 +9,10 @@ Kullanıcı tek cümlelik bir fikir verir; sen çalışan, yayına verilebilir b
 (`cekirdek/`) işin ortak yarısını zaten yapıyor. Senin işin `oyunlar/<ad>/` altını yazmak.
 
 Başlamadan oku: `AGENTS.md` (harita, değişmezler, görsel çıta), `docs/KANCALAR.md` (dolduracağın kancalar ve
-çekirdeğin sunduğu adlar), `oyunlar/halay/js/` (tam örnek).
+çekirdeğin sunduğu adlar), `docs/MUZIK.md` (oyunun müziği), `oyunlar/halay/js/` (tam örnek).
+
+**Her oyunun müziği kendinedir.** Halayın davul zurnası başka oyunda çalmaz; yeni oyun kendi çalgı takımını seçer
+ve kendi özgün havalarını yazar (aşağıda, 3. adım).
 
 ## 1. Fikri kurala çevir
 
@@ -22,6 +25,7 @@ itiraz yoksa devam et. Kullanıcıyı soru yağmuruna tutma; yalnız fikir gerç
 | Beğeniler neyi yükseltir? | Coşkuyu, onunla tempoyu |
 | Hediye kademeleri ne yapar? (genelde 1, 10, 50, 200, 1000 jeton) | Zıpla, omuz, çök, davul şovu, solo |
 | En çok hediye atan kim olur? | Halay başı; mendil onda |
+| Hangi müzik çalar? (takım, havalar, tempo) | Davul zurna; halayın üç havası, 84–132 vuruş/dk |
 
 İyi kurallar: izleyici attığı hediyenin karşılığını **hemen ve kendi adıyla** görür; küçük hediye küçük ama
 görünür bir şey yapar; en büyük hediye sahneyi birkaç saniyeliğine o kişiye verir; liderlik el değiştirebilir
@@ -40,6 +44,9 @@ Yazmadan önce şunlara karar ver:
 - **Lider nasıl ayrılır?** Yer, işaret, renk; bir bakışta.
 - **Renk dünyası.** Zemin, ışık ve yazılar tek paletten (`OYUN.renk`). Sahne gündüz / açık renkliyse
   `panelRenk: {}` ekle: yayın masası çekirdeğin koyu temasında kalır, okunur.
+- **Ses dünyası.** Sahne nerede geçiyor, orada ne çalar? Köy meydanı: `davul-zurna`; düğün, konvoy: `dugun`
+  (darbuka, def, klarnet); televizyon, maç, seksenler: `mac` (davul makinesi, synth bas, bakır nefesli). Hiçbiri
+  uymuyorsa yeni takım gerekir (`docs/MUZIK.md` "Yeni takım"). Tempo oyunun hızıdır: hareket vuruşla ölçülür.
 
 ## 3. Kur
 
@@ -59,6 +66,10 @@ kanca iki dosyada tanımlı kalmasın.
 Sonra şu sırayla ilerle; her adımdan sonra derleyip kareye bak:
 
 1. `js/00-ayar.js`: yazılar, kademeler (`etki` metniyle), tohum kalabalık, sahte yorumlar, kapasite.
+   **Müzik de burada**: `muzik: { takim, havalar }`. Şablon `takim: 'SEC'` ile gelir; seçmeden bırakırsan derleme
+   uyarır, sayfa konsola hata yazar, test kalır. En az iki **özgün** hava yaz (nota ve davul yazımı
+   `docs/MUZIK.md`; örnekler `oyunlar/konvoy/js/00-ayar.js`, `oyunlar/vur-duzelsin/js/00-ayar.js`). Var olan
+   şarkı, türkü, marş, tezahürat, jenerik ya da reklam müziği yazma.
 2. Diziliş ve hareket: `oyunYerlesim`, `oyunGiris`, `oyunGuncelle`, `oyunKamera`.
 3. Çizim: `oyunZemin` (arka plan, zemin, gölgeler), `oyunCiz` (izleyiciler ve sahnedeki her şey).
 4. Hediye etkileri ve rol devri: `oyunHediye`, `oyunLiderDegisti`.
@@ -100,8 +111,9 @@ Sık takılınan yerler:
   `oyunLiderDegisti` kancasını kullan (ilk lider belirirken ve sahne boşaltılırken çağrılmaz).
 - Çıkan izleyiciyi (`k.cikiyor`) sahneden sen götürürsün; uzaklaşınca `k.gitti = true` de. Demezsen 1,7 sn
   sonra olduğu yerde kaybolur.
-- Müzik çekirdekte üretilen davul zurnadır. Oyununun havası buna uymuyorsa çekirdeği değiştirme; kullanıcıya
-  kendi parçasını ekleyebileceğini söyle (`docs/MUZIK.md`).
+- Müzik oyunun kendisinindir (`OYUN.muzik`). Takımı seçtikten sonra tempoyu oyunun hareketine göre ayarla, oyunun
+  gerçek zamanlı testlerini (bekleme süreleri) yeni tempoyla yeniden çalıştır. Kullanıcı kendi kayıtlarını
+  isterse yalnız o oyunun klasörüne gider: `python araclar/muzik-hazirla.py "<klasör>" <ad>` → `oyunlar/<ad>/muzik/`.
 - `gorunumUret(id)` yöresel kıyafet verir (yazma, kasket, önlük). Başka kılık gerekiyorsa gövdeyi kendin çiz,
   başı `kafaCiz` ile al.
 - Adın yeri: ön sıradakinin adı arkadakinin yüzünü örtüyorsa `k.et.asagi = true` (çenenin altına asılır);
@@ -141,7 +153,9 @@ node araclar/test.js <ad>
 ```
 
 Çekirdek testleri kuralların iskeletini, bozuk girdiyi, olay selini, müzik saatini, yayın görünümünü ve
-uzun süre çalışmayı sınar. Kalan kontrol varsa oyunun kancalarında hata vardır; çekirdeği değiştirerek
+uzun süre çalışmayı sınar. Müzik testi (`cekirdek/test/muzik.test.js`, en sonda bir kez) her oyunun müziğinin
+düzeyini, dengesini ve başka takımlı oyunlardan farkını ölçer; `test/cikti/<ad>/muzik-onizleme.wav` dinleme
+önizlemesini yazar. Kalan kontrol varsa oyunun kancalarında hata vardır; çekirdeği değiştirerek
 geçirme.
 
 ## 6. Teslim et
@@ -150,7 +164,7 @@ Kullanıcıya kısa ve dürüst bir özet ver:
 
 - Oyun ne yapıyor (kurallar tablosu).
 - Nasıl açılır: `node kopru.js --deneme --oyun <ad> --ac`.
-- Kare dosyasının yeri.
+- Kare dosyasının yeri ve müzik önizlemesi (`test/cikti/<ad>/muzik-onizleme.wav`): kullanıcı dinleyip karar verir.
 - Neyin testle, neyin gözle doğrulandığı; neyin **hiç** doğrulanmadığı (ses kulakla dinlenmedi, gerçek yayın
   denenmedi, hareket yalnız karelerden görüldü gibi).
 - Yayına verme adımları için `docs/YAYIN.md`; yayıncı paketi için `node araclar/paket.js <ad>`.
@@ -158,7 +172,10 @@ Kullanıcıya kısa ve dürüst bir özet ver:
 ## Yapma
 
 - `cekirdek/` altını değiştirme. Eksik bir şey varsa oyunda çöz, raporda öner. (Çekirdeği değiştiren, var olan
-  oyunların görüntüsünün değişmediğini `node araclar/esitlik.js <ad>` ile kanıtlar.)
+  oyunların görüntüsünün değişmediğini `node araclar/esitlik.js <ad>` ile kanıtlar.) Tek istisna yeni çalgı
+  takımıdır: `cekirdek/js/10-muzik.js` içine **eklenir**, var olan takımlara dokunulmaz; halay ve öbür oyunların
+  müziğinin değişmediğini `node araclar/ses-esitlik.js <ad> --taban <ref>` gösterir.
+- Başka oyunun havalarını kopyalama, halayın davul zurnasını "şimdilik" bırakma: her oyunun müziği kendinedir.
 - Başka bir yayının çizimini, adını, müziğini kopyalama. Mekanik alınır, görünüş senin olur.
 - Depoya görsel ya da ses dosyası ekleme.
 - "Testler geçti" diyerek bitirme; kareye bakmadan teslim etme.

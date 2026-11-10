@@ -85,7 +85,7 @@ Sahne 720x1280 sanal ölçekte çizilir, TikTok'un dikey yayınına göre. Alt k
 - Köprü resmî olmayan `tiktok-live-connector` kütüphanesini kullanır. Kütüphane imza için üçüncü taraf bir servise (Euler Stream) dayanır. Servis ücretsiz kullanımı sınırlayabilir ya da durdurabilir.
 - TikTok, canlı yayın yorumlarını ve hediyelerini okumak için resmî bir açık API sunmuyor. TikTok bir gün bu yolu kapatırsa köprü çalışmaz.
 - Telefondan yayın desteklenmiyor. Yayın bilgisayardan yapılır ve hesapta TikTok LIVE Studio erişimi gerekir.
-- Depoda müzik dosyası yok. Oyunlar kendi sesini üretir. İstersen kendi parçalarını yerelde ekleyebilirsin (`docs/MUZIK.md`); bunlar depoya girmez.
+- Depoda müzik dosyası yok. Her oyun kendi müziğini üretir: halay davul zurna, gelin konvoyu darbuka ve klarnet, Vur Düzelsin seksenlerin televizyon spor jeneriği. İstersen bir oyuna kendi parçalarını yerelde ekleyebilirsin (`oyunlar/<ad>/muzik/`, `docs/MUZIK.md`); bunlar depoya girmez.
 - Doğrulama durumu için `docs/YAYIN.md` sonundaki tabloya bak: gerçek yayın okuma bir kez denendi, LIVE Studio yakalama henüz denenmedi.
 
 ## Belgeler
@@ -94,7 +94,7 @@ Sahne 720x1280 sanal ölçekte çizilir, TikTok'un dikey yayınına göre. Alt k
 | --- | --- |
 | `docs/KANCALAR.md` | Çekirdek ile oyun arasındaki sözleşme, depo düzeni, komutlar |
 | `docs/OLAYLAR.md` | Olay biçimi ve köprü iletileri |
-| `docs/MUZIK.md` | Nota yazımı, kendi parçalarını çaldırma |
+| `docs/MUZIK.md` | Her oyunun kendi müziği: çalgı takımları, nota yazımı, oyun başına kendi parçaların |
 | `docs/YAYIN.md` | Yayıncı için kurulum ve sorun giderme |
 | `docs/MIMARI.md` | Mimari notlar |
 
