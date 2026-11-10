@@ -140,9 +140,14 @@ const { sonuc, kontrol } = kontrolcu();
       document.getElementById('bosalt').click();
       for (let i = 0; i < 30; i++) CanliOyun.olay(i < 6 ? { tip: 'hediye', kullanici: { id: 'k' + i, ad: 'izleyici_adi_' + i }, jeton: 300 - i * 40 } : { tip: 'yorum', kullanici: { id: 'k' + i, ad: 'izleyici_adi_' + i }, metin: '' });
     });
-    await q.waitForTimeout(800);
+    // Bekleme vuruşla ölçülür: kalabalık vuruşla salındığı için ölçüm hep aynı vuruş anına düşsün (eskiden 104
+    // vuruş/dk'da 0,8 + 6,5 sn = 1,4 + 11,3 vuruş). Gerçek saniyeyle beklenince tempo değişince salınımın başka bir
+    // anı ölçülüyordu. (Not: yan kenardaki bir kişi salınırken birkaç piksel kadrajdan taşıyor; bu ölçüm onu değil,
+    // eski ölçümün aynısını sınar.)
+    const vurusBekle = async db => { const b0 = await q.evaluate(() => CanliOyun.durum().vurus); for (let i = 0; i < 400; i++) { if (await q.evaluate(h => CanliOyun.durum().vurus >= h, b0 + db)) return; await q.waitForTimeout(25); } };
+    await vurusBekle(0.8 * 104 / 60);
     await q.evaluate(() => { CanliOyun._test.D.kuyruk.length = 0; });
-    await q.waitForTimeout(6500);
+    await vurusBekle(6.5 * 104 / 60);
     const r = await q.evaluate(() => {
       const t = document.getElementById('tuval').getBoundingClientRect(), k = 720 / t.width;
       const kut = s => { const x = document.querySelector(s).getBoundingClientRect(); return { x0: (x.left - t.left) * k, x1: (x.right - t.left) * k, y1: (x.bottom - t.top) * k }; };
