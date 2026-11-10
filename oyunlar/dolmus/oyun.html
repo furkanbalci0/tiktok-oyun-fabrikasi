@@ -4250,18 +4250,7 @@ const DOL = {
   tarama: '#c9a26a', taban: '#454b54', basamak: '#ffd84f', koltuk: '#9a3340', dantel: '#fffaf0', on: '#ffc63a',
   boncuk: '#a0703f', cam: '#cdeff5', teker: '#24272e', pano: '#3a3036', perde: '#8e2f3a', kilim2: '#f2c14e'
 };
-const renkBellek = new Map();
-// İki #rrggbb rengin karışımı: yüzlerin ışık ve gölge tonları buradan türer.
-function renkKat(a, b, t) {
-  const anahtar = a + b + t;
-  let s = renkBellek.get(anahtar);
-  if (s)
-    return s;
-  const x = parseInt(a.slice(1), 16), y = parseInt(b.slice(1), 16), kanal = sh => Math.round(lerp(x >> sh & 255, y >> sh & 255, t));
-  s = 'rgb(' + kanal(16) + ',' + kanal(8) + ',' + kanal(0) + ')';
-  renkBellek.set(anahtar, s);
-  return s;
-}
+// Yüzlerin ışık ve gölge tonları çekirdeğin renkKat'ından gelir (cekirdek/js/33-cizim.js).
 function bp(x, y, z) { return pr([x - D.otoX, y + D.bob, z]); }
 function bYuz(k, renk, cizgi) {
   const p = k.map(n => bp(n[0], n[1], n[2]));
