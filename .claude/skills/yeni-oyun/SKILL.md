@@ -46,6 +46,10 @@ Yazmadan önce şunlara karar ver:
 node araclar/yeni-oyun.js <ad> "<Görünen Ad>"
 ```
 
+Şablon `js/10-oyun.js` içinde bütün kancaların en yalın hâlini getirir. O dosyayı kendi oyununa göre yeniden
+yaz; büyüdükçe konuya göre yeni dosyalara böl (`20-hareket.js`, `30-dekor.js`, `40-cizim.js` gibi). Aynı kanca
+iki dosyada tanımlı kalmasın.
+
 Sonra şu sırayla ilerle; her adımdan sonra derleyip kareye bak:
 
 1. `js/00-ayar.js`: yazılar, kademeler (`etki` metniyle), tohum kalabalık, sahte yorumlar, kapasite.
@@ -58,8 +62,12 @@ Sonra şu sırayla ilerle; her adımdan sonra derleyip kareye bak:
 
 - Eksenler: x sağ, y yukarı, z kameradan uzağa. `pr([x, y, z])` ekrandaki yeri ve `s` (metre başına piksel)
   verir. Boyutları `s` ile çarp ki uzaktaki küçük görünsün.
-- Sahnedeki nesneleri `kap`, `top`, `ozel` ile çizim listesine ekle; derinliğe göre sıralanıp çizilirler.
-  Zemin ve arka plan `oyunZemin` içinde doğrudan `c` ile çizilir.
+- Sahnedeki nesneleri `oyunCiz` içinde `kap`, `top`, `ozel` ile çizim listesine ekle; derinliğe göre sıralanıp
+  çizilirler. Zemin ve arka plan `oyunZemin` içinde doğrudan `c` ile çizilir; orada listeye eklenen şey
+  çizilmez (liste sonradan boşaltılır).
+- Araç gibi tek parça nesneyi bir `ozel(derinlik, fn)` ile ekle ve `fn` içinde yalnız `c` ile çiz; `fn`
+  içinden `kap` / `top` çağırma. Tam örnek: `oyunlar/konvoy/js/40-araba.js` (dönebilen kutu, kameraya bakan
+  yüzler, pencereden çıkan sürücü).
 - Dış çizgi rengi `MUREKKEP`; renkler `RENK` içinden.
 - Hareketi `B` (vuruş) ile sür: `Math.sin(TAU * B)` vuruşta bir tur atar. `calgi.dumP` her güçlü vuruşta 1'e
   çıkıp söner; ışık ve zıplama için kullan.

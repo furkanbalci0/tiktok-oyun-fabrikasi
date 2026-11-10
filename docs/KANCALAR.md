@@ -119,6 +119,18 @@ Ayrıntılar:
 - Çıkanları silme: `k.cikiyor` olan, 1,7 sn geçince ya da oyun `k.gitti = true` deyince `D.oy`'dan silinir.
   Çıkan oyuncuyu sahneden götürmek `oyunGuncelle`'nin işidir.
 - `oyunCiz` çağrılmadan önce her izleyicinin `k.et`'i boşaltılır; o karede çizilmeyenin etiketi çıkmaz.
+- Çizim listesi `oyunZemin`'den SONRA boşaltılır: `oyunZemin` içinde `kap` / `top` / `ozel` ile eklenen şey
+  çizilmez. Zeminde yalnız `c` ile doğrudan çiz; derinliğe göre sıralanması gereken her şeyi (ağaç, direk)
+  `oyunCiz`'de ekle.
+- `ozel(derinlik, fn)` içindeki `fn` liste çizilirken çalışır: içinden `kap` / `top` / `ozel` çağırma (liste o
+  anda sıralanmış ve dönülüyor, sıra bozulur). `fn` içinde yalnız `c` ile doğrudan çiz. Araç gibi tek parça
+  nesneler böyle çizilir: bir `ozel`, içinde `pr()` ile bulunan noktalara `c` çizimi.
+- Açılıştaki tohum kalabalık için `oyunGiris` çağrılmaz; sıra `oyunYerlesim` → `oyunBaslat` olur. Oyuncuya
+  kendi alanlarını ekliyorsan (araç rengi, binek) bunu tek bir "hazır mı" işlevinde yap ve `oyunYerlesim`,
+  `oyunGiris`, `oyunBaslat` üçünden de çağır.
+- Derlenen kod katı kipte çalışır (`'use strict'`): bildirilmemiş değişkene atama hata verir.
+- `kameraSigdir` her noktanın yanına 0,55 m pay ekler (bir insanın yarı genişliği). Daha geniş nesnede (araba)
+  `oyunKamera`'dan nesnenin kenar noktalarını da döndür.
 - `muzik.sov`'u çekirdek değiştirmez; oyun açıp kapatır (halay: `oyunHediye` ve `oyunGuncelle` içinde
   `muzik.sov = B < D.sovBit`).
 
