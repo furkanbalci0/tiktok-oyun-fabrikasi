@@ -81,6 +81,7 @@ const OYUN = {
   kamera: {},                            // isteğe bağlı: { egim, F, enYakin, ustPay, altPay, ustPx, altPx, x, on, odakEn }
   etiket: {},                            // isteğe bağlı: { ustSinir, altSinir, disari, balonSira } ("Ad etiketleri")
   sahneYazi: {},                         // isteğe bağlı: { pankart: 'alt' } ("Sahne yazıları")
+  tempo: {},                             // isteğe bağlı: { cosku, taban, tavan } ("Tempo kapısı")
   muzik: { takim: 'davul-zurna', havalar: ['harman', 'toz', 'cifte'] }   // OYUNUN KENDİ MÜZİĞİ ("Müzik")
 };
 ```
@@ -107,6 +108,29 @@ Takımların tarifi, nota ve davul yazımı, yeni takım ekleme ve ölçümler `
 (`bpm`) oyunun hızıdır: bütün hareket vuruş saatine (`B`) bağlıdır. Bildirim yoksa oyun öntanımlı davul zurnayı
 çalar ve `derle.js` her seferinde uyarır; şablon `takim: 'SEC'` ile gelir, seçilmeden test geçmez. Oyunun kendi
 kayıtları (isteğe bağlı) yalnız `oyunlar/<ad>/muzik/` klasöründen çalar.
+
+### Tempo kapısı: `OYUN.tempo` ve `muzik.tempoEk`
+
+Müziğin hızı bir çarpandır (`muzik.carpan`; 1 = havanın kendi `bpm`'i). Çekirdek her karede hedefi hesaplar ve
+çarpanı ona yumuşakça kaydırır (ani sıçrama olmaz, `B` geri gitmez):
+
+```
+hedef = sınırla(1 + tempo.cosku × D.cosku + (muzik.sov ? 0,08 : 0) + muzik.tempoEk, tempo.taban, tempo.tavan)
+```
+
+| Ad | Öntanım | Ne |
+| --- | --- | --- |
+| `OYUN.tempo.cosku` | 0,3 | Coşkunun (beğeni, hediye) tempoya katkısı. Tempoyu oyun kendi yönetecekse küçült |
+| `OYUN.tempo.taban`, `OYUN.tempo.tavan` | 0, sınırsız | Hedef çarpanın alt ve üst sınırı |
+| `muzik.tempoEk` | 0 | Oyunun hedefe kattığı pay (eksi olabilir). Oyun yazar (`oyunHediye`, `oyunGuncelle`); çekirdek değiştirmez |
+
+Hiçbiri verilmezse davranış eskisiyle birebir aynıdır. Etkinin süresini oyun vuruşla (`B`) ölçer ve bitince
+`tempoEk`'i kendisi 0'a çeker. Hazır parça kipinde hız ayrıca 1–1,25 arasına alınır (yavaşlatılamaz;
+`muzik.hazirCal` doğruysa o kip çalıyordur). Örnek: halay (`oyunlar/halay/js/22-hediye-muzik.js`) omuz hediyesinde
+tempoyu kademe kademe artırır, soloda tavana çıkarır.
+
+Havayı oyundan değiştirmek için kapı gerekmez: `muzik.bekleyen = hava; muzik.havaSure = 0;` (hava bir sonraki ölçü
+başında girer; `muzik.havalar` oyunun havalarıdır), hazır parça kipinde `muzik.hazirBaslat(no)`.
 
 `yazi` içinde ayrıca isteğe bağlı `bosalt` (paneldeki boşaltma düğmesi) vardır. Eksik `yazi` alanları genel
 karşılıklarıyla doldurulur. Kademeler çekirdekte büyükten küçüğe sıralanır ve en küçüğünün `min`'i 1'e çekilir.
@@ -188,7 +212,8 @@ Ayrıntılar:
 - `D`: `oy` (kimlik → oyuncu `Map`), `sira` (jetona göre azalan dizi), `lider` (`sira[0]`), `cosku` (0–1),
   `begeni`, `sarsinti`. Oyun kendi alanlarını `D`'ye ekler.
 - `zaman` (saniye), `B` (müzik vuruşu, kesirli; **tek saat budur**), `calgi` (`dumP`, `tekP`: vuruş anında 1'e
-  çıkıp sönen nabızlar; `perde`), `muzik` (`sov` alanını oyun ayarlar: doğruysa tempo biraz artar).
+  çıkıp sönen nabızlar; `perde`), `muzik` (`sov` alanını oyun ayarlar: doğruysa tempo biraz artar; `tempoEk`: oyunun tempoya kattığı pay,
+  "Tempo kapısı").
 - `OYUN`, `KADEME`, `MAKS`, `RENK`.
 
 **Oyuncu `k`** (`karakterYap(id, ad)`): `id`, `ad`, `jeton`, `son` (son etkileşim), `katilim`, `sn` (sıradaki

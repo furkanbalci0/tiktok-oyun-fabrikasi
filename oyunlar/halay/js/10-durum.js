@@ -2,6 +2,7 @@
  * D'ye eklenenler: hareket (herkesin yaptığı omuz / çök), soloKuyruk + solo (ortaya çıkan), sovBit (davul şovu
  * hangi vuruşa dek sürer), mendilUcus (el değiştiren mendil), R / Rhedef (yayın yarıçapı), aci (yayın açıklığı),
  * meydanR (ışıklı meydanın yarıçapı), salinim (dizinin yavaş salınımı), soloYer, calZ / calAralik (çalgıcıların yeri).
+ * Hediyenin müziğe etkisi (tempo, hava sırası) 22-hediye-muzik.js'tedir.
  * Kancalar: oyunYerlesim, oyunGiris, oyunHediye, oyunLiderDegisti, oyunBaslat, oyunBosalt, oyunDurum.
  */
 const ARALIK = 0.54;
@@ -48,6 +49,7 @@ function oyunHediye(k, j, kd) {
     konfeti(120, 1);
     D.sarsinti = 1;
   }
+  hediyeMuzik(k, kd, v);
   muzik.sov = B < D.sovBit;
 }
 // Mendil eski halay başının elinden yenisinin başına uçar.
@@ -78,9 +80,12 @@ function oyunBosalt() {
   D.solo = null;
   D.hareket = null;
   D.mendilUcus = null;
+  hediyeMuzikSifirla();
 }
 function oyunDurum(d) {
   d.halayBasi = d.lider;
   d.solo = D.solo ? D.solo.k.ad : null;
   d.soloKuyruk = D.soloKuyruk.length;
+  d.tempoEk = muzik.tempoEk;
+  d.havaSira = D.havaSira.length;
 }

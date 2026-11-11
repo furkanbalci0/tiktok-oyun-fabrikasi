@@ -528,7 +528,7 @@ const OYUN = {
   id: 'mendil-kimde',
   ad: 'Mendil Kimde?',
   logo: ['Mendil', 'Kimde?'],
-  nasil: { yorum: 'Yorum: halaya gir', begeni: 'Beğeni: tempo', hediye: 'Hediye: mendil' },
+  nasil: { yorum: 'Yorum: halaya gir', begeni: 'Beğeni: coşku', hediye: 'Hediye: mendil, müzik' },
   yazi: {
     sira: 'Halay sırası', gosterge: 'Coşku', bos: 'Meydan boş. İlk yazan mendili alır.',
     birim: 'kişi', ses: 'Davul zurnayı başlat', sahne: 'Halay sahnesi', giris: 'halaya girer', bosalt: 'Meydanı boşalt'
@@ -536,10 +536,10 @@ const OYUN = {
   kapasite: 36,
   // Büyükten küçüğe. tip, oyunHediye'nin hangi hareketi başlatacağını seçer; etki paneldeki tabloda yazar.
   kademe: [
-    { min: 1000, ad: 'Meydan senin', tip: 'solo', etki: 'Gönderen ortaya çıkar, tek başına oynar' },
-    { min: 200, ad: 'Davulcu coşsun', tip: 'davul', etki: 'Davulcu coşar, tempo fırlar' },
-    { min: 50, ad: 'Çök', tip: 'cok', etki: 'Herkes çöker, kalkar' },
-    { min: 10, ad: 'Omuz', tip: 'omuz', etki: 'Herkes omuz titretir' },
+    { min: 1000, ad: 'Meydan senin', tip: 'solo', etki: 'Gönderen ortaya çıkar, en hızlı tempoda tek başına oynar' },
+    { min: 200, ad: 'Davulcu coşsun', tip: 'davul', etki: 'Davulcu coşar, sıradaki havaya geçilir' },
+    { min: 50, ad: 'Çök', tip: 'cok', etki: 'Herkes çöker; tempo ağırlaşır, kalkarken patlar' },
+    { min: 10, ad: 'Omuz', tip: 'omuz', etki: 'Herkes omuz titretir, tempo bir kademe hızlanır' },
     { min: 1, ad: 'Zıpla', tip: 'zipla', etki: 'Gönderen zıplar' }
   ],
   tohum: [['zeyno.47', 320], ['urfalı_bekir', 140], ['gülizar_teyze', 60], ['dj_mahmut', 25], ['elif_naz', 10], ['hasan.usta', 5], ['pınar_34', 0], ['köyün_delisi', 0], ['berfin_gül', 0]],
@@ -547,8 +547,20 @@ const OYUN = {
   sahteYorum: ['halay!', 'ben de geldim', 'çek çek çek', 'Diyarbakır’dan selamlar', 'mendil bende kalsın', 'davulcu coştur', 'halay başı kim ya', 'yer açın geliyorum', 'omuzlar omuzlar', 'bu hava çok iyi', 'Antep buradaa', 'kolum koptu ama bırakmam', 'sıraya girin', 'hoppa!', 'zurnacıya bir çay', 'anneme gösteriyorum', 'düğün var düğün', 'adımı gördüm', 'İzmir’den geldim', 'çök çök çök'],
   renk: {},
   kamera: {},
+  // Pankart (mendil el değiştirdi, hava değişti) sıralama kutusunun üstünden değil altından geçer: kutu hep okunur.
+  sahneYazi: { pankart: 'alt' },
   // Müzik: halayın davul zurnası ve üç havası (çekirdekteki davul-zurna takımının kendi havaları; docs/MUZIK.md).
-  muzik: { takim: 'davul-zurna', havalar: ['harman', 'toz', 'cifte'] }
+  muzik: { takim: 'davul-zurna', havalar: ['harman', 'toz', 'cifte'] },
+  // Tempo (çekirdeğin tempo kapısı, docs/KANCALAR.md): çarpan 1 = havanın kendi hızı. Halayda tempoyu hediyeler
+  // yönetir: beğeninin (coşkunun) katkısı küçüktür. taban / tavan: tempo çarpanının hiç aşılmayan sınırları.
+  tempo: { cosku: 0.08, taban: 0.88, tavan: 1.3 },
+  // Hediyeyle müzik (22-hediye-muzik.js). Süreler vuruşladır, tempo payları çarpana eklenir (0.07 = %7).
+  hediyeMuzik: {
+    adim: 0.07, adimVurus: 16, adimEnCok: 3,   // omuz: bir tempo kademesi, kaç vuruş yaşar, en çok kaç kademe birikir
+    cokAgir: 0.12, cokAgirVurus: 2,            // çök: çökerken ağırlaşma payı ve süresi
+    cokPatlama: 0.2, cokPatlamaVurus: 6,       // çök: kalkarken hızlanma payı ve süresi
+    havaAra: 24, havaSiraEnCok: 4              // davul: iki hava değişimi arasında en az vuruş, bekleyen değişim sınırı
+  }
 };
 
 /* ── cekirdek/js/00-yardimci.js ── */
@@ -1189,6 +1201,7 @@ class Muzik {
     this.iz = [];
     this.olaylar = [];
     this.carpan = 1;
+    this.tempoEk = 0; // oyunun hedef tempo çarpanına kattığı ek (35-kare.js: tempo kapısı); çekirdek değiştirmez
     this.sov = false;
     this.cosku = 0;
     this.ctx = null;
@@ -2908,6 +2921,13 @@ const KANCA_EK_ADLAR = typeof oyunEkAdlar === 'function' ? oyunEkAdlar : null;
 let sonKare = 0, kareSay = 0;
 // Yalnız testler ve kare-cek için: doluysa B müzikten okunmaz, bu değerde durur (CanliOyun._test.vurusDondur).
 let vurusKilit = null;
+// Tempo kapısı (isteğe bağlı; docs/KANCALAR.md "Tempo"): oyun OYUN.tempo ile coşkunun tempoya katkısını ve tempo
+// çarpanının alt / üst sınırını verir, muzik.tempoEk ile hedef çarpana kendi ekini katar (hediyeyle hızlanma gibi).
+// Öntanımlar eski davranıştır: katkı 0.3, sınır yok, ek 0.
+const TEMPO = { cosku: 0.3, taban: 0, tavan: Infinity };
+for (const ad of Object.keys(TEMPO))
+  if (OYUN.tempo && typeof OYUN.tempo[ad] === 'number' && OYUN.tempo[ad] >= 0)
+    TEMPO[ad] = OYUN.tempo[ad];
 // Döngü: bir kare hata verse de sonraki kare istenir. Yoksa oyun kodundaki tek bir hata sahneyi sessizce
 // dondurur ve neden donduğu görünmez. Hata konsola ve sayfaya (pageerror) bir kez düşer; deneme görünümünde
 // sahnenin ortasına da yazılır ki kareye bakan hemen görsün. Yayın görünümünde (#yayin) ekrana yazılmaz.
@@ -2941,9 +2961,9 @@ function kareIc(simdiMs) {
   sonKare = simdiMs;
   zaman += dt;
   kareSay++;
-  // müzik saati (oyun muzik.sov'u kendisi açar: doğruysa tempo biraz artar)
+  // müzik saati (oyun muzik.sov'u kendisi açar: doğruysa tempo biraz artar; muzik.tempoEk oyunun kendi ekidir)
   muzik.cosku = D.cosku;
-  const hedefCarpan = 1 + 0.3 * D.cosku + (muzik.sov ? 0.08 : 0);
+  const hedefCarpan = clamp(1 + TEMPO.cosku * D.cosku + (muzik.sov ? 0.08 : 0) + (+muzik.tempoEk || 0), TEMPO.taban, TEMPO.tavan);
   muzik.carpan += (hedefCarpan - muzik.carpan) * Math.min(1, dt * 1.5);
   muzik.planla(0.2);
   const mt = muzik.simdi();
@@ -3879,6 +3899,7 @@ queueMicrotask(() => {
  * D'ye eklenenler: hareket (herkesin yaptığı omuz / çök), soloKuyruk + solo (ortaya çıkan), sovBit (davul şovu
  * hangi vuruşa dek sürer), mendilUcus (el değiştiren mendil), R / Rhedef (yayın yarıçapı), aci (yayın açıklığı),
  * meydanR (ışıklı meydanın yarıçapı), salinim (dizinin yavaş salınımı), soloYer, calZ / calAralik (çalgıcıların yeri).
+ * Hediyenin müziğe etkisi (tempo, hava sırası) 22-hediye-muzik.js'tedir.
  * Kancalar: oyunYerlesim, oyunGiris, oyunHediye, oyunLiderDegisti, oyunBaslat, oyunBosalt, oyunDurum.
  */
 const ARALIK = 0.54;
@@ -3925,6 +3946,7 @@ function oyunHediye(k, j, kd) {
     konfeti(120, 1);
     D.sarsinti = 1;
   }
+  hediyeMuzik(k, kd, v);
   muzik.sov = B < D.sovBit;
 }
 // Mendil eski halay başının elinden yenisinin başına uçar.
@@ -3955,11 +3977,14 @@ function oyunBosalt() {
   D.solo = null;
   D.hareket = null;
   D.mendilUcus = null;
+  hediyeMuzikSifirla();
 }
 function oyunDurum(d) {
   d.halayBasi = d.lider;
   d.solo = D.solo ? D.solo.k.ad : null;
   d.soloKuyruk = D.soloKuyruk.length;
+  d.tempoEk = muzik.tempoEk;
+  d.havaSira = D.havaSira.length;
 }
 
 /* ── oyunlar/halay/js/20-hareket.js ── */
@@ -4215,6 +4240,7 @@ function oyunGuncelle(dt) {
   for (const k of D.oy.values())
     karakterHareket(k, dt);
   muzik.sov = B < D.sovBit;
+  hediyeMuzikGuncelle();
   // eklemler: önce herkesin iskeleti, sonra komşulara uzanan kollar
   const hepsi = [...D.oy.values(), davulcu, zurnaci];
   for (const k of hepsi)
@@ -4232,6 +4258,113 @@ function oyunKamera() {
   if (D.solo)
     n.push(D.soloYer);
   return n;
+}
+
+/* ── oyunlar/halay/js/22-hediye-muzik.js ── */
+/* HEDİYEYLE MÜZİK — izleyici hediye attıkça tempo ve çalan hava değişir. Ayarlar OYUN.tempo ve OYUN.hediyeMuzik.
+ * Tempo: çekirdeğin tempo kapısından geçer (muzik.tempoEk; alt / üst sınırı ve yumuşatmayı çekirdek uygular).
+ *   omuz  : her hediye bir tempo kademesi ekler; kademe adimVurus vuruş yaşar, en çok adimEnCok kademe birikir
+ *   cok   : hareketin ilk cokAgirVurus vuruşunda tempo ağırlaşır, sonraki cokPatlamaVurus vuruşta patlar
+ *   solo  : solo sürdükçe tempo tavandadır
+ * Hava: davul hediyesi sıraya girer (D.havaSira: gönderen izleyiciler). Sıradaki, son hava değişiminden havaAra vuruş
+ * geçince ve solo yokken işlenir: üretilen müzikte sıradaki hava ölçü başında girer (muzik.bekleyen), hazır parça
+ * kipinde sıradaki parça başlar. Kendiliğinden hava dönüşü ve yayıncının panelden seçtiği hava da arayı baştan başlatır.
+ * hediyeMuzik(k, kd, v): oyunHediye çağırır · hediyeMuzikGuncelle(): oyunGuncelle çağırır · hediyeMuzikSifirla()
+ */
+const HEDIYE_MUZIK = OYUN.hediyeMuzik;
+Object.assign(D, { tempoAdimlar: [], cokTempo: null, havaSira: [], havaGecis: null, havaSon: -Infinity, calanKimlik: null });
+
+function hediyeMuzik(k, kd, v) {
+  const a = HEDIYE_MUZIK;
+  if (kd.tip === 'omuz')
+    D.tempoAdimlar = [...D.tempoAdimlar, v + a.adimVurus].slice(-a.adimEnCok);
+  else if (kd.tip === 'cok')
+    D.cokTempo = { bas: v };
+  else if (kd.tip === 'davul' && D.havaSira.length < a.havaSiraEnCok)
+    D.havaSira = [...D.havaSira, k];
+}
+function hediyeMuzikSifirla() {
+  if (D.havaGecis && muzik.bekleyen === D.havaGecis.h)
+    muzik.bekleyen = null;
+  Object.assign(D, { tempoAdimlar: [], cokTempo: null, havaSira: [], havaGecis: null, havaSon: -Infinity });
+  muzik.tempoEk = 0;
+}
+// Hedef tempo çarpanına eklenecek pay. Hazır parça yavaşlatılamaz: ağırlaşma adımı o kipte atlanır.
+function tempoEkHesapla() {
+  const a = HEDIYE_MUZIK, c = D.cokTempo;
+  if (D.solo)
+    return OYUN.tempo.tavan - 1;
+  let ek = D.tempoAdimlar.length * a.adim;
+  if (c && B >= c.bas)
+    ek += B - c.bas >= a.cokAgirVurus ? a.cokPatlama : muzik.hazirCal ? 0 : -a.cokAgir;
+  return ek;
+}
+function calanKimlik() {
+  return muzik.hazirCal ? 'parca-' + muzik.hz.no : muzik.hava.id;
+}
+// Ad hediye anında değil duyuru anında okunur: yayıncı bu arada adı gizlediyse "misafir" yazılır, izleyici
+// sahneden çıktıysa (yayıncı çıkardı ya da kendi gitti) ad hiç yazılmaz.
+function havaDuyur(havaAd, k) {
+  const sahnede = D.oy.get(k.id) === k && !k.cikiyor;
+  pankart(havaAd, sahnede ? 'Havayı ' + k.ad + ' değiştirdi' : 'Hava değişti');
+}
+// Henüz girmemiş hava değişimini geri alır: gönderen sıranın başına döner.
+function havaGecisGeriAl() {
+  const g = D.havaGecis;
+  if (muzik.bekleyen === g.h)
+    muzik.bekleyen = null;
+  D.havaSira = [g.k, ...D.havaSira];
+  D.havaGecis = null;
+}
+function havaSiraIslet() {
+  const a = HEDIYE_MUZIK, kimlik = calanKimlik(), g = D.havaGecis;
+  // Çalan değişti (hediyeyle, kendiliğinden ya da panelden): ara baştan sayılır.
+  if (kimlik !== D.calanKimlik) {
+    if (D.calanKimlik !== null)
+      D.havaSon = B;
+    D.calanKimlik = kimlik;
+  }
+  if (D.solo) {
+    // Solo bitene dek hava değişmez: henüz girmemiş değişim sıranın başına döner, kendiliğinden dönüş bekler.
+    if (g && muzik.bekleyen === g.h)
+      havaGecisGeriAl();
+    muzik.havaSure = 0;
+    return;
+  }
+  if (g && muzik.hazirCal && muzik.hava !== g.h)
+    havaGecisGeriAl(); // hava girmeden hazır parçaya geçildi: değişim sıradaki parçaya uygulanır
+  else if (g) {
+    if (muzik.bekleyen === g.h)
+      return;
+    // Artık beklemiyor: ya ölçü başında girdi ya da yayıncı panelden başka hava seçti.
+    if (muzik.hava === g.h && !muzik.hazirCal)
+      havaDuyur(g.h.ad, g.k);
+    D.havaGecis = null;
+  }
+  if (!D.havaSira.length || (!muzik.hazirCal && muzik.bekleyen) || B - D.havaSon < a.havaAra)
+    return;
+  const [k, ...kalan] = D.havaSira;
+  D.havaSira = kalan;
+  D.havaSon = B;
+  if (muzik.hazirCal) {
+    const no = (muzik.hz.no + 1) % muzik.parcalar.length;
+    muzik.hazirBaslat(no).catch(e => console.error('Hazır parça başlatılamadı:', e));
+    havaDuyur(muzik.parcalar[no].ad, k);
+    return;
+  }
+  const h = muzik.havalar[(muzik.havalar.indexOf(muzik.hava) + 1) % muzik.havalar.length];
+  muzik.bekleyen = h;
+  muzik.havaSure = 0;
+  D.havaGecis = { h, k };
+}
+function hediyeMuzikGuncelle() {
+  const a = HEDIYE_MUZIK;
+  if (D.tempoAdimlar.some(bit => B >= bit))
+    D.tempoAdimlar = D.tempoAdimlar.filter(bit => B < bit);
+  if (D.cokTempo && B >= D.cokTempo.bas + a.cokAgirVurus + a.cokPatlamaVurus)
+    D.cokTempo = null;
+  muzik.tempoEk = tempoEkHesapla();
+  havaSiraIslet();
 }
 
 /* ── oyunlar/halay/js/30-dekor.js ── */

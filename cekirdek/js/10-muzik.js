@@ -614,6 +614,7 @@ class Muzik {
     this.iz = [];
     this.olaylar = [];
     this.carpan = 1;
+    this.tempoEk = 0; // oyunun hedef tempo çarpanına kattığı ek (35-kare.js: tempo kapısı); çekirdek değiştirmez
     this.sov = false;
     this.cosku = 0;
     this.ctx = null;

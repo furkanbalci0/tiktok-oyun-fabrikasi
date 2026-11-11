@@ -112,6 +112,10 @@ TAKIMLAR.ornek = mzSurekliTakim({
   form: 'AABBD' }
 ```
 
+Çalarken tempo `bpm × çarpan`dır: çarpan coşkuyla (öntanımda en çok +%30) ve şovla (+%8) artar. Oyun bu katkıyı,
+çarpanın sınırlarını ve kendi tempo ekini `OYUN.tempo` / `muzik.tempoEk` ile verir (`docs/KANCALAR.md`, "Tempo
+kapısı"); halayda tempoyu hediyeler yönetir (çarpan 0,88–1,3).
+
 Tempo seçerken oyununun hareketine bak: yürüyüş, vuruş, korna, dans hepsi vuruşla ölçülür. Tempo değişince oyunun
 gerçek saatteki hızı değişir; oyunun testlerindeki gerçek zaman beklemelerini buna göre denetle.
 

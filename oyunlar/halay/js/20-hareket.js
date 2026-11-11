@@ -250,6 +250,7 @@ function oyunGuncelle(dt) {
   for (const k of D.oy.values())
     karakterHareket(k, dt);
   muzik.sov = B < D.sovBit;
+  hediyeMuzikGuncelle();
   // eklemler: önce herkesin iskeleti, sonra komşulara uzanan kollar
   const hepsi = [...D.oy.values(), davulcu, zurnaci];
   for (const k of hepsi)

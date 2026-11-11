@@ -1194,6 +1194,7 @@ class Muzik {
     this.iz = [];
     this.olaylar = [];
     this.carpan = 1;
+    this.tempoEk = 0; // oyunun hedef tempo çarpanına kattığı ek (35-kare.js: tempo kapısı); çekirdek değiştirmez
     this.sov = false;
     this.cosku = 0;
     this.ctx = null;
@@ -2913,6 +2914,13 @@ const KANCA_EK_ADLAR = typeof oyunEkAdlar === 'function' ? oyunEkAdlar : null;
 let sonKare = 0, kareSay = 0;
 // Yalnız testler ve kare-cek için: doluysa B müzikten okunmaz, bu değerde durur (CanliOyun._test.vurusDondur).
 let vurusKilit = null;
+// Tempo kapısı (isteğe bağlı; docs/KANCALAR.md "Tempo"): oyun OYUN.tempo ile coşkunun tempoya katkısını ve tempo
+// çarpanının alt / üst sınırını verir, muzik.tempoEk ile hedef çarpana kendi ekini katar (hediyeyle hızlanma gibi).
+// Öntanımlar eski davranıştır: katkı 0.3, sınır yok, ek 0.
+const TEMPO = { cosku: 0.3, taban: 0, tavan: Infinity };
+for (const ad of Object.keys(TEMPO))
+  if (OYUN.tempo && typeof OYUN.tempo[ad] === 'number' && OYUN.tempo[ad] >= 0)
+    TEMPO[ad] = OYUN.tempo[ad];
 // Döngü: bir kare hata verse de sonraki kare istenir. Yoksa oyun kodundaki tek bir hata sahneyi sessizce
 // dondurur ve neden donduğu görünmez. Hata konsola ve sayfaya (pageerror) bir kez düşer; deneme görünümünde
 // sahnenin ortasına da yazılır ki kareye bakan hemen görsün. Yayın görünümünde (#yayin) ekrana yazılmaz.
@@ -2946,9 +2954,9 @@ function kareIc(simdiMs) {
   sonKare = simdiMs;
   zaman += dt;
   kareSay++;
-  // müzik saati (oyun muzik.sov'u kendisi açar: doğruysa tempo biraz artar)
+  // müzik saati (oyun muzik.sov'u kendisi açar: doğruysa tempo biraz artar; muzik.tempoEk oyunun kendi ekidir)
   muzik.cosku = D.cosku;
-  const hedefCarpan = 1 + 0.3 * D.cosku + (muzik.sov ? 0.08 : 0);
+  const hedefCarpan = clamp(1 + TEMPO.cosku * D.cosku + (muzik.sov ? 0.08 : 0) + (+muzik.tempoEk || 0), TEMPO.taban, TEMPO.tavan);
   muzik.carpan += (hedefCarpan - muzik.carpan) * Math.min(1, dt * 1.5);
   muzik.planla(0.2);
   const mt = muzik.simdi();
