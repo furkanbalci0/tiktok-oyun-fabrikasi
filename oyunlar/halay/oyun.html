@@ -4235,116 +4235,652 @@ function oyunKamera() {
 }
 
 /* ── oyunlar/halay/js/30-dekor.js ── */
-/* DEKOR — gece göğü, köy, meydan zemini, kilim baklavaları, ampul dizileri, gölgeler, halay başı halkası, solo ışığı.
- * arkaHazirla: gökyüzü bir kez çizilir · zeminCiz (meydan + ampulCiz) · Kanca: oyunZemin().
+/* DEKOR — düğün gecesi fonu: dört katmanlı perde (gök, tepeler, köy, meydan duvarı) ve katmanlar arası paralaks.
+ * arkaHazirla: katmanlar açılışta bir kez çizilir · fonCiz(): gök + tepeler + köy · onKatmanCiz(): duvar, direkler
+ * FON_DIREK: ampul iplerinin asıldığı direklerin katmandaki yeri (34-isik.js kullanır).
  */
 // Kamera yüksekten baktığı için gerçek ufuk görüntünün dışında kalır. Gökyüzü ve köy, sahnenin üstünde
-// sabit bir fon perdesi gibi durur; UFUK o perdenin bittiği satırdır.
-const UFUK = 432;
-let arkaKatman = null;
-function arkaHazirla() {
+// sabit bir fon perdesi gibi durur; UFUK o perdenin bittiği, meydan duvarının oturduğu satırdır.
+const UFUK = 468;
+// Katmanlar ekrandan geniş çizilir (iki yanda 190 px pay): kamera sağa sola salındıkça farklı hızlarda kayarlar.
+// Yayın 1080 genişlikte olduğu için katmanlar 1,5 kat çözünürlükte tutulur, yoksa perde bulanık kalır.
+const FON_EN = 1100, FON_BOY = 600, FON_OLCEK = 1.5, FON_PAY = 190;
+const FON_KAY = { gok: 120, tepe: 260, koy: 430, on: 640 };
+const FON_DIREK = [{ x: 232, y: UFUK - 84 }, { x: 550, y: UFUK - 96 }, { x: 868, y: UFUK - 84 }];
+const fon = { gok: null, tepe: null, koy: null, on: null };
+
+function katmanYap(ciz) {
   const t = document.createElement('canvas');
-  t.width = 1100;
-  t.height = 600;
-  const a = t.getContext('2d'), r = rastgeleUret(41), H = UFUK + 2;
+  t.width = FON_EN * FON_OLCEK;
+  t.height = FON_BOY * FON_OLCEK;
+  const a = t.getContext('2d');
+  a.scale(FON_OLCEK, FON_OLCEK);
+  a.lineJoin = 'round';
+  a.lineCap = 'round';
+  ciz(a);
+  return t;
+}
+function arkaHazirla() {
+  fon.gok = katmanYap(gokKatman);
+  fon.tepe = katmanYap(tepeKatman);
+  fon.koy = katmanYap(koyKatman);
+  fon.on = katmanYap(onKatman);
+  tasDokuHazirla();
+  isikHazirla();
+}
+const katmanX = ad => -FON_PAY - kam.yaw * FON_KAY[ad];
+function fonCiz() {
+  for (const ad of ['gok', 'tepe', 'koy'])
+    c.drawImage(fon[ad], katmanX(ad), 0, FON_EN, FON_BOY);
+}
+function onKatmanCiz() { c.drawImage(fon.on, katmanX('on'), 0, FON_EN, FON_BOY); }
+
+/* ---- gök: lacivertten ufuktaki gün batımı kızıllığına; yıldızlar, ay, ince bulutlar ---- */
+function gokKatman(a) {
+  const r = rastgeleUret(41), H = UFUK + 2;
   const gr = a.createLinearGradient(0, 0, 0, H);
-  gr.addColorStop(0, '#0a0d2a');
-  gr.addColorStop(0.55, '#1a2260');
-  gr.addColorStop(0.9, '#3a3a86');
-  gr.addColorStop(1, '#6b4f8f');
+  gr.addColorStop(0, '#060920');
+  gr.addColorStop(0.38, '#111747');
+  gr.addColorStop(0.68, '#272a70');
+  gr.addColorStop(0.86, '#5a3f86');
+  gr.addColorStop(0.95, '#9a5a80');
+  gr.addColorStop(1, '#d08a6a');
   a.fillStyle = gr;
-  a.fillRect(0, 0, 1100, H + 160);
-  for (let i = 0; i < 120; i++) {
-    a.globalAlpha = 0.3 + r() * 0.7;
-    a.fillStyle = '#f6ecd9';
+  a.fillRect(0, 0, FON_EN, FON_BOY);
+  for (let i = 0; i < 190; i++) {
+    const x = r() * FON_EN, y = r() * H * 0.86, b = 0.5 + r() * 1.3, al = (0.25 + r() * 0.75) * (1 - y / H * 0.7);
+    a.globalAlpha = al;
+    a.fillStyle = r() < 0.2 ? '#ffe2a8' : '#f6ecd9';
     a.beginPath();
-    a.arc(r() * 1100, r() * H * 0.85, 0.6 + r() * 1.4, 0, TAU);
+    a.arc(x, y, b, 0, TAU);
     a.fill();
-  }
-  a.globalAlpha = 0.12;
-  a.fillStyle = '#ffd166';
-  a.beginPath();
-  a.arc(800, 92, 70, 0, TAU);
-  a.fill();
-  a.globalAlpha = 1;
-  a.fillStyle = '#f6ecd9';
-  a.beginPath();
-  a.arc(800, 92, 34, 0, TAU);
-  a.fill();
-  a.fillStyle = 'rgba(169,176,220,.35)';
-  for (const [x, y, q] of [[790, 84, 8], [812, 100, 6], [798, 106, 4]]) {
-    a.beginPath();
-    a.arc(x, y, q, 0, TAU);
-    a.fill();
-  }
-  const tepe = (renk, yuk, f1, f2, kay) => { a.fillStyle = renk; a.beginPath(); a.moveTo(0, H + 160); for (let x = 0; x <= 1100; x += 10)
-    a.lineTo(x, H - yuk * (0.55 + 0.3 * Math.sin(x * f1 + kay) + 0.15 * Math.sin(x * f2 + kay * 2))); a.lineTo(1100, H + 160); a.closePath(); a.fill(); };
-  tepe('#232a6b', 74, 0.0071, 0.019, 1.2);
-  tepe('#181e52', 44, 0.011, 0.027, 4.1);
-  // köy: evler, kavaklar, ışıklı pencereler
-  for (let x = 20; x < 1090;) {
-    const kavak = r() < 0.3;
-    if (kavak) {
-      const h = 46 + r() * 30;
-      a.fillStyle = '#10153d';
-      a.beginPath();
-      a.ellipse(x + 8, H - h / 2 - 2, 8, h / 2, 0, 0, TAU);
-      a.fill();
-      x += 22;
-      continue;
+    if (b > 1.5) {
+      // iri yıldızın dört kollu ışıltısı
+      a.globalAlpha = al * 0.55;
+      a.fillRect(x - b * 3.4, y - 0.4, b * 6.8, 0.8);
+      a.fillRect(x - 0.4, y - b * 3.4, 0.8, b * 6.8);
     }
-    const w = 34 + r() * 30, h = 20 + r() * 20;
-    a.fillStyle = '#10153d';
-    a.fillRect(x, H - h, w, h + 4);
+  }
+  a.globalAlpha = 1;
+  // ay: geniş hale, hacimli yüzey, kraterler
+  const mx = 800, my = 96, mr = 36;
+  const hale = a.createRadialGradient(mx, my, mr * 0.8, mx, my, mr * 5);
+  hale.addColorStop(0, 'rgba(255,226,170,.34)');
+  hale.addColorStop(0.3, 'rgba(255,214,160,.12)');
+  hale.addColorStop(1, 'rgba(255,214,160,0)');
+  a.fillStyle = hale;
+  a.fillRect(mx - mr * 5, my - mr * 5, mr * 10, mr * 10);
+  const yuz = a.createRadialGradient(mx - 12, my - 13, 3, mx, my, mr);
+  yuz.addColorStop(0, '#fffaf0');
+  yuz.addColorStop(0.6, '#f3e6c8');
+  yuz.addColorStop(1, '#cdbd9f');
+  a.fillStyle = yuz;
+  a.beginPath();
+  a.arc(mx, my, mr, 0, TAU);
+  a.fill();
+  for (const [x, y, q] of [[-9, -7, 8], [13, 9, 6], [-2, 15, 4], [14, -13, 3.5], [-17, 9, 3]]) {
+    a.fillStyle = 'rgba(150,146,170,.28)';
     a.beginPath();
-    a.moveTo(x - 4, H - h);
-    a.lineTo(x + w / 2, H - h - 12 - r() * 8);
-    a.lineTo(x + w + 4, H - h);
+    a.arc(mx + x, my + y, q, 0, TAU);
+    a.fill();
+    a.fillStyle = 'rgba(255,250,240,.35)';
+    a.beginPath();
+    a.arc(mx + x + q * 0.2, my + y + q * 0.25, q * 0.78, 0, TAU);
+    a.fill();
+  }
+  // ince bulut şeritleri: üstleri ay ışığıyla, ufka yakın olanlar kızıllıkla aydınlanır
+  for (let i = 0; i < 9; i++) {
+    const x = r() * FON_EN, y = 170 + r() * 240, w = 90 + r() * 150, sicak = y > 330;
+    for (let q = 0; q < 6; q++) {
+      a.fillStyle = sicak ? 'rgba(232,150,130,.075)' : 'rgba(169,176,220,.06)';
+      a.beginPath();
+      a.ellipse(x + (r() - 0.5) * w, y + (r() - 0.5) * 9, w * (0.3 + r() * 0.4), 5 + r() * 6, 0, 0, TAU);
+      a.fill();
+    }
+  }
+}
+
+/* ---- tepeler: uzaktaki sırt puslu ve açık, yakındaki koyu ---- */
+function tepeKatman(a) {
+  const H = UFUK + 2, r = rastgeleUret(9);
+  const sirt = (ust, alt, yuk, f1, f2, kay, agac) => {
+    const yy = x => H - yuk * (0.55 + 0.3 * Math.sin(x * f1 + kay) + 0.15 * Math.sin(x * f2 + kay * 2));
+    const gr = a.createLinearGradient(0, H - yuk, 0, H);
+    gr.addColorStop(0, ust);
+    gr.addColorStop(1, alt);
+    a.fillStyle = gr;
+    a.beginPath();
+    a.moveTo(0, FON_BOY);
+    for (let x = 0; x <= FON_EN; x += 8)
+      a.lineTo(x, yy(x));
+    a.lineTo(FON_EN, FON_BOY);
     a.closePath();
     a.fill();
-    a.fillStyle = r() < 0.75 ? '#ffd166' : '#22b8a7';
-    for (let px = x + 7; px < x + w - 9; px += 13)
-      if (r() < 0.7)
-        a.fillRect(px, H - h + 7, 6, 8);
-    x += w + 6 + r() * 26;
-  }
-  arkaKatman = t;
+    // sırtın üstünde ufak ağaç kümeleri
+    a.fillStyle = ust;
+    for (let i = 0; i < agac; i++) {
+      const x = r() * FON_EN, q = 3 + r() * 4;
+      a.beginPath();
+      a.ellipse(x, yy(x) - q * 0.5, q, q * 1.25, 0, 0, TAU);
+      a.fill();
+    }
+  };
+  sirt('#4a3f88', '#5b4a8c', 104, 0.0052, 0.013, 0.4, 0);
+  sirt('#2c3178', '#3d3a80', 78, 0.0071, 0.019, 1.2, 26);
+  sirt('#191f55', '#2a2b68', 46, 0.011, 0.027, 4.1, 34);
 }
-const KILIM = ['#e23d2f', '#22b8a7', '#f2b632'];
-let zeminBoya = null;
-function zeminCiz() {
-  c.drawImage(arkaKatman, -190 - kam.yaw * 520, 0);
-  if (!zeminBoya) {
-    zeminBoya = c.createLinearGradient(0, UFUK, 0, GH);
-    zeminBoya.addColorStop(0, '#242b66');
-    zeminBoya.addColorStop(0.3, '#171d4b');
-    zeminBoya.addColorStop(1, '#0c1030');
+
+/* ---- köy: minare, kavaklar, alttan meydan ışığı alan evler, ışıklı pencereler, baca dumanı ---- */
+function evCiz(a, r, x, H, w, h) {
+  const govde = a.createLinearGradient(0, H - h, 0, H);
+  govde.addColorStop(0, '#161b4c');
+  govde.addColorStop(1, '#43305c');
+  a.fillStyle = govde;
+  a.fillRect(x, H - h, w, h + 6);
+  // ayın vurmadığı yan
+  a.fillStyle = 'rgba(8,10,34,.32)';
+  a.fillRect(x, H - h, w * 0.3, h + 6);
+  const tepe = 14 + r() * 10, kirma = r() < 0.45, sacak = 5;
+  a.fillStyle = '#0c1034';
+  a.beginPath();
+  a.moveTo(x - sacak, H - h);
+  if (kirma) {
+    a.lineTo(x + w * 0.24, H - h - tepe);
+    a.lineTo(x + w * 0.76, H - h - tepe);
   }
-  c.fillStyle = zeminBoya;
-  c.fillRect(0, UFUK, GW, GH - UFUK);
-  // meydan: ampullerin aydınlattığı sıcak toprak. Kenarı geceye karışır, ortası en aydınlık yerdir.
-  const mz = kam.tz, yc = D.meydanR + 0.8;
-  const o = pr([0, 0, mz]), sag = pr([yc, 0, mz]), on = pr([0, 0, mz - yc]), ar = pr([0, 0, mz + yc]);
-  if (o.ok && sag.ok && on.ok && ar.ok) {
-    const rx = sag.x - o.x, my = (on.y + ar.y) / 2, ky = (on.y - ar.y) / 2 / rx;
+  else
+    a.lineTo(x + w / 2, H - h - tepe);
+  a.lineTo(x + w + sacak, H - h);
+  a.closePath();
+  a.fill();
+  // kiremit çizgileri ve ayın vurduğu saçak
+  a.strokeStyle = 'rgba(120,128,200,.2)';
+  a.lineWidth = 1;
+  for (let i = 1; i < 3; i++) {
+    const t = i / 3, ic = (tepe / 12) * sacak * t;
+    a.beginPath();
+    a.moveTo(x - sacak + (kirma ? w * 0.24 + sacak : w / 2 + sacak) * t, H - h - tepe * t);
+    a.lineTo(x + w + sacak - (kirma ? w * 0.24 + sacak : w / 2 + sacak) * t + ic * 0, H - h - tepe * t);
+    a.stroke();
+  }
+  a.strokeStyle = 'rgba(196,202,240,.6)';
+  a.lineWidth = 1.5;
+  a.beginPath();
+  a.moveTo(kirma ? x + w * 0.76 : x + w / 2, H - h - tepe);
+  a.lineTo(x + w + sacak, H - h);
+  a.stroke();
+  if (r() < 0.6) {
+    const bx = x + w * (0.2 + r() * 0.5);
+    a.fillStyle = '#0c1034';
+    a.fillRect(bx, H - h - tepe - 5, 7, tepe * 0.8);
+    for (let i = 0; i < 6; i++) {
+      a.fillStyle = 'rgba(190,190,230,' + (0.09 - i * 0.012) + ')';
+      a.beginPath();
+      a.arc(bx + 4 + i * 3.5 + Math.sin(i * 1.3) * 3, H - h - tepe - 10 - i * 8, 4 + i * 1.6, 0, TAU);
+      a.fill();
+    }
+  }
+  // pencereler: çoğu yanık; yanan pencere duvara ışık saçar
+  const adet = Math.max(1, Math.floor((w - 14) / 19)), ara = (w - 14) / adet;
+  for (let i = 0; i < adet; i++) {
+    const px = x + 9 + i * ara + (ara - 9) / 2 - 2, py = H - h + 9, yanik = r() < 0.72, renk = r() < 0.82 ? '#ffd98a' : '#7fe0d2';
+    if (yanik) {
+      const isik = a.createRadialGradient(px + 4.5, py + 6, 2, px + 4.5, py + 6, 20);
+      isik.addColorStop(0, renkSaydam(renk, 0.34));
+      isik.addColorStop(1, renkSaydam(renk, 0));
+      a.fillStyle = isik;
+      a.fillRect(px - 16, py - 14, 41, 40);
+    }
+    a.fillStyle = yanik ? renk : '#0a0d2c';
+    a.fillRect(px, py, 9, 12);
+    if (yanik) {
+      a.fillStyle = 'rgba(255,255,255,.4)';
+      a.fillRect(px, py, 9, 3.5);
+    }
+    a.strokeStyle = '#0c1034';
+    a.lineWidth = 1.4;
+    a.strokeRect(px, py, 9, 12);
+    a.beginPath();
+    a.moveTo(px + 4.5, py);
+    a.lineTo(px + 4.5, py + 12);
+    a.moveTo(px, py + 6);
+    a.lineTo(px + 9, py + 6);
+    a.stroke();
+  }
+}
+function kavakCiz(a, x, H, h) {
+  a.fillStyle = '#0c1136';
+  a.fillRect(x - 1.5, H - h * 0.3, 3, h * 0.3 + 4);
+  a.beginPath();
+  a.ellipse(x, H - h * 0.56, h * 0.13, h * 0.46, 0, 0, TAU);
+  a.fill();
+  // ay sağda: kavağın sağ yanı hafifçe aydınlanır
+  a.fillStyle = 'rgba(92,100,190,.3)';
+  a.beginPath();
+  a.ellipse(x + h * 0.045, H - h * 0.6, h * 0.06, h * 0.36, 0, 0, TAU);
+  a.fill();
+}
+function koyKatman(a) {
+  const r = rastgeleUret(23), H = UFUK + 2;
+  // minare: köyün en yüksek yapısı, şerefesinde bir ışık
+  const mx = 660;
+  a.fillStyle = '#151a4e';
+  a.fillRect(mx - 5, H - 134, 10, 140);
+  a.fillRect(mx - 9, H - 100, 18, 6);
+  a.beginPath();
+  a.moveTo(mx - 6, H - 134);
+  a.lineTo(mx, H - 164);
+  a.lineTo(mx + 6, H - 134);
+  a.closePath();
+  a.fill();
+  a.fillStyle = 'rgba(196,202,240,.5)';
+  a.fillRect(mx + 3.5, H - 134, 1.5, 134);
+  const mi = a.createRadialGradient(mx, H - 104, 1, mx, H - 104, 16);
+  mi.addColorStop(0, 'rgba(255,217,138,.9)');
+  mi.addColorStop(0.25, 'rgba(255,217,138,.3)');
+  mi.addColorStop(1, 'rgba(255,217,138,0)');
+  a.fillStyle = mi;
+  a.fillRect(mx - 16, H - 120, 32, 32);
+  for (let x = -6; x < FON_EN;) {
+    if (r() < 0.27) {
+      kavakCiz(a, x + 10, H, 62 + r() * 46);
+      x += 24 + r() * 8;
+      continue;
+    }
+    const w = 54 + r() * 40, h = 30 + r() * 28;
+    evCiz(a, r, x, H, w, h);
+    x += w + 2 + r() * 20;
+  }
+  // meydanın ışığı evlerin dibinde pus olur
+  const pus = a.createLinearGradient(0, H - 70, 0, H + 6);
+  pus.addColorStop(0, 'rgba(255,184,120,0)');
+  pus.addColorStop(1, 'rgba(255,184,120,.3)');
+  a.fillStyle = pus;
+  a.fillRect(0, H - 70, FON_EN, 80);
+}
+
+/* ---- ön katman: çınarlar, taş duvar, duvara serilmiş kilimler, fenerli ahşap direkler ---- */
+const TAS_DUVAR = [[125, 98, 102], [143, 114, 104], [108, 85, 96], [158, 128, 110]];
+function cinarCiz(a, r, x, H) {
+  a.fillStyle = '#1c1430';
+  a.beginPath();
+  a.moveTo(x - 11, H);
+  a.quadraticCurveTo(x - 5, H - 60, x - 16, H - 104);
+  a.lineTo(x + 12, H - 104);
+  a.quadraticCurveTo(x + 4, H - 60, x + 12, H);
+  a.closePath();
+  a.fill();
+  const kume = [];
+  for (let i = 0; i < 22; i++)
+    kume.push([x + (r() - 0.5) * 150, H - 104 - r() * 96, 22 + r() * 22]);
+  kume.sort((p, q) => p[1] - q[1]);
+  for (const [kx, ky, kr] of kume) {
+    // üst kümeler gece koyusu, alttakiler meydanın ışığını alır
+    const t = clamp((ky - (H - 200)) / 96, 0, 1);
+    a.fillStyle = 'rgb(' + Math.round(lerp(14, 74, t)) + ',' + Math.round(lerp(22, 62, t)) + ',' + Math.round(lerp(58, 58, t)) + ')';
+    a.beginPath();
+    a.arc(kx, ky, kr, 0, TAU);
+    a.fill();
+    a.fillStyle = 'rgba(255,190,110,' + (0.05 + t * 0.13) + ')';
+    a.beginPath();
+    a.arc(kx, ky + kr * 0.3, kr * 0.72, 0, TAU);
+    a.fill();
+  }
+}
+function duvarCiz(a, r, H) {
+  const ust = H - 30, sira = 3, sy = 11;
+  a.fillStyle = '#33263f';
+  a.fillRect(0, ust, FON_EN, 36);
+  for (let s = 0; s < sira; s++)
+    for (let x = -r() * 20; x < FON_EN;) {
+      const w = 20 + r() * 22, t = TAS_DUVAR[Math.floor(r() * TAS_DUVAR.length)], p = 0.86 + r() * 0.28;
+      a.fillStyle = 'rgb(' + Math.round(t[0] * p) + ',' + Math.round(t[1] * p) + ',' + Math.round(t[2] * p) + ')';
+      a.beginPath();
+      a.roundRect(x + 1, ust + 3 + s * sy + 1, w - 2, sy - 2, 2.5);
+      a.fill();
+      // taşın üst kenarına vuran ışık
+      a.fillStyle = 'rgba(255,226,180,.22)';
+      a.fillRect(x + 3, ust + 3 + s * sy + 1.5, w - 6, 1.4);
+      x += w;
+    }
+  // harpuşta: duvarın üstündeki açık renkli kapak taşları
+  for (let x = -r() * 20; x < FON_EN;) {
+    const w = 34 + r() * 20;
+    a.fillStyle = r() < 0.5 ? '#b3947c' : '#a58670';
+    a.beginPath();
+    a.roundRect(x + 0.8, ust - 4, w - 1.6, 7.5, 2);
+    a.fill();
+    a.fillStyle = 'rgba(255,240,210,.35)';
+    a.fillRect(x + 3, ust - 3.4, w - 6, 1.3);
+    x += w;
+  }
+  // meydanın ışığı ortada güçlü, kenarlarda duvar geceye karışır
+  const kenar = a.createLinearGradient(FON_PAY - 60, 0, FON_EN - FON_PAY + 60, 0);
+  kenar.addColorStop(0, 'rgba(12,14,44,.72)');
+  kenar.addColorStop(0.3, 'rgba(12,14,44,.12)');
+  kenar.addColorStop(0.5, 'rgba(255,190,110,.1)');
+  kenar.addColorStop(0.7, 'rgba(12,14,44,.12)');
+  kenar.addColorStop(1, 'rgba(12,14,44,.72)');
+  a.fillStyle = kenar;
+  a.fillRect(0, ust - 5, FON_EN, 42);
+}
+// Duvardan sarkan kilim: düğün evinin en iyi kilimi meydana asılır.
+function asiliKilimCiz(a, x, H, w, renkler) {
+  const ust = H - 33, boy = 31, serit = boy / 7;
+  for (let i = 0; i < 7; i++) {
+    a.fillStyle = renkler[i % renkler.length];
+    a.fillRect(x, ust + i * serit, w, serit + 0.5);
+  }
+  // orta şeritte baklava motifleri
+  a.fillStyle = '#f1dfbd';
+  for (let bx = x + 7; bx < x + w - 4; bx += 11) {
+    a.beginPath();
+    a.moveTo(bx, ust + serit * 3.5 - 4);
+    a.lineTo(bx + 4, ust + serit * 3.5);
+    a.lineTo(bx, ust + serit * 3.5 + 4);
+    a.lineTo(bx - 4, ust + serit * 3.5);
+    a.closePath();
+    a.fill();
+  }
+  a.strokeStyle = '#f1dfbd';
+  a.lineWidth = 1;
+  a.beginPath();
+  for (let sx = x + 1.5; sx < x + w; sx += 3) {
+    a.moveTo(sx, ust + boy);
+    a.lineTo(sx, ust + boy + 4);
+  }
+  a.stroke();
+  // kumaşın kıvrım gölgesi
+  const kiv = a.createLinearGradient(x, 0, x + w, 0);
+  kiv.addColorStop(0, 'rgba(10,8,30,.32)');
+  kiv.addColorStop(0.25, 'rgba(10,8,30,0)');
+  kiv.addColorStop(0.7, 'rgba(255,230,190,.1)');
+  kiv.addColorStop(1, 'rgba(10,8,30,.36)');
+  a.fillStyle = kiv;
+  a.fillRect(x, ust, w, boy);
+}
+function direkCiz(a, d, H) {
+  const g = a.createLinearGradient(d.x - 5, 0, d.x + 5, 0);
+  g.addColorStop(0, '#3d2616');
+  g.addColorStop(0.45, '#94602f');
+  g.addColorStop(1, '#4b2e19');
+  a.fillStyle = g;
+  a.fillRect(d.x - 4.5, d.y, 9, H + 8 - d.y);
+  a.fillRect(d.x - 20, d.y + 5, 40, 4.5);
+  // ahşabın damarı
+  a.strokeStyle = 'rgba(30,16,8,.4)';
+  a.lineWidth = 0.8;
+  a.beginPath();
+  for (let y = d.y + 16; y < H; y += 13) {
+    a.moveTo(d.x - 2.5, y);
+    a.lineTo(d.x - 1.5, y + 8);
+    a.moveTo(d.x + 2, y + 5);
+    a.lineTo(d.x + 2.6, y + 11);
+  }
+  a.stroke();
+  // fener: kolun ucunda asılı, camı sıcak ışıklı
+  for (const s of [-1, 1]) {
+    const fx = d.x + s * 17, fy = d.y + 12;
+    a.strokeStyle = '#20140c';
+    a.lineWidth = 1.2;
+    a.beginPath();
+    a.moveTo(fx, d.y + 9);
+    a.lineTo(fx, fy);
+    a.stroke();
+    a.fillStyle = '#20140c';
+    a.beginPath();
+    a.moveTo(fx - 5, fy + 3);
+    a.lineTo(fx, fy - 2);
+    a.lineTo(fx + 5, fy + 3);
+    a.closePath();
+    a.fill();
+    const cam = a.createLinearGradient(0, fy + 3, 0, fy + 14);
+    cam.addColorStop(0, '#fff3c8');
+    cam.addColorStop(1, '#ffb347');
+    a.fillStyle = cam;
+    a.fillRect(fx - 4, fy + 3, 8, 11);
+    a.strokeStyle = '#20140c';
+    a.lineWidth = 1.1;
+    a.strokeRect(fx - 4, fy + 3, 8, 11);
+    a.fillRect(fx - 5, fy + 14, 10, 2);
+  }
+}
+function onKatman(a) {
+  const r = rastgeleUret(77), H = UFUK + 2;
+  cinarCiz(a, r, 196, H);
+  cinarCiz(a, r, 918, H);
+  duvarCiz(a, r, H);
+  asiliKilimCiz(a, 296, H, 58, ['#b5332a', '#f1dfbd', '#1f8f84', '#b5332a', '#d99a2b']);
+  asiliKilimCiz(a, 634, H, 66, ['#1f8f84', '#f1dfbd', '#b5332a', '#d99a2b', '#b5332a']);
+  asiliKilimCiz(a, 772, H, 50, ['#d99a2b', '#b5332a', '#f1dfbd', '#1f8f84', '#b5332a']);
+  for (const d of FON_DIREK)
+    direkCiz(a, d, H);
+}
+
+/* ── oyunlar/halay/js/32-zemin.js ── */
+/* ZEMİN — taş döşeli köy meydanı: taş dokusu (bir kez çizilir, perspektifle şerit şerit yere serilir), gece ile
+ * fener ışığı arasındaki geçiş, meydanı çevreleyen kilim kuşağı.
+ * tasDokuHazirla · tasDokuCiz · meydanIsikCiz · kilimKusakCiz · zeminCiz (hepsini sırayla çağırır)
+ */
+// Doku dünyada sabittir: merkezi halkanın merkezi (0, 0), kenarı DOKU_M metre. Kalabalıkla büyümez, kamera ona
+// yaklaşıp uzaklaşır; böylece taşlar gerçek bir yer gibi durur.
+const DOKU_PX = 1536, DOKU_M = 16, DOKU_PPM = DOKU_PX / DOKU_M;
+const TAS_TON = [[222, 186, 136], [203, 164, 114], [190, 150, 104], [214, 178, 148], [196, 172, 140]];
+let tasDoku = null;
+function tasDokuHazirla() {
+  const t = document.createElement('canvas');
+  t.width = t.height = DOKU_PX;
+  const a = t.getContext('2d'), r = rastgeleUret(1907), o = DOKU_PX / 2, P = DOKU_PPM;
+  // derz: taşların arasında kalan koyu toprak
+  a.fillStyle = '#8c6a48';
+  a.fillRect(0, 0, DOKU_PX, DOKU_PX);
+  // halka halka dizilmiş, boyu ve tonu değişen taşlar
+  for (let r0 = 1.06; r0 < DOKU_M / 2;) {
+    const kalin = 0.36 + r() * 0.14, r1 = r0 + kalin, orta = (r0 + r1) / 2;
+    const adet = Math.round(TAU * orta / (0.46 + r() * 0.2)), kay = r() * TAU, bosluk = 0.022 / orta;
+    for (let i = 0; i < adet; i++) {
+      const a0 = kay + (i + (r() - 0.5) * 0.22) / adet * TAU, a1 = kay + (i + 1 + (r() - 0.5) * 0.22) / adet * TAU;
+      const ton = TAS_TON[Math.floor(r() * TAS_TON.length)], p = 0.9 + r() * 0.2;
+      a.fillStyle = 'rgb(' + Math.round(ton[0] * p) + ',' + Math.round(ton[1] * p) + ',' + Math.round(ton[2] * p) + ')';
+      a.beginPath();
+      a.arc(o, o, r1 * P - 2.2, a0 + bosluk, a1 - bosluk);
+      a.arc(o, o, r0 * P + 2.2, a1 - bosluk, a0 + bosluk, true);
+      a.closePath();
+      a.fill();
+      // taşın bir kenarı aşınmış ve açık, karşı kenarı gölgeli: yüzeyin düz olmadığı okunur
+      a.lineWidth = 1.6;
+      a.strokeStyle = 'rgba(255,240,205,.3)';
+      a.beginPath();
+      a.arc(o, o, r1 * P - 3.4, a0 + bosluk * 2, a1 - bosluk * 2);
+      a.stroke();
+      a.strokeStyle = 'rgba(70,44,26,.26)';
+      a.beginPath();
+      a.arc(o, o, r0 * P + 3.4, a0 + bosluk * 2, a1 - bosluk * 2);
+      a.stroke();
+    }
+    r0 = r1;
+  }
+  // ortadaki göbek: sekiz köşeli yıldız, çevresinde dişli kilim suyu
+  a.fillStyle = '#c79a66';
+  a.beginPath();
+  a.arc(o, o, 1.04 * P, 0, TAU);
+  a.fill();
+  const dis = 28;
+  for (let i = 0; i < dis; i++) {
+    const a0 = i / dis * TAU, a1 = (i + 1) / dis * TAU, am = (a0 + a1) / 2;
+    a.fillStyle = i % 2 ? '#a8402c' : '#efdcb6';
+    a.beginPath();
+    a.moveTo(o + Math.cos(a0) * 0.99 * P, o + Math.sin(a0) * 0.99 * P);
+    a.lineTo(o + Math.cos(a1) * 0.99 * P, o + Math.sin(a1) * 0.99 * P);
+    a.lineTo(o + Math.cos(am) * 0.8 * P, o + Math.sin(am) * 0.8 * P);
+    a.closePath();
+    a.fill();
+  }
+  const yildiz = (yar, ic, renk) => {
+    a.fillStyle = renk;
+    a.beginPath();
+    for (let i = 0; i < 16; i++) {
+      const q = i / 16 * TAU, m = (i % 2 ? ic : yar) * P;
+      a.lineTo(o + Math.cos(q) * m, o + Math.sin(q) * m);
+    }
+    a.closePath();
+    a.fill();
+  };
+  yildiz(0.74, 0.5, '#a8402c');
+  yildiz(0.56, 0.36, '#efdcb6');
+  yildiz(0.36, 0.22, '#1f8f84');
+  a.fillStyle = '#d9a23a';
+  a.beginPath();
+  a.arc(o, o, 0.11 * P, 0, TAU);
+  a.fill();
+  // çakıl, toz ve saman çöpleri: yüzey temiz bir desen gibi durmasın
+  for (let i = 0; i < 5200; i++) {
+    const x = r() * DOKU_PX, y = r() * DOKU_PX;
+    a.fillStyle = r() < 0.5 ? 'rgba(64,40,24,.16)' : 'rgba(255,238,200,.16)';
+    a.beginPath();
+    a.arc(x, y, 0.8 + r() * 2.2, 0, TAU);
+    a.fill();
+  }
+  a.strokeStyle = 'rgba(240,214,140,.4)';
+  a.lineWidth = 1.5;
+  a.beginPath();
+  for (let i = 0; i < 240; i++) {
+    const x = r() * DOKU_PX, y = r() * DOKU_PX, q = r() * TAU, u = 5 + r() * 9;
+    a.moveTo(x, y);
+    a.lineTo(x + Math.cos(q) * u, y + Math.sin(q) * u);
+  }
+  a.stroke();
+  // kenar: doku sert bir çizgiyle bitmez, geceye erir
+  a.globalCompositeOperation = 'destination-in';
+  const kenar = a.createRadialGradient(o, o, o * 0.8, o, o, o);
+  kenar.addColorStop(0, 'rgba(0,0,0,1)');
+  kenar.addColorStop(1, 'rgba(0,0,0,0)');
+  a.fillStyle = kenar;
+  a.fillRect(0, 0, DOKU_PX, DOKU_PX);
+  tasDoku = t;
+}
+// Doku, kameradan uzağa doğru ince şeritlere bölünüp her şerit kendi derinliğinin ölçeğiyle çizilir: uzak taşlar
+// küçülür, yakındakiler büyür. Tek parça çizim perspektifi veremezdi (2B tuvalde yalnız eğme ve ölçek var).
+const SERIT_M = 0.2;
+function tasDokuCiz() {
+  const yari = DOKU_M / 2, mz = kam.tz, pay = D.meydanR + 3;
+  const zUst = Math.min(yari, mz + pay), zAlt = Math.max(-yari, mz - pay);
+  let u0 = pr([0, 0, zUst]);
+  for (let z0 = zUst; z0 > zAlt + 1e-6; z0 -= SERIT_M) {
+    const z1 = Math.max(zAlt, z0 - SERIT_M), zm = (z0 + z1) / 2, u1 = pr([0, 0, z1]), ust = u0;
+    u0 = u1;
+    if (!ust.ok || !u1.ok || u1.y < UFUK - 2 || ust.y > GH)
+      continue;
+    const sol = pr([-yari, 0, zm]), sag = pr([yari, 0, zm]), om = pr([0, 0, zm]);
+    if (!sol.ok || !sag.ok)
+      continue;
+    const sy = (yari - z0) * DOKU_PPM, sh = (z0 - z1) * DOKU_PPM;
+    const ux = (sag.x - sol.x) / DOKU_PX, uy = (sag.y - sol.y) / DOKU_PX, vx = (u1.x - ust.x) / sh, vy = (u1.y - ust.y) / sh;
     c.save();
-    c.translate(o.x, my);
-    c.scale(1, ky);
-    const isik = c.createRadialGradient(0, 0, rx * 0.08, 0, 0, rx);
-    isik.addColorStop(0, '#f0cf93');
-    isik.addColorStop(0.42, '#c9a166');
-    isik.addColorStop(0.72, 'rgba(132,104,96,.86)');
-    isik.addColorStop(1, 'rgba(58,52,98,0)');
-    c.fillStyle = isik;
-    c.beginPath();
-    c.arc(0, 0, rx, 0, TAU);
-    c.fill();
+    c.transform(ux, uy, vx, vy, om.x - ux * DOKU_PX / 2 - vx * sh / 2, om.y - uy * DOKU_PX / 2 - vy * sh / 2);
+    // şeritler arasında ince boşluk kalmasın diye bir buçuk satır fazla çizilir
+    c.drawImage(tasDoku, 0, sy, DOKU_PX, Math.min(sh + 1.5, DOKU_PX - sy), 0, 0, DOKU_PX, Math.min(sh + 1.5, DOKU_PX - sy));
     c.restore();
   }
-  // kilim baklavaları: meydanın çevresini sarar
-  const rr = D.meydanR - 0.2, adet = Math.max(18, Math.round(rr * TAU / 0.62));
+}
+// Meydanın yerdeki elipsi: merkezi, yatay yarıçapı (px) ve dikey basıklığı. Işık, gece ve halkalar bunu kullanır.
+function meydanElips(yaricap) {
+  const mz = kam.tz, o = pr([0, 0, mz]), sag = pr([yaricap, 0, mz]), on = pr([0, 0, mz - yaricap]), ar = pr([0, 0, mz + yaricap]);
+  if (!o.ok || !sag.ok || !on.ok || !ar.ok)
+    return null;
+  const rx = sag.x - o.x;
+  return { x: o.x, y: (on.y + ar.y) / 2, rx, ky: (on.y - ar.y) / 2 / rx };
+}
+// Gece: fenerlerin yetişmediği yer lacivert karanlığa gömülür; taşlar orada da belli belirsiz seçilir.
+// Işık: ortada sıcak bir havuz, vuruşla hafifçe soluk alır.
+function meydanIsikCiz() {
+  const e = meydanElips(D.meydanR + 0.8);
+  if (!e)
+    return;
+  const nabiz = 0.5 + 0.5 * Math.cos(TAU * B), gosteri = isik.solo * 0.5;
+  c.save();
+  c.translate(e.x, e.y);
+  c.scale(1, e.ky);
+  const ust = (UFUK - e.y) / e.ky, alt = (GH - e.y) / e.ky;
+  const gece = c.createRadialGradient(0, 0, e.rx * 0.2, 0, 0, e.rx * 1.08);
+  gece.addColorStop(0, 'rgba(22,18,58,' + (0.04 + gosteri * 0.5) + ')');
+  gece.addColorStop(0.5, 'rgba(22,18,58,' + (0.2 + gosteri * 0.5) + ')');
+  gece.addColorStop(0.8, 'rgba(14,16,48,.74)');
+  gece.addColorStop(1, 'rgba(9,11,36,.95)');
+  c.fillStyle = gece;
+  c.fillRect(-GW, ust, GW * 2, alt - ust);
+  c.globalCompositeOperation = 'lighter';
+  const havuz = c.createRadialGradient(0, 0, 0, 0, 0, e.rx * 0.8);
+  havuz.addColorStop(0, 'rgba(255,190,104,' + (0.2 + 0.05 * nabiz) * (1 - gosteri) + ')');
+  havuz.addColorStop(0.55, 'rgba(255,170,90,' + 0.08 * (1 - gosteri) + ')');
+  havuz.addColorStop(1, 'rgba(255,170,90,0)');
+  c.fillStyle = havuz;
+  c.fillRect(-e.rx, Math.max(ust, -e.rx), e.rx * 2, e.rx * 2);
+  c.restore();
+}
+
+/* ---- kilim kuşağı: meydanı çevreleyen dokuma yolluk ---- */
+const KILIM = ['#e23d2f', '#22b8a7', '#f2b632'];
+function halkaYol(yaricap, adet, mz) {
+  const n = [];
   for (let i = 0; i < adet; i++) {
-    const a = i / adet * TAU, da = 0.2 / rr, dr = 0.26;
+    const a = i / adet * TAU, p = pr([Math.sin(a) * yaricap, 0, mz + Math.cos(a) * yaricap]);
+    if (!p.ok)
+      return null;
+    n.push(p);
+  }
+  return n;
+}
+function kilimKusakCiz() {
+  const mz = kam.tz, rr = D.meydanR - 0.2, en = 0.34, dilim = 72;
+  const dis = halkaYol(rr + en, dilim, mz), ic = halkaYol(rr - en, dilim, mz), sacak = halkaYol(rr + en + 0.13, dilim, mz);
+  if (!dis || !ic || !sacak)
+    return;
+  const yol = n => { c.moveTo(n[0].x, n[0].y); for (let i = 1; i < n.length; i++)
+    c.lineTo(n[i].x, n[i].y); c.closePath(); };
+  // saçaklar: kilimin dış kenarından sarkan iplikler
+  c.strokeStyle = 'rgba(241,223,189,.7)';
+  c.lineWidth = Math.max(1, dis[0].s * 0.012);
+  c.beginPath();
+  for (let i = 0; i < dilim; i++)
+    for (const t of [0, 0.33, 0.66]) {
+      const j = (i + 1) % dilim;
+      c.moveTo(lerp(dis[i].x, dis[j].x, t), lerp(dis[i].y, dis[j].y, t));
+      c.lineTo(lerp(sacak[i].x, sacak[j].x, t), lerp(sacak[i].y, sacak[j].y, t));
+    }
+  c.stroke();
+  // yerdeki kilimin altına düşen ince gölge
+  c.save();
+  c.translate(0, 3);
+  c.fillStyle = 'rgba(16,8,26,.35)';
+  c.beginPath();
+  yol(dis);
+  yol(ic);
+  c.fill('evenodd');
+  c.restore();
+  c.fillStyle = '#9c2a24';
+  c.beginPath();
+  yol(dis);
+  yol(ic);
+  c.fill('evenodd');
+  // kenar suları: krem ve koyu iki ince çizgi
+  for (const [oran, renk, kal] of [[0.86, '#f1dfbd', 0.03], [0.68, '#3a1a2a', 0.016]]) {
+    c.strokeStyle = renk;
+    c.lineWidth = Math.max(1, dis[0].s * kal);
+    for (const yon of [1, -1]) {
+      const h = halkaYol(rr + yon * en * oran, dilim, mz);
+      if (!h)
+        continue;
+      c.beginPath();
+      yol(h);
+      c.stroke();
+    }
+  }
+  // baklavalar: kilimin ana motifi; hediye hareketinde ve vuruşta hafifçe parlar
+  const adet = Math.max(18, Math.round(rr * TAU / 0.6)), da = 0.17 / rr, dr = 0.2;
+  const coskulu = D.hareket || muzik.sov, parla = (coskulu ? 0.5 : 0.18) * (0.5 + 0.5 * Math.cos(TAU * B));
+  for (let i = 0; i < adet; i++) {
+    const a = i / adet * TAU;
     const k = [pr([Math.sin(a - da) * rr, 0, mz + Math.cos(a - da) * rr]), pr([Math.sin(a) * (rr + dr), 0, mz + Math.cos(a) * (rr + dr)]), pr([Math.sin(a + da) * rr, 0, mz + Math.cos(a + da) * rr]), pr([Math.sin(a) * (rr - dr), 0, mz + Math.cos(a) * (rr - dr)])];
     if (k.some(p => !p.ok))
       continue;
@@ -4353,99 +4889,532 @@ function zeminCiz() {
     for (let q = 1; q < 4; q++)
       c.lineTo(k[q].x, k[q].y);
     c.closePath();
-    c.globalAlpha = 0.8;
-    c.fillStyle = KILIM[i % 3];
+    c.fillStyle = i % 3 === 0 ? '#f1dfbd' : KILIM[i % 3];
+    c.fill();
+    c.lineWidth = Math.max(1, k[0].s * 0.012);
+    c.strokeStyle = '#3a1a2a';
+    c.stroke();
+    // baklavanın göbeği
+    const o = pr([Math.sin(a) * rr, 0, mz + Math.cos(a) * rr]);
+    c.fillStyle = i % 3 === 0 ? '#e23d2f' : '#f1dfbd';
+    c.beginPath();
+    c.ellipse(o.x, o.y, o.s * 0.05, o.s * 0.03, 0, 0, TAU);
     c.fill();
   }
-  c.globalAlpha = 1;
+  if (parla > 0.02) {
+    c.globalCompositeOperation = 'lighter';
+    c.fillStyle = 'rgba(255,200,120,' + parla * 0.5 + ')';
+    c.beginPath();
+    yol(dis);
+    yol(ic);
+    c.fill('evenodd');
+    c.globalCompositeOperation = 'source-over';
+  }
+}
+
+let zeminBoya = null, altBoya = null;
+function zeminCiz() {
+  fonCiz();
+  if (!zeminBoya) {
+    zeminBoya = c.createLinearGradient(0, UFUK, 0, GH);
+    zeminBoya.addColorStop(0, '#1d2052');
+    zeminBoya.addColorStop(0.3, '#131640');
+    zeminBoya.addColorStop(1, '#090b26');
+  }
+  c.fillStyle = zeminBoya;
+  c.fillRect(0, UFUK, GW, GH - UFUK);
+  c.save();
+  c.beginPath();
+  c.rect(0, UFUK, GW, GH - UFUK);
+  c.clip();
+  tasDokuCiz();
+  meydanIsikCiz();
+  kilimKusakCiz();
+  // Alt beşte bir TikTok'un yorum alanıdır: zemin orada geceye gömülür, yorumların arkası sakin kalır.
+  if (!altBoya) {
+    altBoya = c.createLinearGradient(0, ALAN_ALT - 60, 0, GH);
+    altBoya.addColorStop(0, 'rgba(9,11,36,0)');
+    altBoya.addColorStop(0.35, 'rgba(9,11,36,.72)');
+    altBoya.addColorStop(1, 'rgba(9,11,36,.94)');
+  }
+  c.fillStyle = altBoya;
+  c.fillRect(0, ALAN_ALT - 60, GW, GH - ALAN_ALT + 60);
+  c.restore();
+  onKatmanCiz();
+  fenerIsikCiz();
   ampulCiz();
 }
-// Ampul dizileri fon perdesinin önünde, meydanın arkasında asılıdır; vuruşla yanıp söner.
+
+/* ── oyunlar/halay/js/34-isik.js ── */
+/* IŞIK — fenerler, ampul ve flama ipleri, yumuşak yönlü gölgeler, havada uçuşan ışık zerreleri, hediye gösterilerinin
+ * ışıkları (davulun yerde yayılan halkaları, solo ışıkları, zıplayanın yıldızları), halay başının altın halkası.
+ * isikHazirla: ışık ve gölge damgaları bir kez çizilir · Kanca: oyunZemin().
+ * Damga (sprite): her karede gradyan üretmek yerine önceden çizilmiş küçük tuval; drawImage ile basılır.
+ */
 const AMPUL = ['#ffd166', '#e23d2f', '#ffd166', '#22b8a7', '#f6ecd9'];
-const IPLER = [[-24, 404, 744, 452, 13], [-24, 474, 744, 414, 12]];
+const FLAMA = ['#e23d2f', '#f6ecd9', '#22b8a7', '#f2b632'];
+const damga = { hale: {}, ampul: {}, golge: null, kafa: null, boyun: null };
+// solo: solo ışığının yumuşak açılıp kapanması (0–1) · halkalar: davulun yerde yayılan vuruş halkaları
+const isik = { solo: 0, halkalar: [], dumOnce: 0 };
+
+function damgaYap(boy, ciz) {
+  const t = document.createElement('canvas');
+  t.width = t.height = boy;
+  ciz(t.getContext('2d'), boy / 2);
+  return t;
+}
+function isikHazirla() {
+  for (const renk of [...AMPUL, '#ffb347', '#fff3c8']) {
+    damga.hale[renk] = damgaYap(96, (a, o) => {
+      const g = a.createRadialGradient(o, o, 0, o, o, o);
+      g.addColorStop(0, renkSaydam(renk, 0.85));
+      g.addColorStop(0.16, renkSaydam(renk, 0.42));
+      g.addColorStop(0.45, renkSaydam(renk, 0.12));
+      g.addColorStop(1, renkSaydam(renk, 0));
+      a.fillStyle = g;
+      a.fillRect(0, 0, o * 2, o * 2);
+    });
+    // ampulün camı: ortası akkor, kenarı kendi renginde
+    damga.ampul[renk] = damgaYap(40, (a, o) => {
+      const g = a.createRadialGradient(o - 3, o - 4, 1, o, o, o - 2);
+      g.addColorStop(0, '#ffffff');
+      g.addColorStop(0.35, renkKat(renk, '#ffffff', 0.45));
+      g.addColorStop(0.8, renk);
+      g.addColorStop(1, renkKat(renk, '#3a1a2a', 0.45));
+      a.fillStyle = g;
+      a.beginPath();
+      a.arc(o, o, o - 2, 0, TAU);
+      a.fill();
+    });
+  }
+  // yer gölgesi: kenarı keskin olmayan koyu leke
+  damga.golge = damgaYap(96, (a, o) => {
+    const g = a.createRadialGradient(o, o, 0, o, o, o);
+    g.addColorStop(0, 'rgba(22,10,34,.62)');
+    g.addColorStop(0.5, 'rgba(22,10,34,.4)');
+    g.addColorStop(1, 'rgba(22,10,34,0)');
+    a.fillStyle = g;
+    a.fillRect(0, 0, o * 2, o * 2);
+  });
+  // başın hacmi: tepede fenerlerden gelen sıcak kenar ışığı, saçta parıltı, çenenin altında serin gölge
+  damga.kafa = damgaYap(160, (a, o) => {
+    const R = o * 0.9375;
+    a.beginPath();
+    a.arc(o, o, R - 2, 0, TAU);
+    a.clip();
+    const golge = a.createRadialGradient(o - R * 0.16, o - R * 0.42, R * 0.72, o - R * 0.1, o - R * 0.3, R * 1.42);
+    golge.addColorStop(0, 'rgba(46,18,70,0)');
+    golge.addColorStop(1, 'rgba(46,18,70,.5)');
+    a.fillStyle = golge;
+    a.fillRect(0, 0, o * 2, o * 2);
+    const kenar = a.createRadialGradient(o, o + R * 0.07, R * 0.9, o, o + R * 0.07, R * 1.02);
+    kenar.addColorStop(0, 'rgba(255,226,165,0)');
+    kenar.addColorStop(1, 'rgba(255,226,165,.8)');
+    a.fillStyle = kenar;
+    a.fillRect(0, 0, o * 2, o * 0.9);
+    const parilti = a.createRadialGradient(o - R * 0.36, o - R * 0.58, 0, o - R * 0.36, o - R * 0.58, R * 0.36);
+    parilti.addColorStop(0, 'rgba(255,255,255,.42)');
+    parilti.addColorStop(1, 'rgba(255,255,255,0)');
+    a.fillStyle = parilti;
+    a.fillRect(0, 0, o * 2, o * 2);
+  });
+  // başın gövdeye düşürdüğü gölge
+  damga.boyun = damgaYap(64, (a, o) => {
+    const g = a.createRadialGradient(o, o, 0, o, o, o);
+    g.addColorStop(0, 'rgba(30,12,44,.55)');
+    g.addColorStop(0.6, 'rgba(30,12,44,.34)');
+    g.addColorStop(1, 'rgba(30,12,44,0)');
+    a.fillStyle = g;
+    a.fillRect(0, 0, o * 2, o * 2);
+  });
+}
+// Işık damgası: ekranda (x, y) merkezli, cap genişliğinde, üst üste bindikçe parlayan ('lighter') hale.
+function haleBas(renk, x, y, cap, al) {
+  c.globalAlpha = al;
+  c.drawImage(damga.hale[renk], x - cap / 2, y - cap / 2, cap, cap);
+}
+// Dört kollu ışıltı (yıldız): mendilin izi, solo ve zıplama gösterileri.
+function isiltiCiz(x, y, r, renk, al) {
+  if (r < 0.6 || al <= 0.01)
+    return;
+  c.globalAlpha = Math.min(1, al);
+  c.fillStyle = renk;
+  c.beginPath();
+  c.moveTo(x, y - r);
+  c.quadraticCurveTo(x, y, x + r, y);
+  c.quadraticCurveTo(x, y, x, y + r);
+  c.quadraticCurveTo(x, y, x - r, y);
+  c.quadraticCurveTo(x, y, x, y - r);
+  c.fill();
+}
+
+/* ---- fenerler, ampul ipi, flamalar: fon perdesinin önünde, meydanın arkasında; vuruşla yanıp söner ---- */
+function fenerIsikCiz() {
+  const ox = katmanX('on'), nabiz = 0.5 + 0.5 * Math.cos(TAU * B);
+  c.globalCompositeOperation = 'lighter';
+  // meydanın üstünde asılı duran ışıklı pus
+  c.globalAlpha = 0.2 + 0.05 * nabiz;
+  c.drawImage(damga.hale['#ffb347'], GW / 2 - 430, UFUK - 150, 860, 330);
+  for (const d of FON_DIREK) {
+    for (const s of [-1, 1])
+      haleBas('#ffb347', d.x + s * 17 + ox, d.y + 20, 78 + 10 * nabiz, 0.6 + 0.2 * nabiz);
+    // fenerin direğin dibine düşürdüğü ışık havuzu
+    c.globalAlpha = 0.34 + 0.08 * nabiz;
+    c.drawImage(damga.hale['#ffb347'], d.x + ox - 120, UFUK - 14, 240, 70);
+  }
+  c.globalAlpha = 1;
+  c.globalCompositeOperation = 'source-over';
+}
+// İpler direkten direğe sarkar; iki uçta ekranın dışına uzanır.
+function ipler() {
+  const d = FON_DIREK, n = [];
+  n.push([d[0].x - 150, d[0].y - 26, d[0].x, d[0].y + 7, 10, 4]);
+  for (let i = 0; i + 1 < d.length; i++)
+    n.push([d[i].x, d[i].y + 7, d[i + 1].x, d[i + 1].y + 7, 30, 10]);
+  n.push([d[d.length - 1].x, d[d.length - 1].y + 7, d[d.length - 1].x + 150, d[d.length - 1].y - 26, 10, 4]);
+  return n;
+}
+const IPLER = ipler();
 function ampulCiz() {
+  const ox = katmanX('on');
   let say = 0;
-  for (const [x1, y1, x2, y2, sark] of IPLER) {
-    const n = 22, nokta = t => [lerp(x1, x2, t), lerp(y1, y2, t) + sark * 4 * t * (1 - t)];
-    c.strokeStyle = 'rgba(8,10,28,.85)';
-    c.lineWidth = 2;
+  // flamalar: ampul ipinin altında, daha derin sarkan ikinci ip; üçgen bezler vuruşla sallanır
+  for (let q = 1; q + 1 < IPLER.length; q++) {
+    const [x1, y1, x2, y2] = IPLER[q], adet = 13, nokta = t => [lerp(x1, x2, t) + ox, lerp(y1, y2, t) - 4 + 46 * 4 * t * (1 - t)];
+    c.strokeStyle = 'rgba(8,10,28,.8)';
+    c.lineWidth = 1.4;
     c.beginPath();
-    for (let i = 0; i <= n; i++) {
-      const [x, y] = nokta(i / n);
+    for (let i = 0; i <= 24; i++) {
+      const [x, y] = nokta(i / 24);
       i ? c.lineTo(x, y) : c.moveTo(x, y);
     }
     c.stroke();
-    for (let i = 1; i < n; i++) {
-      const [x, y] = nokta(i / n), renk = AMPUL[say % AMPUL.length], par = 0.72 + 0.28 * Math.sin(B * Math.PI + say * 1.7), r = 6.5;
+    for (let i = 0; i < adet; i++) {
+      const t = (i + 0.5) / adet, [x, y] = nokta(t), [xs, ys] = nokta(t + 0.01), egim = Math.atan2(ys - y, xs - x);
+      const sal = azHareket ? 0 : 0.2 * Math.sin(B * Math.PI + i * 0.9 + q);
+      c.save();
+      c.translate(x, y);
+      c.rotate(egim + sal);
+      c.fillStyle = FLAMA[(i + q) % FLAMA.length];
+      c.beginPath();
+      c.moveTo(-7, 0);
+      c.lineTo(7, 0);
+      c.lineTo(0, 17);
+      c.closePath();
+      c.fill();
+      // bezin gölgede kalan yarısı
+      c.fillStyle = 'rgba(10,8,34,.28)';
+      c.beginPath();
+      c.moveTo(-7, 0);
+      c.lineTo(0, 0);
+      c.lineTo(0, 17);
+      c.closePath();
+      c.fill();
+      c.restore();
+    }
+  }
+  for (const [x1, y1, x2, y2, sark, adet] of IPLER) {
+    const nokta = t => [lerp(x1, x2, t) + ox, lerp(y1, y2, t) + sark * 4 * t * (1 - t)];
+    c.strokeStyle = 'rgba(8,10,28,.9)';
+    c.lineWidth = 2;
+    c.beginPath();
+    for (let i = 0; i <= 24; i++) {
+      const [x, y] = nokta(i / 24);
+      i ? c.lineTo(x, y) : c.moveTo(x, y);
+    }
+    c.stroke();
+    for (let i = 1; i < adet; i++) {
+      const [x, y] = nokta(i / adet), renk = AMPUL[say % AMPUL.length], par = 0.7 + 0.3 * Math.sin(B * Math.PI + say * 1.7);
       say++;
-      c.globalAlpha = 0.17 * par;
-      c.fillStyle = renk;
-      c.beginPath();
-      c.arc(x, y + r, r * 3.3, 0, TAU);
-      c.fill();
-      c.globalAlpha = 0.6 + 0.4 * par;
-      c.beginPath();
-      c.arc(x, y + r, r, 0, TAU);
-      c.fill();
+      c.globalCompositeOperation = 'lighter';
+      haleBas(renk, x, y + 9, 58 * (0.75 + 0.25 * par), 0.5 + 0.4 * par);
+      c.globalCompositeOperation = 'source-over';
+      c.globalAlpha = 1;
+      // duy
+      c.fillStyle = '#1a1226';
+      c.fillRect(x - 2.5, y, 5, 5);
+      c.globalAlpha = 0.72 + 0.28 * par;
+      c.drawImage(damga.ampul[renk], x - 7, y + 3, 14, 14);
     }
   }
   c.globalAlpha = 1;
+}
+
+/* ---- havadaki ışık zerreleri: fener ışığında yükselen toz. Yarısı oynayanların arkasında, yarısı önünde ---- */
+const ZERRE = Array.from({ length: 46 }, (_, i) => {
+  const r = rastgeleUret(300 + i);
+  return { x: r(), y: r(), hiz: 0.35 + r() * 0.65, evre: r() * TAU, boy: 5 + r() * 9, on: i % 2 };
+});
+function zerreCiz(on) {
+  const ust = UFUK - 40, yuk = ALAN_ALT - 30 - ust, t = azHareket ? 0 : zaman;
+  c.globalCompositeOperation = 'lighter';
+  for (const z of ZERRE) {
+    if (z.on !== on)
+      continue;
+    const yol = (z.y * yuk + t * 15 * z.hiz) % yuk, y = ust + yuk - yol;
+    const x = ((z.x * (GW + 80) + Math.sin(t * 0.6 * z.hiz + z.evre) * 30 - kam.yaw * 400) % (GW + 80) + GW + 80) % (GW + 80) - 40;
+    // iki uçta ve ışığın yetişmediği kenarlarda söner; vuruşla göz kırpar
+    const kenar = Math.min(1, yol / 60, (yuk - yol) / 90) * clamp(1.25 - Math.abs(x - GW / 2) / 330, 0, 1);
+    const kirp = 0.45 + 0.55 * (0.5 + 0.5 * Math.sin(B * Math.PI * z.hiz + z.evre));
+    haleBas(z.on ? '#fff3c8' : '#ffd166', x, y, z.boy * (z.on ? 1.3 : 1), 0.75 * kenar * kirp);
+  }
+  c.globalAlpha = 1;
+  c.globalCompositeOperation = 'source-over';
+}
+
+/* ---- gölgeler: ışık meydanın arkasındaki fenerlerden gelir, gölge öne ve yanlara doğru uzar ---- */
+function golgeCiz(k) {
+  const boy = k.g.boy, g = pr([k.x, 0, k.z]);
+  if (!g.ok)
+    return;
+  let dx = k.x, dz = k.z - (kam.tz + D.meydanR + 2.5);
+  const u = Math.hypot(dx, dz) || 1, uzun = 0.72 * boy;
+  dx /= u;
+  dz /= u;
+  // zıplayanın gölgesi küçülür ve solar
+  const yuk = Math.max(0, k.j.hip ? k.j.hip[1] - k.y0 - KALCA * boy : 0), kis = 1 / (1 + yuk * 3);
+  const uc = pr([k.x + dx * uzun, 0, k.z + dz * uzun]);
+  if (uc.ok) {
+    const ax = uc.x - g.x, ay = uc.y - g.y, L = Math.hypot(ax, ay), en = 0.42 * boy * g.s;
+    c.save();
+    c.translate((g.x + uc.x) / 2, (g.y + uc.y) / 2);
+    c.rotate(Math.atan2(ay, ax));
+    c.globalAlpha = 0.8 * kis;
+    c.drawImage(damga.golge, -(L / 2 + en * 0.7), -en / 2, L + en * 1.4, en);
+    c.restore();
+  }
+  const rx = 0.3 * boy * g.s * kis, rz = 0.16 * boy * g.s * kis;
+  c.globalAlpha = 0.95 * kis;
+  c.drawImage(damga.golge, g.x - rx, g.y - rz, rx * 2, rz * 2);
+  c.globalAlpha = 1;
+}
+
+/* ---- gösteri ışıkları ---- */
+function isikGuncelle(dt) {
+  const hedef = D.solo && D.solo.k.yer > 0.5 ? 1 : 0;
+  isik.solo += (hedef - isik.solo) * Math.min(1, dt * 3.5);
+  // davulun her "düm"ü yerde bir halka başlatır
+  if (calgi.dumP > 0.8 && isik.dumOnce <= 0.8 && isik.halkalar.length < 8)
+    isik.halkalar.push({ t0: zaman, x: davulcu.x, z: davulcu.z, sov: !!muzik.sov });
+  isik.dumOnce = calgi.dumP;
+  while (isik.halkalar.length && zaman - isik.halkalar[0].t0 > 0.9)
+    isik.halkalar.shift();
+}
+// Yerdeki bir dairenin ekrandaki basıklığı: kamera ne kadar yatık bakıyorsa o kadar basık.
+const yerBasik = () => Math.sin(kam.egim);
+function davulHalkaCiz() {
+  const bas = yerBasik();
+  if (muzik.sov) {
+    const g = pr([davulcu.x, 0, davulcu.z]);
+    if (g.ok) {
+      c.globalCompositeOperation = 'lighter';
+      c.globalAlpha = 0.45 + 0.4 * calgi.dumP;
+      c.drawImage(damga.hale['#ffd166'], g.x - 1.3 * g.s, g.y - 1.3 * g.s * bas, 2.6 * g.s, 2.6 * g.s * bas);
+      c.globalCompositeOperation = 'source-over';
+    }
+  }
+  for (const h of isik.halkalar) {
+    const t = (zaman - h.t0) / 0.9, g = pr([h.x, 0, h.z]);
+    if (!g.ok || t < 0 || t > 1)
+      continue;
+    const r = (0.3 + (h.sov ? 3.2 : 0.7) * yumusak(t)) * g.s, soluk = (1 - t) * (1 - t);
+    c.strokeStyle = h.sov ? '#ffd166' : '#f6ecd9';
+    // şovda halka üç katlıdır: geniş ve soluk bir ışık, üstünde parlak çizgi
+    for (const [kal, al] of h.sov ? [[0.34, 0.16], [0.14, 0.32], [0.05, 0.9]] : [[0.045, 0.4]]) {
+      c.globalAlpha = soluk * al;
+      c.lineWidth = Math.max(2, g.s * kal * (1 - t * 0.5));
+      c.beginPath();
+      c.ellipse(g.x, g.y, r, r * bas, 0, 0, TAU);
+      c.stroke();
+    }
+  }
+  c.globalAlpha = 1;
+}
+// Solo: yerde dönen ışık yelpazesi, direklerdeki fenerlerden inen huzmeler, ayak altında altın havuz.
+function soloZeminCiz() {
+  const s = isik.solo;
+  if (s < 0.02 || !D.solo)
+    return;
+  const g = pr([D.solo.k.x, 0, D.solo.k.z]);
+  if (!g.ok)
+    return;
+  const bas = yerBasik(), nabiz = 0.5 + 0.5 * Math.cos(TAU * B), ox = katmanX('on');
+  c.globalCompositeOperation = 'lighter';
+  // huzmeler
+  for (const [i, d] of FON_DIREK.entries()) {
+    const lx = d.x + ox, ly = d.y + 20, yari = (0.62 + 0.08 * nabiz) * g.s;
+    const gr = c.createLinearGradient(lx, ly, g.x, g.y);
+    gr.addColorStop(0, i === 1 ? 'rgba(255,236,190,.42)' : 'rgba(255,196,110,.3)');
+    gr.addColorStop(1, 'rgba(255,209,102,.07)');
+    c.fillStyle = gr;
+    // iç içe iki huzme: dar olan parlak, geniş olan soluk; kenar yumuşak görünür
+    for (const [gen, al] of [[1, 0.55], [1.9, 0.3]]) {
+      c.globalAlpha = s * al * (0.75 + 0.25 * Math.sin(B * Math.PI + i * 2.1));
+      c.beginPath();
+      c.moveTo(lx - 4 * gen, ly);
+      c.lineTo(lx + 4 * gen, ly);
+      c.lineTo(g.x + yari * gen, g.y);
+      c.lineTo(g.x - yari * gen, g.y);
+      c.closePath();
+      c.fill();
+    }
+  }
+  // yerde dönen yelpaze
+  c.save();
+  c.translate(g.x, g.y);
+  c.scale(1, bas);
+  c.rotate(azHareket ? 0 : B * TAU / 16);
+  const yar = 2.3 * g.s, yel = c.createRadialGradient(0, 0, 0, 0, 0, yar);
+  yel.addColorStop(0, 'rgba(255,214,120,.5)');
+  yel.addColorStop(0.5, 'rgba(255,196,100,.16)');
+  yel.addColorStop(1, 'rgba(255,196,100,0)');
+  c.fillStyle = yel;
+  c.globalAlpha = s;
+  for (let i = 0; i < 10; i++) {
+    c.beginPath();
+    c.moveTo(0, 0);
+    c.arc(0, 0, yar, i / 10 * TAU, (i + 0.5) / 10 * TAU);
+    c.closePath();
+    c.fill();
+  }
+  c.restore();
+  // ayak altındaki havuz ve vuruşla açılan halka
+  c.globalAlpha = s * (0.7 + 0.3 * nabiz);
+  c.drawImage(damga.hale['#ffd166'], g.x - 1.5 * g.s, g.y - 1.5 * g.s * bas, 3 * g.s, 3 * g.s * bas);
+  c.globalCompositeOperation = 'source-over';
+  const vu = ((B % 1) + 1) % 1, hr = (0.5 + 1.1 * vu) * g.s;
+  c.globalAlpha = s * (1 - vu) * 0.8;
+  c.strokeStyle = '#ffe9a8';
+  c.lineWidth = Math.max(2, g.s * 0.035);
+  c.beginPath();
+  c.ellipse(g.x, g.y, hr, hr * bas, 0, 0, TAU);
+  c.stroke();
+  c.globalAlpha = 1;
+}
+// Solo sürerken sahnenin geri kalanı kararır; oynayanın çevresinde yıldızlar yükselir. Listenin üstüne çizilir.
+function soloUstCiz() {
+  const s = isik.solo;
+  if (s < 0.02 || !D.solo)
+    return;
+  const k = D.solo.k, o = pr([k.x, 0.45, k.z]);
+  if (!o.ok)
+    return;
+  const perde = c.createRadialGradient(o.x, o.y, o.s * 1.1, o.x, o.y, o.s * 3.6);
+  perde.addColorStop(0, 'rgba(6,8,30,0)');
+  perde.addColorStop(1, 'rgba(6,8,30,' + 0.5 * s + ')');
+  c.fillStyle = perde;
+  c.fillRect(0, 0, GW, GH);
+  c.globalCompositeOperation = 'lighter';
+  for (let i = 0; i < 18; i++) {
+    const evre = (((B / 3 + i * 0.137) % 1) + 1) % 1, aci = i * 2.4 + B * 0.25, uz = 0.45 + 0.5 * ((i * 0.618) % 1);
+    const p = pr([k.x + Math.cos(aci) * uz, 0.1 + evre * 1.7, k.z + Math.sin(aci) * uz]);
+    if (p.ok)
+      isiltiCiz(p.x, p.y, p.s * (0.05 + 0.07 * ((i * 0.37) % 1)) * Math.sin(evre * Math.PI), i % 3 ? '#ffd166' : '#fff3c8', s * Math.sin(evre * Math.PI));
+  }
+  c.globalAlpha = 1;
+  c.globalCompositeOperation = 'source-over';
+}
+// Hediye sevinci: zıplayanın başının çevresinde açılan yıldızlar.
+function ziplaIsiltiCiz() {
+  c.globalCompositeOperation = 'lighter';
+  for (const k of D.oy.values()) {
+    if (!(B >= k.zip0 && B < k.zip1) || !k.p.kafa || !k.p.kafa.ok)
+      continue;
+    const ph = k.p.kafa, u = (B - k.zip0) / Math.max(0.5, k.zip1 - k.zip0), R = KAFA_R * k.g.boy * ph.s;
+    for (let i = 0; i < 7; i++) {
+      const a = -Math.PI * (0.08 + 0.84 * i / 6), uz = R * (1.25 + 0.9 * yumusak(u * 2) + 0.2 * (i % 2));
+      isiltiCiz(ph.x + Math.cos(a) * uz, ph.y + Math.sin(a) * uz, R * (0.2 + 0.12 * (i % 2)) * Math.sin(Math.min(1, u * 1.2) * Math.PI), i % 2 ? '#fff3c8' : '#ffd166', 1 - u);
+    }
+  }
+  c.globalAlpha = 1;
+  c.globalCompositeOperation = 'source-over';
+}
+// Halay başının ayağının altında vuruşla atan altın halka: ışıklı zemin, çift çizgi, çevresinde dönen baklavalar.
+function liderHalkaCiz() {
+  if (!D.lider)
+    return;
+  const g = pr([D.lider.x, 0, D.lider.z]);
+  if (!g.ok)
+    return;
+  const bas = yerBasik(), n = 1 + 0.08 * Math.sin(B * TAU), rx = 0.4 * g.s * n, ry = rx * bas;
+  c.globalCompositeOperation = 'lighter';
+  c.globalAlpha = 0.55;
+  c.drawImage(damga.hale['#ffd166'], g.x - rx * 1.9, g.y - ry * 1.9, rx * 3.8, ry * 3.8);
+  c.globalCompositeOperation = 'source-over';
+  c.globalAlpha = 1;
+  c.strokeStyle = 'rgba(120,60,10,.55)';
+  c.lineWidth = Math.max(3, g.s * 0.05);
+  c.beginPath();
+  c.ellipse(g.x, g.y + 1.5, rx, ry, 0, 0, TAU);
+  c.stroke();
+  c.strokeStyle = '#ffd166';
+  c.lineWidth = Math.max(2, g.s * 0.034);
+  c.beginPath();
+  c.ellipse(g.x, g.y, rx, ry, 0, 0, TAU);
+  c.stroke();
+  c.strokeStyle = '#fff3c8';
+  c.lineWidth = Math.max(1, g.s * 0.01);
+  c.beginPath();
+  c.ellipse(g.x, g.y - 1, rx * 0.86, ry * 0.86, 0, 0, TAU);
+  c.stroke();
+  c.fillStyle = '#ffd166';
+  for (let i = 0; i < 8; i++) {
+    const a = i / 8 * TAU + (azHareket ? 0 : B * TAU / 8), x = g.x + Math.cos(a) * rx * 1.24, y = g.y + Math.sin(a) * ry * 1.24, q = g.s * 0.035;
+    c.beginPath();
+    c.moveTo(x - q, y);
+    c.lineTo(x, y - q * bas);
+    c.lineTo(x + q, y);
+    c.lineTo(x, y + q * bas);
+    c.closePath();
+    c.fill();
+  }
 }
 
 function oyunZemin() {
   // Meydanın ışığı ve kilim çevresi oynayanları ortalar: üç kişi de otuz altı kişi de ışığın içinde durur.
   D.meydanR += (Math.max(kam.son.enX, kam.son.hd) + 1.7 - D.meydanR) * Math.min(1, sonDt * 1.6);
+  isikGuncelle(sonDt);
   zeminCiz();
+  zerreCiz(0);
+  davulHalkaCiz();
+  soloZeminCiz();
   for (const k of D.oy.values())
-    golge(k.x, k.z, 0.25 * k.g.boy, 0.13 * k.g.boy);
+    golgeCiz(k);
   for (const k of CALGICILAR)
-    golge(k.x, k.z, 0.25 * k.g.boy, 0.13 * k.g.boy);
-  // halay başının ayağının altında vuruşla atan altın halka
-  if (D.lider) {
-    const g = pr([D.lider.x, 0, D.lider.z]);
-    if (g.ok) {
-      const n = 1 + 0.08 * Math.sin(B * TAU);
-      c.strokeStyle = '#ffd166';
-      c.lineWidth = Math.max(2, g.s * 0.03);
-      c.beginPath();
-      c.ellipse(g.x, g.y, 0.37 * g.s * n, 0.2 * g.s * n, 0, 0, TAU);
-      c.stroke();
-    }
-  }
-  // solo yapanın üstüne düşen ışık
-  if (D.solo && D.solo.k.yer > 0.5) {
-    const g = pr([D.solo.k.x, 0, D.solo.k.z]);
-    if (g.ok) {
-      const gr = c.createLinearGradient(0, 0, 0, g.y);
-      gr.addColorStop(0, 'rgba(255,209,102,0)');
-      gr.addColorStop(1, 'rgba(255,209,102,.13)');
-      c.fillStyle = gr;
-      c.beginPath();
-      c.moveTo(g.x - 30, 0);
-      c.lineTo(g.x + 30, 0);
-      c.lineTo(g.x + 0.7 * g.s, g.y);
-      c.lineTo(g.x - 0.7 * g.s, g.y);
-      c.closePath();
-      c.fill();
-      c.fillStyle = 'rgba(255,209,102,.25)';
-      c.beginPath();
-      c.ellipse(g.x, g.y, 0.7 * g.s, 0.38 * g.s, 0, 0, TAU);
-      c.fill();
-    }
-  }
+    golgeCiz(k);
+  liderHalkaCiz();
 }
 
 /* ── oyunlar/halay/js/40-cizim.js ── */
 /* HALAY ÇİZİMİ — oyuncular, davul, zurna, mendil; el değiştiren mendilin uçuşu; çalgıcıların ad etiketi.
- * davulCiz · mendilCiz · Kancalar: oyunCiz(), oyunUst(dt), oyunEkAdlar().
+ * hacimEkle (başın ışığı ve gölgesi) · davulCiz · mendilCiz · Kancalar: oyunCiz(), oyunUst(dt), oyunEkAdlar().
  */
 function oyunCiz() {
   for (const k of D.oy.values())
-    if (insanEkle(k))
+    if (insanEkle(k)) {
+      hacimEkle(k);
       ekCiz(k);
+    }
   for (const k of CALGICILAR)
-    if (insanEkle(k))
+    if (insanEkle(k)) {
+      hacimEkle(k);
       ekCiz(k);
+    }
+}
+// Düz renkli başa ve gövdeye hacim: başın gövdeye düşen gölgesi (baştan hemen önce çizilir) ve başın üstüne
+// basılan ışık damgası (kenar ışığı, parıltı, çene gölgesi). Derinliği başınkiyle aynıdır; liste eşit derinlikleri
+// eklenme sırasıyla çizdiği için baştan hemen sonra gelir.
+function hacimEkle(k) {
+  const ph = k.p.kafa, gg = k.p.gogus, R = KAFA_R * k.g.boy * (k.basOlcek === undefined ? 1 : k.basOlcek) * ph.s;
+  if (gg.ok)
+    ozel(ph.d - 0.049, () => {
+      const en = 0.21 * k.g.boy * gg.s;
+      c.drawImage(damga.boyun, gg.x - en, gg.y - en * 0.5, en * 2, en * 1.5);
+    });
+  ozel(ph.d - 0.05, () => {
+    const q = R / 0.9375;
+    c.drawImage(damga.kafa, ph.x - q, ph.y - q, q * 2, q * 2);
+  });
 }
 // İnsanın üstüne gelenler: çalgılar ve halay başının mendili. insanEkle k.p'yi doldurduktan sonra çağrılır.
 function ekCiz(k) {
@@ -4471,10 +5440,26 @@ function ekCiz(k) {
 }
 // uçan mendil: eski halay başının elinden yenisinin başına
 function oyunUst() {
+  soloUstCiz();
+  ziplaIsiltiCiz();
+  zerreCiz(1);
   const mu = D.mendilUcus;
   if (!mu)
     return;
-  const t = (zaman - mu.t0) / mu.sure, h = mu.kime.j.kafa || [0, 1.5, 0], p = pr([lerp(mu.x, h[0], t), lerp(mu.y, h[1] + 0.3, t) + Math.sin(t * Math.PI) * 1.8, lerp(mu.z, h[2], t)]);
+  const t = (zaman - mu.t0) / mu.sure, h = mu.kime.j.kafa || [0, 1.5, 0];
+  const yer = u => pr([lerp(mu.x, h[0], u), lerp(mu.y, h[1] + 0.3, u) + Math.sin(u * Math.PI) * 1.8, lerp(mu.z, h[2], u)]);
+  // mendilin ardında kalan ışıltı izi
+  c.globalCompositeOperation = 'lighter';
+  for (let i = 1; i <= 9; i++) {
+    const u = t - i * 0.035, q = u > 0 ? yer(u) : null;
+    if (q && q.ok) {
+      haleBas('#ffd166', q.x, q.y, q.s * 0.5 * (1 - i / 10), 0.5 * (1 - i / 10));
+      isiltiCiz(q.x + Math.sin(i * 2.3) * q.s * 0.12, q.y + Math.cos(i * 1.7) * q.s * 0.12, q.s * 0.09 * (1 - i / 11), '#fff3c8', 0.9 - i * 0.08);
+    }
+  }
+  c.globalAlpha = 1;
+  c.globalCompositeOperation = 'source-over';
+  const p = yer(t);
   if (p.ok)
     mendilCiz(p.x, p.y, p.s * 1.2, t * 14, 1);
 }
@@ -4500,7 +5485,12 @@ function davulCiz(k) {
   c.lineTo(yk.x - nx * r2, yk.y - ny * r2);
   c.lineTo(uz.x - nx * r1, uz.y - ny * r1);
   c.closePath();
-  c.fillStyle = '#b5482f';
+  // gövde: silindirin üstü ışık alır, altı gölgede kalır
+  const gv = c.createLinearGradient(yk.x - nx * r2, yk.y - ny * r2, yk.x + nx * r2, yk.y + ny * r2), ustte = ny > 0 ? 1 : 0;
+  gv.addColorStop(ustte, '#7a2a20');
+  gv.addColorStop(0.5, '#b5482f');
+  gv.addColorStop(1 - ustte, '#de7a4c');
+  c.fillStyle = gv;
   c.fill();
   c.stroke();
   c.strokeStyle = '#ffd166';
@@ -4517,42 +5507,119 @@ function davulCiz(k) {
   const vur = 1 + (yakinA ? calgi.tekP : calgi.dumP) * 0.05;
   c.beginPath();
   c.ellipse(yk.x, yk.y, r2 * dar * vur, r2 * vur, ac, 0, TAU);
-  c.fillStyle = '#f6ecd9';
+  // deri: ortası tokmaktan aşınmış, kenarı ahşap kasnakla çevrili
+  const deri = c.createRadialGradient(yk.x - r2 * 0.2, yk.y - r2 * 0.25, r2 * 0.1, yk.x, yk.y, r2 * 1.05);
+  deri.addColorStop(0, '#fff8e8');
+  deri.addColorStop(0.7, '#efe0c0');
+  deri.addColorStop(1, '#c9ae84');
+  c.fillStyle = deri;
   c.fill();
+  c.lineWidth = Math.max(2, yk.s * 0.03);
+  c.strokeStyle = '#8a5a2c';
+  c.stroke();
+  c.lineWidth = Math.max(1, yk.s * 0.012);
+  c.strokeStyle = MUREKKEP;
+  c.beginPath();
+  c.ellipse(yk.x, yk.y, r2 * dar * vur * 1.06, r2 * vur * 1.06, ac, 0, TAU);
   c.stroke();
   c.beginPath();
-  c.ellipse(yk.x, yk.y, r2 * dar * 0.55, r2 * 0.55, ac, 0, TAU);
-  c.strokeStyle = 'rgba(8,10,28,.25)';
-  c.stroke();
-  c.strokeStyle = MUREKKEP;
+  c.ellipse(yk.x, yk.y, r2 * dar * 0.5, r2 * 0.5, ac, 0, TAU);
+  c.fillStyle = 'rgba(150,110,70,.2)';
+  c.fill();
 }
+// İşlemeli mendil: ışıklı kumaş, gölgede kalan kıvrım, sırma kenar, köşede püskül.
 function mendilCiz(x, y, s, aci, parlak) {
   const b = 0.3 * s, dal = Math.sin(zaman * 14) * 0.25;
   c.save();
   c.translate(x, y);
   c.rotate(aci);
   if (parlak) {
-    c.globalAlpha = 0.25;
-    c.beginPath();
-    c.arc(b * 0.5, 0, b * 0.9, 0, TAU);
-    c.fillStyle = '#ffd166';
-    c.fill();
+    c.globalCompositeOperation = 'lighter';
+    c.globalAlpha = 0.7;
+    c.drawImage(damga.hale['#ffd166'], b * 0.5 - b * 1.5, -b * 1.5, b * 3, b * 3);
     c.globalAlpha = 1;
+    c.globalCompositeOperation = 'source-over';
   }
-  c.beginPath();
-  c.moveTo(0, 0);
-  c.quadraticCurveTo(b * 0.5, -b * (0.5 + dal), b, -b * 0.28);
-  c.lineTo(b * 0.78, b * 0.12);
-  c.lineTo(b * 1.02, b * 0.42);
-  c.quadraticCurveTo(b * 0.45, b * (0.3 - dal), 0, 0);
-  c.closePath();
+  const yol = () => {
+    c.beginPath();
+    c.moveTo(0, 0);
+    c.quadraticCurveTo(b * 0.5, -b * (0.5 + dal), b, -b * 0.28);
+    c.lineTo(b * 0.78, b * 0.12);
+    c.lineTo(b * 1.02, b * 0.42);
+    c.quadraticCurveTo(b * 0.45, b * (0.3 - dal), 0, 0);
+    c.closePath();
+  };
+  yol();
   c.fillStyle = '#e23d2f';
   c.fill();
-  c.lineWidth = Math.max(1.5, s * 0.016);
-  c.strokeStyle = '#ffd166';
+  // kıvrımın alt yarısı gölgede, üstünde ince bir ışık çizgisi
+  c.save();
+  c.clip();
+  c.fillStyle = 'rgba(110,16,30,.5)';
+  c.beginPath();
+  c.moveTo(0, 0);
+  c.quadraticCurveTo(b * 0.5, -b * dal * 0.5, b * 0.8, b * 0.1);
+  c.lineTo(b * 1.1, b * 0.6);
+  c.lineTo(0, b * 0.5);
+  c.closePath();
+  c.fill();
+  c.strokeStyle = 'rgba(255,190,160,.7)';
+  c.lineWidth = Math.max(1, s * 0.012);
+  c.beginPath();
+  c.moveTo(b * 0.12, -b * 0.08);
+  c.quadraticCurveTo(b * 0.5, -b * (0.36 + dal), b * 0.86, -b * 0.2);
   c.stroke();
   c.restore();
+  yol();
+  c.lineWidth = Math.max(1.5, s * 0.018);
+  c.strokeStyle = '#ffd166';
+  c.stroke();
+  // püskül
+  c.fillStyle = '#ffd166';
+  c.beginPath();
+  c.arc(b * 1.04, b * 0.45, Math.max(1.2, b * 0.07), 0, TAU);
+  c.arc(b * 1.02, -b * 0.3, Math.max(1.2, b * 0.07), 0, TAU);
+  c.fill();
+  c.restore();
 }
+
+/* ── oyunlar/halay/js/45-yazi-stil.js ── */
+/* SAHNE YAZILARININ GÖRÜNÜMÜ — sıralama kutusu, coşku göstergesi, nasıl oynanır şeridi, bildirim ve pankart bu
+ * oyunda düğün gecesinin malzemesiyle (lake lacivert, sırma kenar, kilim suyu) giydirilir.
+ * Yalnız görünüm değişir: kutuların yeri ve boyu çekirdeğin stilindeki gibidir, metinler yine textContent ile yazılır.
+ * Stil sayfaya bir <style> öğesiyle eklenir; içinde izleyiciden gelen hiçbir şey yoktur.
+ */
+const HALAY_STIL = `
+.logo{text-shadow:0 .5cqw 0 var(--sicak),0 1cqw 0 #8f1f1a,0 1.8cqw 2.6cqw rgba(0,0,0,.6),0 0 7cqw rgba(255,170,90,.42)}
+.nasil span{background:linear-gradient(180deg,rgba(38,42,100,.84),rgba(8,10,28,.84));border-color:rgba(255,209,102,.4);
+  box-shadow:0 .5cqw 1.4cqw rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.12)}
+.sira h2,.cosku h2{letter-spacing:.04em;text-shadow:0 .3cqw 0 rgba(8,10,28,.9),0 .6cqw 1.6cqw rgba(0,0,0,.65)}
+.sira li{background:linear-gradient(180deg,rgba(38,42,100,.9),rgba(10,12,38,.9));
+  box-shadow:0 .5cqw 1.4cqw rgba(0,0,0,.38),inset 0 0 0 1px rgba(246,236,217,.16),inset 0 1px 0 rgba(255,255,255,.14)}
+.sira li .no{background:rgba(246,236,217,.14);box-shadow:inset 0 0 0 1px rgba(246,236,217,.18)}
+.sira li .jt{text-shadow:0 .2cqw .5cqw rgba(0,0,0,.6)}
+.sira li.bas{background:linear-gradient(180deg,#f2604a,#c12a22);
+  box-shadow:0 .6cqw 2cqw rgba(226,61,47,.5),inset 0 0 0 1.5px rgba(255,209,102,.95),inset 0 -.5cqw .8cqw rgba(110,16,20,.35)}
+.sira li.bas .no{background:radial-gradient(circle at 35% 30%,#fff3cc,#ffd166 55%,#dc9f28);
+  box-shadow:0 0 0 1px rgba(8,10,28,.45)}
+.sira li.bas .ad{text-shadow:0 .2cqw 0 rgba(110,16,20,.6)}
+.sira .bos{background:linear-gradient(180deg,rgba(38,42,100,.9),rgba(10,12,38,.9));box-shadow:inset 0 0 0 1px rgba(246,236,217,.16)}
+.cosku .cubuk{box-sizing:border-box;background:rgba(8,10,28,.74);border:1px solid rgba(255,209,102,.55);
+  box-shadow:inset 0 .4cqw .8cqw rgba(0,0,0,.65),0 .5cqw 1.4cqw rgba(0,0,0,.4)}
+.cosku .dolu{background:linear-gradient(180deg,rgba(255,255,255,.42),rgba(255,255,255,0) 46%,rgba(60,10,20,.22)),
+  linear-gradient(90deg,var(--serin),var(--vurgu) 60%,var(--sicak));box-shadow:0 0 1.8cqw rgba(255,209,102,.6)}
+.cosku .bilgi{text-shadow:0 .2cqw 0 rgba(8,10,28,.85),0 .3cqw 1cqw rgba(0,0,0,.9)}
+.bildirim div{background:linear-gradient(180deg,#fff8e8,#f0e0c2);border-left:.8cqw solid var(--vurgu);
+  box-shadow:0 .6cqw 1.6cqw rgba(0,0,0,.4)}
+.pankart{background:linear-gradient(180deg,#f2604a,#bf2a22);border-block:1.1cqw solid var(--vurgu);
+  border-image:repeating-linear-gradient(90deg,#ffd166 0 2.4cqw,#22b8a7 2.4cqw 3.6cqw,#f6ecd9 3.6cqw 4.8cqw,#8f1f1a 4.8cqw 6cqw) 1;
+  box-shadow:0 1.4cqw 3.4cqw rgba(0,0,0,.5),inset 0 0 5cqw rgba(110,16,20,.45)}
+.pankart .b1{text-shadow:0 .4cqw 0 #8f1f1a,0 .9cqw 1.6cqw rgba(0,0,0,.45)}
+.pankart .b2{text-shadow:0 .25cqw 0 rgba(110,16,20,.7)}
+`;
+const halayStil = document.createElement('style');
+halayStil.textContent = HALAY_STIL;
+document.head.appendChild(halayStil);
 })();
 </script>
 </body>
